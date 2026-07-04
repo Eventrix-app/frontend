@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
+
+    <link rel="stylesheet" href="./global.css" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Nunito Sans:wght@400;500&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@600&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap"
+    />
+  </head>
+  <body>
+    <div
+      class="w-full relative bg-fill-background flex flex-col items-start p-16 box-border gap-16 leading-[normal] tracking-[normal] mq750:gap-8 mq750:pl-8 mq750:pr-8 mq750:box-border mq450:gap-4"
+    >
+      <header class="self-stretch flex items-center justify-end gap-4">
+        <img
+          class="w-[204px] relative max-h-full object-cover"
+          loading="lazy"
+          alt=""
+          src="/public/logo-1@2x.png"
+        />
+
+        <img
+          class="w-[204px] relative max-h-full object-cover"
+          loading="lazy"
+          alt=""
+          src="/public/logo-2@2x.png"
+        />
+      </header>
+      <section
+        class="self-stretch flex flex-col items-start gap-6 text-left text-6xl text-[#161616] font-['Nunito_Sans']"
+      >
+        <h1
+          class="m-0 relative text-[length:inherit] tracking-[-0.02em] leading-[72px] font-medium font-[inherit] mq750:text-5xl mq750:leading-[58px] mq450:text-4xl mq450:leading-[43px]"
+        >
+          Shadows
+        </h1>
+        <h3
+          class="m-0 self-stretch relative text-xl leading-[150%] font-normal font-[inherit] mq450:text-base mq450:leading-6"
+        >
+          This section provides all the shadow options included in your project.
+        </h3>
+      </section>
+      <section
+        class="self-stretch flex items-start justify-center flex-wrap content-start gap-8 text-left text-base text-[#000] font-[Roboto] mq675:gap-4"
+      >
+        <div
+          class="h-40 flex-1 shadow-[0px_1px_2px_rgba(0,_0,_0,_0.05)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            xxsmall
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_1px_3px_rgba(0,_0,_0,_0.1),_0px_1px_2px_rgba(0,_0,_0,_0.06)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            xsmall
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_4px_8px_-2px_rgba(0,_0,_0,_0.1),_0px_2px_4px_-2px_rgba(0,_0,_0,_0.06)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            small
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_12px_16px_-4px_rgba(0,_0,_0,_0.08),_0px_4px_6px_-2px_rgba(0,_0,_0,_0.03)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            medium
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_20px_24px_-4px_rgba(0,_0,_0,_0.08),_0px_8px_8px_-4px_rgba(0,_0,_0,_0.03)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            large
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_24px_48px_-12px_rgba(0,_0,_0,_0.18)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            xlarge
+          </h1>
+        </div>
+        <div
+          class="h-40 flex-1 shadow-[0px_32px_64px_-12px_rgba(0,_0,_0,_0.14)] rounded-lg bg-[#fff] overflow-hidden flex flex-col items-start justify-end py-6 pl-6 pr-5 box-border max-w-[160px]"
+        >
+          <h1
+            class="m-0 relative text-[length:inherit] leading-[150%] font-semibold font-[inherit]"
+          >
+            xxlarge
+          </h1>
+        </div>
+      </section>
+      <div
+        class="self-stretch h-px relative border-[#d9d9d9] border-solid border-t-[1px] box-border"
+      ></div>
+      <section
+        class="self-stretch flex flex-col items-start gap-6 text-left text-6xl text-[#161616] font-['Nunito_Sans']"
+      >
+        <h2
+          class="m-0 relative text-[length:inherit] tracking-[-0.02em] leading-[72px] font-medium font-[inherit] mq750:text-5xl mq750:leading-[58px] mq450:text-4xl mq450:leading-[43px]"
+        >
+          Colour System
+        </h2>
+        <h3
+          class="m-0 self-stretch relative text-xl leading-[150%] font-normal font-[inherit] mq450:text-base mq450:leading-6"
+        >
+          Below is a polished, professional palette; balanced, WCAG-friendly and
+          brandable.
+        </h3>
+      </section>
+      <main
+        class="self-stretch border-[#666] border-solid border-[1px] flex flex-col items-start"
+      >
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-primary-lime1 font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-primary-lime flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Primary Lime</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              CTA buttons, key icons, highlights, progress indicators
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-accent-lime-light flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-accent-lime-light"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Accent Lime - Light</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              hover states, gradients, minimal illustrations, small UI
+              highlights
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-accent-lime-dark flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-accent-lime-dark"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Accent Lime - Dark</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#fff] text-center"
+            >
+              pressed buttons, shadows, borders on coloured surfaces
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-primary-text font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-primary-text flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Primary Text</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Main headings, strong text
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-body-text flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] text-body-text1 mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Body Text</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Paragraphs, details
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-background-light font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-background-light flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Light</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333]"
+            >
+              Section backgrounds, contrast areas
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-background-mid flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-neutral-line"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Mid</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              contrast for sections
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-background-dark flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-background-dark"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Dark</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Footer or hero background (alt)
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-neutral-line font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-neutral-line flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Neutral Line</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333]"
+            >
+              Dividers, subtle outlines
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-neutral-dark-border flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] text-body-text1 mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Neutral Dark Border</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Dividers, subtle outlines
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-sm text-[#333] font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-success-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <button
+              class="cursor-pointer [border:none] py-0.5 px-1.5 bg-[#333] rounded-[1000px] flex items-center justify-center shrink-0 hover:bg-[#595959]"
+            >
+              <div
+                class="relative text-[8px] font-semibold font-[Poppins] text-supporting-colors-success-state text-left"
+              >
+                Success State
+              </div>
+            </button>
+            <div class="relative hidden shrink-0">
+              Section backgrounds, contrast areas
+            </div>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-warning-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-center"
+          >
+            <button
+              class="cursor-pointer [border:none] py-0.5 px-1.5 bg-[#333] rounded-[1000px] flex items-center justify-center hover:bg-[#595959]"
+            >
+              <div
+                class="relative text-[8px] font-semibold font-[Poppins] text-supporting-colors-warning-state text-left"
+              >
+                Warning State
+              </div>
+            </button>
+            <div class="relative hidden">contrast for sections</div>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-error-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <button
+              class="cursor-pointer [border:none] py-0.5 px-1.5 bg-[#333] rounded-[1000px] flex items-center justify-center hover:bg-[#595959]"
+            >
+              <div
+                class="relative text-[8px] font-semibold font-[Poppins] text-supporting-colors-error-state text-left"
+              >
+                Error State
+              </div>
+            </button>
+            <div class="relative hidden">Footer or hero background (alt)</div>
+          </div>
+        </section>
+      </main>
+      <section
+        class="self-stretch border-[#666] border-solid border-[1px] flex flex-col items-start"
+      >
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-primary-lime1 font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-primary-lime flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Primary Lime</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              CTA buttons, key icons, highlights, progress indicators
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-accent-lime-light flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-accent-lime-light"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Accent Lime - Light</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              hover states, gradients, minimal illustrations, small UI
+              highlights
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-accent-lime-dark flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-accent-lime-dark"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Accent Lime - Dark</div>
+            </div>
+            <h2
+              class="m-0 self-stretch relative text-sm font-normal font-[inherit] text-[#fff] text-center"
+            >
+              pressed buttons, shadows, borders on coloured surfaces
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-primary-text font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-primary-text flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Primary Text</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Main headings, strong text
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-body-text flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] text-body-text1 mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Body Text</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Paragraphs, details
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-background-light font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-background-light flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Light</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333]"
+            >
+              Section backgrounds, contrast areas
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-background-mid flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-neutral-line"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Mid</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333] text-center"
+            >
+              contrast for sections
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-background-dark flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-background-dark"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Background Dark</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Footer or hero background (alt)
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-[8px] text-neutral-line font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-neutral-line flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Neutral Line</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#333]"
+            >
+              Dividers, subtle outlines
+            </h2>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-neutral-dark-border flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[426px] text-body-text1 mq675:min-w-full"
+          >
+            <div
+              class="rounded-[1000px] bg-[#fff] flex items-center justify-center py-0.5 px-1.5"
+            >
+              <div class="relative font-semibold">Neutral Dark Border</div>
+            </div>
+            <h2
+              class="m-0 relative text-sm font-normal font-[inherit] text-[#fff]"
+            >
+              Dividers, subtle outlines
+            </h2>
+          </div>
+        </section>
+        <section
+          class="self-stretch flex items-center flex-wrap content-center gap-0.5 text-left text-sm text-[#333] font-[Poppins]"
+        >
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-success-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-[8px] text-supporting-colors-success-state"
+          >
+            <div
+              class="rounded-[1000px] bg-[#333] flex items-center justify-center py-0.5 px-1.5 shrink-0"
+            >
+              <div class="relative font-semibold">Success State</div>
+            </div>
+            <div class="relative text-sm text-[#333] hidden shrink-0">
+              Section backgrounds, contrast areas
+            </div>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-warning-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px] text-center"
+          >
+            <button
+              class="cursor-pointer [border:none] py-0.5 px-1.5 bg-[#333] rounded-[1000px] flex items-center justify-center hover:bg-[#595959]"
+            >
+              <div
+                class="relative text-[8px] font-semibold font-[Poppins] text-supporting-colors-warning-state text-left"
+              >
+                Warning State
+              </div>
+            </button>
+            <div class="relative hidden">contrast for sections</div>
+          </div>
+          <div
+            class="h-[200px] flex-1 bg-supporting-colors-error-state flex flex-col items-center justify-center py-0 px-6 box-border gap-4 min-w-[327px]"
+          >
+            <button
+              class="cursor-pointer [border:none] py-0.5 px-1.5 bg-[#333] rounded-[1000px] flex items-center justify-center hover:bg-[#595959]"
+            >
+              <div
+                class="relative text-[8px] font-semibold font-[Poppins] text-supporting-colors-error-state text-left"
+              >
+                Error State
+              </div>
+            </button>
+            <div class="relative hidden">Footer or hero background (alt)</div>
+          </div>
+        </section>
+      </section>
+      <div
+        class="self-stretch h-px relative border-[#d9d9d9] border-solid border-t-[1px] box-border"
+      ></div>
+    </div>
+  </body>
+</html>
