@@ -5,11 +5,21 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://930e-2401-4900-530c-b3ed-1d55-380f-c04-902b.ngrok-free.app/api/",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://your-production-api.com/api/",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4"
+      },
       "android": {
         "buildType": "app-bundle"
       }

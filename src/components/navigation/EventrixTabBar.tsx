@@ -11,7 +11,6 @@ const TABS: { name: string; label: string; icon: string }[] = [
   { name: 'Shorts', label: 'Shorts', icon: '▶️' },
   { name: 'Bookings', label: 'Bookings', icon: '🎫' },
 ];
-
 export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
   state,
   navigation,

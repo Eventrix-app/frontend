@@ -11,26 +11,25 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
 import { AuthStackParamList } from '../../navigation/types';
 import { AnimatedToggle } from '../../components/AnimatedToggle';
 import { CheckBadge } from '../../components/CheckBadge';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing } from '../../theme';
+import { setNotificationPrefs } from '../../store/slices/onboardingDraftSlice';
+import { AppDispatch, RootState } from '../../store';
 
-type Pref =
-  | 'eventReminders'
-  | 'newEventsNearby'
-  | 'reelsCommunity'
-  | 'specialOffers';
+type Pref = 'eventReminders' | 'nearbyEvents' | 'reelsAndCommunity' | 'specialOffers';
 
 const ITEMS: { key: Pref; label: string }[] = [
   { key: 'eventReminders', label: 'Event reminders' },
-  { key: 'newEventsNearby', label: 'New events near you' },
-  { key: 'reelsCommunity', label: 'Reels & community activity' },
+  { key: 'nearbyEvents', label: 'New events near you' },
+  { key: 'reelsAndCommunity', label: 'Reels & community activity' },
   { key: 'specialOffers', label: 'Special offers & updates' },
 ];
 
-type Props = {
+type ModalProps = {
   visible: boolean;
   onClose: () => void;
   onContinue: (prefs: Record<Pref, boolean>) => void;
@@ -38,17 +37,30 @@ type Props = {
 
 const { height } = Dimensions.get('window');
 
-export const NotificationsModal: React.FC<Props> = ({
-  visible,
-  onClose,
-  onContinue,
-}) => {
+export const NotificationsModal: React.FC<ModalProps> = ({ visible, onClose, onContinue }) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const persistedPrefs = useSelector((state: RootState) => state.onboardingDraft.notificationPrefs);
+
   const [prefs, setPrefs] = useState<Record<Pref, boolean>>({
     eventReminders: true,
-    newEventsNearby: true,
-    reelsCommunity: true,
-    specialOffers: false,
+    nearbyEvents: true,
+    reelsAndCommunity: true,
+    specialOffers: true,
   });
+
+  useEffect(() => {
+    if (persistedPrefs) {
+      setPrefs(persistedPrefs);
+    }
+  }, [persistedPrefs]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      dispatch(setNotificationPrefs(prefs));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [dispatch, prefs]);
 
   const slide = useRef(new Animated.Value(height)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -56,25 +68,12 @@ export const NotificationsModal: React.FC<Props> = ({
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.timing(fade, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slide, {
-          toValue: 0,
-          useNativeDriver: true,
-          speed: 14,
-          bounciness: 6,
-        }),
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(fade, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
+        Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(slide, {
           toValue: height,
           duration: 220,
@@ -85,8 +84,12 @@ export const NotificationsModal: React.FC<Props> = ({
     }
   }, [visible, fade, slide]);
 
-  const toggle = (key: Pref) =>
-    setPrefs((p) => ({ ...p, [key]: !p[key] }));
+  const toggle = (key: Pref) => setPrefs((p) => ({ ...p, [key]: !p[key] }));
+
+  const handleContinue = () => {
+    dispatch(setNotificationPrefs(prefs));
+    onContinue(prefs);
+  };
 
   return (
     <Modal
@@ -101,9 +104,7 @@ export const NotificationsModal: React.FC<Props> = ({
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
-        <Animated.View
-          style={[styles.sheet, { transform: [{ translateY: slide }] }]}
-        >
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
           <View style={styles.handle} />
 
           <Text style={styles.title}>Stay in the loop</Text>
@@ -117,19 +118,13 @@ export const NotificationsModal: React.FC<Props> = ({
             {ITEMS.map((item, i) => (
               <View
                 key={item.key}
-                style={[
-                  styles.row,
-                  i < ITEMS.length - 1 && styles.rowDivider,
-                ]}
+                style={[styles.row, i < ITEMS.length - 1 && styles.rowDivider]}
               >
                 <View style={styles.left}>
                   <CheckBadge checked={prefs[item.key]} />
                   <Text style={styles.rowLabel}>{item.label}</Text>
                 </View>
-                <AnimatedToggle
-                  value={prefs[item.key]}
-                  onChange={() => toggle(item.key)}
-                />
+                <AnimatedToggle value={prefs[item.key]} onChange={() => toggle(item.key)} />
               </View>
             ))}
           </View>
@@ -138,7 +133,7 @@ export const NotificationsModal: React.FC<Props> = ({
             <PrimaryButton
               label="Continue  →"
               variant="solid"
-              onPress={() => onContinue(prefs)}
+              onPress={handleContinue}
               style={styles.continueBtn}
             />
           </View>
@@ -177,7 +172,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: {
-    fontFamily: 'ZalandoSansExpanded-Medium',
     fontWeight: '500',
     fontSize: 20,
     lineHeight: 20,
@@ -185,20 +179,15 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   subtitle: {
-    fontFamily: 'Poppins-Medium',
     fontWeight: '500',
     fontSize: 14,
-    lineHeight: 21, // 150%
+    lineHeight: 21,
     textAlign: 'center',
     color: colors.subtext,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#EDEDF1',
-    marginVertical: spacing.lg,
-  },
+  divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
   list: {},
   row: {
     flexDirection: 'row',
@@ -206,60 +195,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
   },
-  rowDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F5',
-  },
-  left: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: spacing.md,
-  },
-  rowLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.text,
-    flexShrink: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    marginTop: spacing.xl,
-    justifyContent: 'center',
-  },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: '#F2F2F5' },
+  left: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md },
+  rowLabel: { fontSize: 15, fontWeight: '500', color: colors.text, flexShrink: 1 },
+  actions: { flexDirection: 'row', marginTop: spacing.xl, justifyContent: 'center' },
   continueBtn: { minWidth: 220 },
 });
 
-// Screen component for navigation
-type NotificationPreferencesScreenProps = NativeStackScreenProps<
-  AuthStackParamList,
-  'NotificationPreferences'
->;
+// Standalone screen wrapper (used when navigated to directly)
+type ScreenProps = NativeStackScreenProps<AuthStackParamList, 'NotificationPreferences'>;
 
-export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScreenProps> =
-  () => {
-    const navigation = useNavigation();
-    const [visible, setVisible] = useState(true);
+export const NotificationPreferencesScreen: React.FC<ScreenProps> = () => {
+  const navigation = useNavigation();
+  const [visible, setVisible] = useState(true);
 
-    const handleClose = () => {
-      setVisible(false);
-      navigation.goBack();
-    };
-
-    const handleContinue = (prefs: Record<Pref, boolean>) => {
-      setVisible(false);
-      console.log('Notification preferences:', prefs);
-      navigation.navigate('Login' as never);
-    };
-
-    return (
-      <NotificationsModal
-        visible={visible}
-        onClose={handleClose}
-        onContinue={handleContinue}
-      />
-    );
+  const handleClose = () => {
+    setVisible(false);
+    navigation.goBack();
   };
+
+  const handleContinue = () => {
+    setVisible(false);
+    navigation.navigate('Login' as never);
+  };
+
+  return (
+    <NotificationsModal
+      visible={visible}
+      onClose={handleClose}
+      onContinue={handleContinue}
+    />
+  );
+};
 
 export default NotificationPreferencesScreen;

@@ -9,6 +9,9 @@ import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
 import { AuthStackParamList } from '../../navigation/types';
 import { spacing } from '../../theme/spacing';
 import { useRegisterMutation } from '../../store/services/authApi';
+import { useDispatch } from 'react-redux';
+import { AppDispatch, store } from '../../store';
+import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -30,10 +33,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     password === confirm &&
     !isLoading;
 
+  const dispatch = useDispatch<AppDispatch>();
+
   const handleRegister = async () => {
     try {
       setErrorMessage(null);
       await register({ email, password, firstName, lastName }).unwrap();
+      // Fire-and-forget: sync onboarding draft in background, navigate immediately
+      syncOnboardingDraft(dispatch, store.getState);
       navigation.getParent()?.navigate('Main' as never);
     } catch (err: any) {
       console.error('Registration error details:', err);

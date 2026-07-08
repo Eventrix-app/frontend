@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthStackParamList } from './types';
 import SplashScreen from '../Pages/splashscreen/SplashScreen';
 import OnboardingScreen from '../Pages/onboardscreen/OnboardingScreen';
-import RoleSelectionScreen from '../Pages/roleselection/RoleSelectionScreen';
 import InterestSelectionScreen from '../Pages/interestselection/InterestSelectionScreen';
 import LocationAccessScreen from '../Pages/personalization-modules/LocationAccessScreen';
 import NotificationPreferencesScreen from '../Pages//personalization-modules/NotificationPreferencesScreen';
@@ -24,7 +23,6 @@ const AuthNavigator = () => {
     >
       <Stack.Screen name="Splash" component={SplashScreen} options={{ animation: 'none' }} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: 'none' }} />
-      <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ animation: 'none' }} />
       <Stack.Screen name="InterestSelection" component={InterestSelectionScreen} />
       <Stack.Screen name="LocationAccess" component={LocationAccessScreen} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />

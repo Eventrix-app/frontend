@@ -6,7 +6,7 @@ interface User {
   id: string;
   email: string;
   full_name: string;
-  role: string;
+  roles: string[];
 }
 
 interface AuthState {
@@ -42,7 +42,7 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, role: payload.role };
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
         state.token = payload.accessToken;
         state.isAuthenticated = true;
         state.isLoading = false;
@@ -57,7 +57,7 @@ const authSlice = createSlice({
         state.error = error.message ?? 'Login failed';
       })
       .addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
-        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, role: payload.role };
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
         state.token = payload.accessToken;
         state.isAuthenticated = true;
         state.isLoading = false;

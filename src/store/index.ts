@@ -1,29 +1,54 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
+import {
+  persistStore,
+  persistReducer,
+  FLUSH,
+  REHYDRATE,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+} from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Import slices directly
 import authSlice from './slices/authSlice';
 import eventsSlice from './slices/eventsSlice';
 import uiSlice from './slices/uiSlice';
+import onboardingDraftReducer from './slices/onboardingDraftSlice';
 
-// Import API services
 import { eventsApi } from './services/eventsApi';
 import { authApi } from './services/authApi';
+import { userApi } from './services/userApi';
+
+// Persist only the onboarding draft so it survives app kills mid-onboarding
+const onboardingDraftPersistConfig = {
+  key: 'onboardingDraft',
+  storage: AsyncStorage,
+};
+
+const rootReducer = combineReducers({
+  auth: authSlice,
+  events: eventsSlice,
+  ui: uiSlice,
+  onboardingDraft: persistReducer(onboardingDraftPersistConfig, onboardingDraftReducer),
+  [eventsApi.reducerPath]: eventsApi.reducer,
+  [authApi.reducerPath]: authApi.reducer,
+  [userApi.reducerPath]: userApi.reducer,
+});
 
 export const store = configureStore({
-  reducer: {
-    auth: authSlice,
-    events: eventsSlice,
-    ui: uiSlice,
-    [eventsApi.reducerPath]: eventsApi.reducer,
-    [authApi.reducerPath]: authApi.reducer,
-  },
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(
-      eventsApi.middleware,
-      authApi.middleware
-    ),
+    getDefaultMiddleware({
+      serializableCheck: {
+        // redux-persist actions are non-serializable by design
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+      },
+    }).concat(eventsApi.middleware, authApi.middleware, userApi.middleware),
 });
+
+export const persistor = persistStore(store);
 
 setupListeners(store.dispatch);
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,6 +13,9 @@ import { MOCK_EVENTS } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState, store } from '../../store';
+import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 
 const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#888"><path d="M395-435q-35-35-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35q-50 0-85-35Zm85-205Zm-40 520v-123q-104-14-172-93t-68-184h80q0 83 58.5 141.5T480-320q83 0 141.5-58.5T680-520h80q0 105-68 184t-172 93v123h-80Zm68.5-371.5Q520-503 520-520v-240q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v240q0 17 11.5 28.5T480-480q17 0 28.5-11.5Z"/></svg>`;
 
@@ -25,6 +28,22 @@ const CARD_WIDTH = Dimensions.get('window').width * 0.88;
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const dispatch = useDispatch<AppDispatch>();
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        if (isAuthenticated && !isSynced) {
+          syncOnboardingDraft(dispatch, store.getState);
+        }
+      }
+      appState.current = nextState;
+    });
+    return () => subscription.remove();
+  }, [dispatch, isAuthenticated, isSynced]);
   const featured = MOCK_EVENTS.filter((event) => event.featured);
   const recommended = MOCK_EVENTS;
 

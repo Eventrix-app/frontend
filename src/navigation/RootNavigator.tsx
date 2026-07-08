@@ -19,12 +19,17 @@ import NotificationsScreen from '../Pages/main/NotificationsScreen';
 import AdminRedirectScreen from '../Pages/authenticationscreens/AdminRedirectScreen';
 import ErrorNoInternetScreen from '../Pages/screens/ErrorNoInternetScreen';
 import ErrorGenericScreen from '../Pages/screens/ErrorGenericScreen';
+import MyEventsScreen from '../Pages/main/MyEventsScreen';
+import CreateEventScreen from '../Pages/main/CreateEventScreen';
+import CheckInScreen from '../Pages/main/CheckInScreen';
+import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const RootNavigator = () => {
+  useForegroundSyncRetry();
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
-  const isAdmin = isAuthenticated && user?.role?.toLowerCase() === 'admin';
+  const isAdmin = isAuthenticated && (user?.roles ?? []).includes('admin');
 
   return (
     <NavigationContainer>
@@ -47,6 +52,9 @@ const RootNavigator = () => {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="MyEvents" component={MyEventsScreen} />
+        <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+        <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />
       </Stack.Navigator>

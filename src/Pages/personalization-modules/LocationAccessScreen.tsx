@@ -1,167 +1,245 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  Animated,
+  Dimensions,
+  Easing,
+  Modal,
+  Pressable,
   StyleSheet,
-  TouchableOpacity,
+  Text,
+  View,
   Image,
   TextInput,
-  Modal,
-  Dimensions,
-  StatusBar,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NotificationsModal } from './NotificationPreferencesScreen';
+import * as Location from 'expo-location';
+import { useDispatch, useSelector } from 'react-redux';
+import { setLocation, setManualCity } from '../../store/slices/onboardingDraftSlice';
+import { AppDispatch, RootState } from '../../store';
+import { colors, spacing } from '../../theme';
+import { PrimaryButton } from '../../components/PrimaryButton';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 const LocationAccessScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [cityInput, setCityInput] = useState('');
-  const [modalVisible, setModalVisible] = useState(true);
-  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const dispatch = useDispatch<AppDispatch>();
+  const persistedCity = useSelector((state: RootState) => state.onboardingDraft.manualCity) ?? '';
 
-  const handleAllowLocation = () => {
-    setModalVisible(false);
-    // Show notification preferences modal
-    setNotificationModalVisible(true);
+  const [visible, setVisible] = useState(true);
+  const [cityInput, setCityInput] = useState(persistedCity);
+  const [isLocating, setIsLocating] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // ── Animation (identical to NotificationsModal) ──────────────────────────
+  const slide = useRef(new Animated.Value(height)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(slide, {
+          toValue: height,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible, fade, slide]);
+
+  // ── Persist city input to Redux (debounced) ───────────────────────────────
+  useEffect(() => {
+    setCityInput(persistedCity);
+  }, [persistedCity]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = cityInput.trim();
+      dispatch(setManualCity(trimmed.length > 0 ? trimmed : null));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cityInput, dispatch]);
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
+  const proceed = () => {
+    setVisible(false);
+    navigation.navigate('NotificationPreferences' as never);
   };
 
-  const handleNotificationClose = () => {
-    setNotificationModalVisible(false);
-    navigation.navigate('Login' as never);
+  const handleClose = () => {
+    setVisible(false);
+    navigation.goBack();
   };
 
-  const handleNotificationContinue = (prefs: Record<string, boolean>) => {
-    setNotificationModalVisible(false);
-    console.log('Notification preferences:', prefs);
-    navigation.navigate('Login' as never);
+  // ── Location logic (unchanged) ────────────────────────────────────────────
+  const handleAllowLocation = async () => {
+    setIsLocating(true);
+    setLocationError(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Location permission denied. Enter your city below or skip.');
+        setIsLocating(false);
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      dispatch(setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+      proceed();
+    } catch {
+      setLocationError('Could not get location. Enter your city below or skip.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
-  const handleBackdropPress = () => {
-    // Optional: Allow closing modal by tapping backdrop
-    // setModalVisible(false);
+  const handleManualCity = async () => {
+    const city = cityInput.trim();
+    if (!city) { proceed(); return; }
+    setIsGeocoding(true);
+    setLocationError(null);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Eventrix/1.0 (eventrix-app)' } });
+      const data = await res.json();
+      if (data && data.length > 0) {
+        dispatch(setManualCity(city));
+        dispatch(setLocation({ latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) }));
+      } else {
+        dispatch(setManualCity(city));
+      }
+    } catch {
+      dispatch(setManualCity(city));
+    } finally {
+      setIsGeocoding(false);
+      proceed();
+    }
   };
 
   return (
-    <>
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        statusBarTranslucent={true}
-        onRequestClose={handleBackdropPress}
-      >
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-        
-        
-        {/* Blurred Background */}
-        <View style={styles.backdrop}>
-          <View style={styles.blurOverlay} />
-          <TouchableOpacity 
-            style={styles.backdropTouchable}
-            activeOpacity={1}
-            onPress={handleBackdropPress}
-          />
-        </View>
-        
-        {/* Modal Content */}
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.handle} />
-            {/* Title */}
-            <Text style={styles.title}>Enable location access</Text>
-            
-            {/* Subtitle */}
-            <Text style={styles.subtitle}>
-              We use your location to show events happening near you.
-            </Text>
-            
-            {/* Location Image */}
-            <View style={styles.imageContainer}>
-              <Image
-                source={require('../../../assets/location/location.png')}
-                style={styles.locationImage}
-                resizeMode="cover"
-              />
-            </View>
-            
-            {/* Text Input */}
-            <View style={styles.inputContainer}>
-              <Image
-                source={require('../../../assets/location/search.png')}
-                style={styles.searchIcon}
-                resizeMode="contain"
-                tintColor="#9CA3AF"
-              />
-              <TextInput
-                style={styles.cityInput}
-                placeholder="or enter your city manually"
-                placeholderTextColor="#9CA3AF"
-                value={cityInput}
-                onChangeText={setCityInput}
-              />
-            </View>
-            
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.allowButton}
-                onPress={handleAllowLocation}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.allowButtonText}>Allow Location Access</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}
+    >
+      <View style={styles.root}>
+        {/* Dimmed backdrop — tap to go back */}
+        <Animated.View style={[styles.backdrop, { opacity: fade }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
 
-      {/* Notification Preferences Modal */}
-      <NotificationsModal
-        visible={notificationModalVisible}
-        onClose={handleNotificationClose}
-        onContinue={handleNotificationContinue}
-      />
-    </>
+        {/* Bottom sheet */}
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: slide }] }]}>
+          <View style={styles.handle} />
+
+          <Text style={styles.title}>Enable location access</Text>
+          <Text style={styles.subtitle}>
+            We use your location to show events happening near you.
+          </Text>
+
+          <View style={styles.divider} />
+
+          {/* Map image */}
+          <View style={styles.imageContainer}>
+            <Image
+              source={require('../../../assets/location/location.png')}
+              style={styles.locationImage}
+              resizeMode="cover"
+            />
+          </View>
+
+          {locationError ? (
+            <Text style={styles.errorText}>{locationError}</Text>
+          ) : null}
+
+          {/* Manual city input */}
+          <View style={styles.inputContainer}>
+            <Image
+              source={require('../../../assets/location/search.png')}
+              style={styles.searchIcon}
+              resizeMode="contain"
+              tintColor="#9CA3AF"
+            />
+            <TextInput
+              style={styles.cityInput}
+              placeholder="or enter your city manually"
+              placeholderTextColor="#9CA3AF"
+              value={cityInput}
+              onChangeText={setCityInput}
+              editable={!isLocating && !isGeocoding}
+            />
+          </View>
+
+          {/* Primary action */}
+          <View style={styles.actions}>
+            <PrimaryButton
+              label={isLocating ? '  Locating…  ' : 'Allow Location Access'}
+              variant="solid"
+              onPress={handleAllowLocation}
+              style={[styles.primaryBtn, (isLocating || isGeocoding) && styles.btnDisabled]}
+            />
+          </View>
+
+          {/* Secondary row */}
+          <View style={styles.secondaryRow}>
+            <TouchableOpacity
+              onPress={handleManualCity}
+              disabled={isLocating || isGeocoding}
+              activeOpacity={0.7}
+            >
+              {isGeocoding ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Text style={styles.manualCityText}>
+                  {cityInput.trim() ? 'Continue with city name' : 'Skip'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {cityInput.trim() ? (
+              <TouchableOpacity onPress={proceed} activeOpacity={0.7}>
+                <Text style={styles.skipText}>Skip</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  // ── Shell (mirrors NotificationsModal exactly) ──────────────────────────
+  root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20,20,30,0.45)',
   },
-  blurOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  backdropTouchable: {
-    flex: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: 0,
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 30,
-    width: screenWidth,
-    alignItems: 'center',
-    boxShadow: '0 -10px 20px rgba(0, 0, 0, 0.25)',
-    paddingBottom: 50,
+  sheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 24,
   },
   handle: {
     alignSelf: 'center',
@@ -169,35 +247,42 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 3,
     backgroundColor: '#D8D8DE',
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '500',
+    fontSize: 20,
+    lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 12,
-    fontFamily: 'Zalando Sans Expanded',
+    color: colors.text,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    color: colors.subtext,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
+  divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
+
+  // ── Content ──────────────────────────────────────────────────────────────
   imageContainer: {
-    width: 330,
-    height: 180,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 24,
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-  },
-  locationImage: {
     width: '100%',
-    height: '100%',
+    height: 150,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+  },
+  locationImage: { width: '100%', height: '100%' },
+  errorText: {
+    fontSize: 13,
+    color: '#D32F2F',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -206,41 +291,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    marginBottom: 32,
-    width: '100%',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
-  searchIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
-  },
-  cityInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    paddingVertical: 14,
-  },
-  buttonContainer: {
+  searchIcon: { width: 18, height: 18, marginRight: 10 },
+  cityInput: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: 12 },
+  actions: { flexDirection: 'row', justifyContent: 'center', marginBottom: spacing.md },
+  primaryBtn: { minWidth: 220 },
+  btnDisabled: { opacity: 0.6 },
+  secondaryRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    width: '100%',
-  },
-  allowButton: {
-    minWidth: 220,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    backgroundColor: '#FF3366',
-    borderWidth: 1,
-    borderColor: '#FF3366',
+    gap: spacing.lg,
     alignItems: 'center',
   },
-  allowButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  manualCityText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
+  skipText: { fontSize: 14, color: colors.subtext },
 });
 
 export default LocationAccessScreen;

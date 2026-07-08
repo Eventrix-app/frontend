@@ -160,7 +160,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
         useNativeDriver: true,
       }),
     ]).start(() => {
-      navigation.replace('RoleSelection');
+      navigation.replace('InterestSelection');
       mountTranslateY.setValue(0);
       mountOpacity.setValue(1);
     });
