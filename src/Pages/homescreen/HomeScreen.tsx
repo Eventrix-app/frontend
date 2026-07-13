@@ -1,14 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
-import { CategoryScroller } from '../../components/events/CategoryScroller';
-import { MainEventCard } from '../../components/events/MainEventCard';
+import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
+import { EventInterestCard } from '../../components/events/EventInterestCard';
+import { EventHighlightCard, HighlightItem } from '../../components/events/EventHighlightCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
+import HalfScreenModal from '../../components/common/halfscreenmodal';
+import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { MOCK_EVENTS } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -23,7 +26,19 @@ const notificationSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" v
 
 const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M480-80q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm0-420ZM160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v13q-11 22-16 45t-4 47q-10-2-19.5-3.5T480-720q-66 0-113 47t-47 113v280h320v-257q18 8 38.5 12.5T720-520v240h80v80H160Zm475-435q-35-35-35-85t35-85q35-35 85-35t85 35q35 35 35 85t-35 85q-35 35-85 35t-85-35Z"/></svg>`;
 
-const CARD_WIDTH = Dimensions.get('window').width * 0.88;
+// TODO: source from user profile / auth state instead of hardcoding
+const CURRENT_USER = {
+  name: 'Mubeen',
+  address: 'Sr. No. 1/2/3, Street Name, Residence, State...',
+  avatar: require('../../../assets/profile/avatar-placeholder.png'),
+};
+
+// TODO: pull from a real "shorts"/highlights endpoint once available
+const HIGHLIGHTS: HighlightItem[] = [
+  { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
+  { id: 'h2', thumbnail: require('../../../assets/highlights/h2.jpg'), title: 'Event highlight title...', views: '9k views', postedAgo: '2h ago' },
+  { id: 'h3', thumbnail: require('../../../assets/highlights/h3.jpg'), title: 'Event highlight title...', views: '3k views', postedAgo: '1d ago' },
+];
 
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -32,6 +47,7 @@ const HomeScreen: React.FC = () => {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
+  const [showInterestSheet, setShowInterestSheet] = useState(false);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -44,6 +60,7 @@ const HomeScreen: React.FC = () => {
     });
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
+
   const featured = MOCK_EVENTS.filter((event) => event.featured);
   const recommended = MOCK_EVENTS;
 
@@ -54,56 +71,63 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('EventDetails', { eventId });
   };
 
+  const openCategory = (categoryKey: string) => {
+    navigation.navigate('Search', { category: categoryKey } as never);
+  };
+
+  // "View All Events" (bottom of the events sections) goes to the full Explore screen.
+  const openExplore = () => {
+    navigation.navigate('Explore' as never);
+  };
+
+  // "View All" on categories opens the half-screen interest-selection popup.
+  const openInterestSheet = () => setShowInterestSheet(true);
+  const closeInterestSheet = () => setShowInterestSheet(false);
+
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={[colors.brandPink, '#ff6b8a']}
+        colors={[colors.brandPink, '#F43362']}
         style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
       >
-        {/* Row 1: greeting + address + avatar */}
+        {/* Row 1: greeting + address on the left, avatar on the right */}
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>E</Text>
-            </View>
-            <View style={{ marginLeft: spacing.sm }}>
-              <Text style={styles.greeting}>Welcome, Explorer 👋</Text>
-              <Text style={styles.location}>📍 Mumbai, India</Text>
-            </View>
+          <View style={styles.greetingCol}>
+            <Text style={styles.greeting}>Welcome, {CURRENT_USER.name} 👋</Text>
+            <Text style={styles.location} numberOfLines={1}>
+              📍 {CURRENT_USER.address}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Image source={CURRENT_USER.avatar} style={styles.avatarImg} />
           </TouchableOpacity>
         </View>
 
         {/* Row 2: search bar + notification bell */}
         <View style={styles.searchRow}>
-          {/* Search pill */}
           <TouchableOpacity
             style={styles.search}
             activeOpacity={0.95}
             onPress={() => navigation.navigate('Search')}
           >
-            {/* Search icon (left) */}
             <Image
               source={require('../../../assets/location/search.png')}
               style={styles.searchImg}
               resizeMode="contain"
             />
-            {/* Text input */}
             <TextInput
               style={styles.searchInput}
-              placeholder="Search events, shorts"
+              placeholder="Search 'events'"
               placeholderTextColor="#aaa"
               editable={false}
               pointerEvents="none"
             />
-            {/* Vertical divider */}
             <View style={styles.divider} />
-            {/* Mic icon */}
             <TouchableOpacity style={styles.micBtn}>
               <SvgXml xml={micSvg} width={22} height={22} />
             </TouchableOpacity>
           </TouchableOpacity>
 
-          {/* Notification bell (outside pill) */}
           <TouchableOpacity
             style={styles.bell}
             onPress={() => navigation.navigate('Notifications')}
@@ -116,12 +140,11 @@ const HomeScreen: React.FC = () => {
             {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
-      </LinearGradient>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {featured.length > 0 ? (
-          <>
-            <SectionHeader title="Featured Events" />
+        {/* Featured section lives inside the pink gradient */}
+        {featured.length > 0 && (
+          <View style={styles.featuredWrap}>
+            <SectionHeader title="Featured Near You" light />
             <FeaturedCarousel
               events={featured.map((event) => ({
                 id: event.id,
@@ -134,53 +157,62 @@ const HomeScreen: React.FC = () => {
               }))}
               onEventPress={(eventId) => openEvent(eventId)}
             />
-          </>
-        ) : null}
+          </View>
+        )}
+      </LinearGradient>
 
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <SectionHeader title="Browse by Category" />
-        <CategoryScroller />
-
-        <SectionHeader title="Based on interest" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {recommended.slice(0, 3).map((event) => (
-            <View key={event.id} style={{ marginRight: spacing.md }}>
-              <MainEventCard
-                event={event}
-                width={CARD_WIDTH * 0.92}
-                onPress={() => openEvent(event.id)}
-              />
-            </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {CATEGORIES.map((category) => (
+            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
           ))}
+          <ViewAllCategoryIconCard onPress={openInterestSheet} />
         </ScrollView>
+
+        <SectionHeader title="Based on Interest" />
+        {recommended.slice(0, 1).map((event) => (
+          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
+        ))}
 
         <SectionHeader title="Event Highlights" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {['🎬', '🎤', '🎪'].map((emoji, index) => (
-            <TouchableOpacity
-              key={emoji}
-              style={styles.shortThumb}
+          {HIGHLIGHTS.map((item) => (
+            <EventHighlightCard
+              key={item.id}
+              item={item}
               onPress={() =>
                 (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
                   'Main',
                   { screen: 'Shorts' },
                 )
               }
-            >
-              <Text style={styles.shortEmoji}>{emoji}</Text>
-              <Text style={styles.shortLabel}>Highlight {index + 1}</Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
 
-        <SectionHeader title="You might also Like" />
+        <SectionHeader title="You Might Also Like" />
         {recommended.map((event) => (
-          <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
+          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
         ))}
+
+        <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
+          <Text style={styles.viewAllText}>View All Events</Text>
+          <Text style={styles.viewAllArrow}>→</Text>
+        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
       </ScrollView>
+
+      <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
+    <InterestSelectionScreen
+    mode="sheet"
+    onComplete={closeInterestSheet}
+    onDismiss={closeInterestSheet}
+  />
+</HalfScreenModal>
     </View>
   );
 };
@@ -199,28 +231,20 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  greetingCol: {
     flex: 1,
+    marginRight: spacing.sm,
   },
-  avatar: {
+  avatarImg: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.3)',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: '700',
   },
   greeting: {
     color: colors.white,
@@ -229,7 +253,7 @@ const styles = StyleSheet.create({
   },
   location: {
     color: 'rgba(255,255,255,0.88)',
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 2,
   },
   searchRow: {
@@ -292,34 +316,17 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.brandPink,
   },
+  featuredWrap: {
+    marginTop: spacing.lg,
+  },
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
-  shortThumb: {
-    width: 146,
-    height: 240,
-    borderRadius: 16,
-    backgroundColor: colors.backgroundSecondary,
-    marginRight: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    padding: spacing.md,
-    overflow: 'hidden',
-  },
-  shortEmoji: {
-    fontSize: 48,
-    position: 'absolute',
-    top: '30%',
-  },
-  shortLabel: {
-    color: colors.white,
-    fontWeight: '600',
-    fontSize: 13,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 8,
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingBottom: spacing.sm,
   },
   footer: {
     alignItems: 'center',
@@ -328,6 +335,27 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: colors.brandPink,
+    borderRadius: 14,
+    paddingVertical: spacing.sm + 2,
+    marginTop: spacing.sm,
+  },
+  viewAllText: {
+    color: colors.brandPink,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  viewAllArrow: {
+    color: colors.brandPink,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
 

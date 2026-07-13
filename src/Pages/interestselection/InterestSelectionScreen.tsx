@@ -20,7 +20,17 @@ const MIN_SELECTIONS = 3;
 
 const buildSkeletonIds = () => ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
-const InterestSelectionScreen: React.FC = () => {
+type InterestSelectionScreenProps = {
+  mode?: 'onboarding' | 'sheet';
+  onComplete?: () => void;
+  onDismiss?: () => void;
+};
+
+const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
+  mode = 'onboarding',
+  onComplete,
+  onDismiss,
+}) => {
   const navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
   const persistedSelections = useSelector((state: RootState) => state.onboardingDraft.categoryIds);
@@ -37,6 +47,10 @@ const InterestSelectionScreen: React.FC = () => {
   const handleContinue = () => {
     if (selectedIds.length < MIN_SELECTIONS) return;
     dispatch(setInterests(selectedIds));
+    if (mode === 'sheet') {
+      onComplete?.();
+      return;
+    }
     navigation.navigate('LocationAccess' as never);
   };
 
@@ -111,7 +125,13 @@ const InterestSelectionScreen: React.FC = () => {
 
         <View style={styles.bottomActions}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (mode === 'sheet') {
+                onDismiss?.();
+                return;
+              }
+              navigation.goBack();
+            }}
             style={styles.backButton}
             activeOpacity={0.7}
           >

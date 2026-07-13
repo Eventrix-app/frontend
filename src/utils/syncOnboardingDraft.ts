@@ -4,14 +4,18 @@ import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
 
 /**
  * Syncs the locally-cached onboarding draft to the backend after auth.
- * Uses Promise.allSettled so one failure doesn't block the others.
- * Safe to call even if draft is empty — null-checks skip each call.
- * Do NOT await before navigating; fire and forget.
+ *
+ * TODO: backend /api/users/me/* routes not implemented yet.
+ * Temporarily disabled to stop console spam / retry loop.
+ * Re-enable by uncommenting the block below once the backend routes exist.
  */
 export async function syncOnboardingDraft(
   dispatch: AppDispatch,
   getState: () => RootState,
 ): Promise<void> {
+  return;
+
+  /*
   const draft = getState().onboardingDraft;
 
   if (draft.isSynced) return;
@@ -63,4 +67,5 @@ export async function syncOnboardingDraft(
       results.filter((r) => r.status === 'rejected'),
     );
   }
+  */
 }

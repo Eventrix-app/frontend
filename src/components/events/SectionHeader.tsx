@@ -5,12 +5,13 @@ import { spacing } from '../../theme/spacing';
 
 type SectionHeaderProps = {
   title: string;
+  light?: boolean;
 };
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => (
+export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light }) => (
   <View style={styles.row}>
-    <Text style={styles.title}>{title}</Text>
-    <View style={styles.line} />
+    <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
+    <View style={[styles.line, light && styles.lineLight]} />
   </View>
 );
 
@@ -22,13 +23,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   line: {
     flex: 1,
     height: 1,
     backgroundColor: colors.borderLight,
+  },
+  titleLight: {
+    color: 'rgba(255,255,255,0.95)',
+  },
+  lineLight: {
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
 });

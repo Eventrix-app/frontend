@@ -1,180 +1,282 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
-import { Text, Card } from '../common';
-import theme from '../../theme';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  ImageBackground,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
-const { width } = Dimensions.get('window');
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = SCREEN_WIDTH - spacing.md * 2;
+const CARD_HEIGHT = Math.round(CARD_WIDTH * 0.55);
+const CARD_SPACING = spacing.md;
+const SLOT_WIDTH = CARD_WIDTH + CARD_SPACING;
+const LOOP_MULTIPLIER = 50;
+const AUTO_SCROLL_INTERVAL = 3500;
 
-interface FeaturedEvent {
+export interface FeaturedEvent {
   id: string;
   title: string;
   date: string;
   location: string;
-  price: string;
-  image: string;
+  price: number | string;
+  image: any;
   featured?: boolean;
 }
 
-interface FeaturedCarouselProps {
+interface Props {
   events: FeaturedEvent[];
   onEventPress: (eventId: string) => void;
 }
 
-const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ events, onEventPress }) => {
-  const scrollRef = useRef<ScrollView>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+const resolveImageSource = (image: unknown) => {
+  if (!image) return undefined;
+  if (typeof image === 'string') return { uri: image };
+  return image as any;
+};
 
-  const handleScroll = (event: any) => {
-    const contentOffset = event.nativeEvent.contentOffset.x;
-    const index = Math.round(contentOffset / (width - theme.spacing.xl * 2));
-    setActiveIndex(index);
+const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const currentRawIndex = useRef(0);
+  const isUserInteracting = useRef(false);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loopedEvents = useMemo(() => {
+    if (events.length === 0) return [];
+    return Array.from({ length: events.length * LOOP_MULTIPLIER }, (_, i) => ({
+      ...events[i % events.length],
+      __loopKey: `${events[i % events.length].id}-${i}`,
+    }));
+  }, [events]);
+
+  const initialIndex = useMemo(
+    () => (events.length > 0 ? Math.floor(loopedEvents.length / 2 / events.length) * events.length : 0),
+    [loopedEvents, events],
+  );
+
+  useEffect(() => {
+    currentRawIndex.current = initialIndex;
+    if (events.length > 1) {
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+      });
+    }
+  }, [initialIndex, events.length]);
+
+  // Single source of truth for the active dot: derive it from actual scroll
+  // position rather than viewability events, which don't reliably fire for
+  // programmatic animated scrollToIndex calls.
+  const updateActiveIndexFromOffset = useCallback(
+    (offsetX: number) => {
+      if (events.length === 0) return;
+      const rawIndex = Math.round(offsetX / SLOT_WIDTH);
+      currentRawIndex.current = rawIndex;
+      const normalized = ((rawIndex % events.length) + events.length) % events.length;
+      setActiveIndex(normalized);
+    },
+    [events.length],
+  );
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    updateActiveIndexFromOffset(e.nativeEvent.contentOffset.x);
   };
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {events.map((event) => (
-          <TouchableOpacity key={event.id} style={styles.slide} activeOpacity={0.85} onPress={() => onEventPress(event.id)}>
-            <Card style={styles.eventCard} shadow>
-              <View style={styles.eventImage}>
-                <Text style={styles.eventEmoji}>{event.image}</Text>
-                {event.featured && (
-                  <View style={styles.featuredBadge}>
-                    <Text variant="caption" color="textInverse" style={styles.featuredText}>
-                      ⭐ Featured
-                    </Text>
+  const startAutoScroll = useCallback(() => {
+    if (events.length <= 1) return;
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    autoScrollTimer.current = setInterval(() => {
+      if (isUserInteracting.current) return;
+      currentRawIndex.current += 1;
+      flatListRef.current?.scrollToIndex({ index: currentRawIndex.current, animated: true });
+      // scrollToIndex's own momentum-end will also fire and correct this,
+      // but setting it immediately keeps the dot in sync with the animation.
+      updateActiveIndexFromOffset(currentRawIndex.current * SLOT_WIDTH);
+    }, AUTO_SCROLL_INTERVAL);
+  }, [events.length, updateActiveIndexFromOffset]);
+
+  useEffect(() => {
+    startAutoScroll();
+    return () => {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    };
+  }, [startAutoScroll]);
+
+  const handleTouchStart = () => {
+    isUserInteracting.current = true;
+  };
+
+  const handleTouchEnd = () => {
+    setTimeout(() => {
+      isUserInteracting.current = false;
+    }, 800);
+  };
+
+  const renderItem = useCallback(
+    ({ item: event }: { item: FeaturedEvent }) => {
+      const imageSource = resolveImageSource(event.image);
+      return (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.card}
+          onPress={() => onEventPress(event.id)}
+        >
+          <ImageBackground
+            source={imageSource}
+            style={[styles.image, !imageSource && styles.imageFallback]}
+            imageStyle={styles.imageRadius}
+          >
+            <View style={styles.priceTag}>
+              <Text style={styles.priceText}>🎟 {event.price}</Text>
+            </View>
+
+            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gradient}>
+              <View style={styles.bottomRow}>
+                <View style={styles.textCol}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {event.title}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.meta}>📅 {event.date}</Text>
+                    <Text style={styles.meta}>📍 {event.location}</Text>
+                  </View>
+                </View>
+
+                {events.length > 1 && (
+                  <View style={styles.dots}>
+                    {events.map((_, i) => (
+                      <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                    ))}
                   </View>
                 )}
               </View>
-              <View style={styles.eventInfo}>
-                <Text variant="h3" style={styles.eventTitle} numberOfLines={2}>
-                  {event.title}
-                </Text>
-                <View style={styles.eventMeta}>
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>📅</Text>
-                    <Text variant="caption" color="textSecondary">
-                      {event.date}
-                    </Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>📍</Text>
-                    <Text variant="caption" color="textSecondary">
-                      {event.location}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.eventFooter}>
-                  <Text variant="label" color="primary" style={styles.eventPrice}>
-                    {event.price}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </LinearGradient>
+          </ImageBackground>
+        </TouchableOpacity>
+      );
+    },
+    [onEventPress, events.length, activeIndex],
+  );
 
-      {/* Pagination Dots */}
-      <View style={styles.pagination}>
-        {events.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              index === activeIndex && styles.activeDot,
-            ]}
-          />
-        ))}
-      </View>
-    </View>
+  if (events.length === 0) return null;
+
+  return (
+    <FlatList
+      ref={flatListRef}
+      data={loopedEvents}
+      keyExtractor={(item: any) => item.__loopKey}
+      renderItem={renderItem}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={SLOT_WIDTH}
+      decelerationRate="fast"
+      onMomentumScrollEnd={handleMomentumScrollEnd}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onScrollToIndexFailed={(info) => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToOffset({
+            offset: info.index * SLOT_WIDTH,
+            animated: false,
+          });
+        }, 50);
+      }}
+      getItemLayout={(_, index) => ({
+        length: SLOT_WIDTH,
+        offset: SLOT_WIDTH * index,
+        index,
+      })}
+      initialScrollIndex={initialIndex}
+      extraData={activeIndex}
+    />
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: theme.spacing.lg,
-  },
-  scrollContent: {
-    paddingHorizontal: theme.spacing.lg,
-  },
-  slide: {
-    width: width - theme.spacing.xl * 2,
-    marginRight: theme.spacing.lg,
-  },
-  eventCard: {
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    marginRight: CARD_SPACING,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  eventImage: {
-    height: 180,
-    backgroundColor: theme.colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+  image: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  eventEmoji: {
-    fontSize: 64,
+  imageFallback: {
+    backgroundColor: colors.subtext ?? '#999',
   },
-  featuredBadge: {
+  imageRadius: {
+    borderRadius: 20,
+  },
+  priceTag: {
     position: 'absolute',
-    top: theme.spacing.md,
-    left: theme.spacing.md,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-  featuredText: {
-    fontWeight: '600',
-  },
-  eventInfo: {
-    padding: theme.spacing.lg,
-  },
-  eventTitle: {
-    marginBottom: theme.spacing.md,
-  },
-  eventMeta: {
-    marginBottom: theme.spacing.md,
-  },
-  metaItem: {
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.xs,
+    gap: 4,
   },
-  metaIcon: {
-    fontSize: 16,
-    marginRight: theme.spacing.sm,
+  priceText: {
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 12,
   },
-  eventFooter: {
+  gradient: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.xl,
+  },
+  bottomRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  eventPrice: {
-    fontWeight: '600',
+  textCol: {
+    flex: 1,
   },
-  pagination: {
+  title: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  metaRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: theme.spacing.md,
+    gap: spacing.md,
+  },
+  meta: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+  },
+  dots: {
+    flexDirection: 'row',
+    gap: 6,
+    marginLeft: spacing.sm,
+    marginBottom: 4,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.border,
-    marginHorizontal: theme.spacing.xs,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
-  activeDot: {
-    backgroundColor: theme.colors.primary,
-    width: 24,
+  dotActive: {
+    width: 16,
+    backgroundColor: colors.white,
   },
 });
 
