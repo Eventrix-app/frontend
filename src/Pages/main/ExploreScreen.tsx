@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
-import { MOCK_EVENTS } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { toCardEvent } from '../../utils/eventCardAdapter';
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'All', icon: '✨' },
@@ -22,6 +23,8 @@ const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [filter, setFilter] = useState('all');
+  const { data: events = [], isLoading, isError, refetch } = useGetEventsQuery({});
+  const cardEvents = events.map(toCardEvent);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -45,6 +48,7 @@ const ExploreScreen: React.FC = () => {
       {/* Inline filter pills — no external component dependency */}
       <ScrollView
         horizontal
+        style={styles.pillsRowScroll}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.pillsRow}
       >
@@ -67,9 +71,24 @@ const ExploreScreen: React.FC = () => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <SectionHeader title="All Events" />
-        {MOCK_EVENTS.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
-        ))}
+        {isLoading ? (
+          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        ) : isError ? (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>Couldn't load events.</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : cardEvents.length === 0 ? (
+          <View style={styles.stateBox}>
+            <Text style={styles.stateText}>No events yet — check back soon.</Text>
+          </View>
+        ) : (
+          cardEvents.map((event) => (
+            <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
+          ))
+        )}
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
@@ -117,10 +136,15 @@ const styles = StyleSheet.create({
   filterIcon: {
     fontSize: 16,
   },
-   pillsRow: {
+   pillsRowScroll: {
+    maxHeight: 52,
+    flexGrow: 0,
+  },
+  pillsRow: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
     gap: spacing.sm,
+    alignItems: 'center',
   },
   pill: {
     flexDirection: 'row',
@@ -170,6 +194,28 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  loader: {
+    marginTop: spacing.xxl,
+  },
+  stateBox: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.sm,
+  },
+  stateText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  retryBtn: {
+    backgroundColor: colors.brandPink,
+    borderRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryText: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

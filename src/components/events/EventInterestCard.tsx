@@ -24,6 +24,14 @@ interface Props {
   onPress: () => void;
 }
 
+// event.image may be a require()'d local asset (number) or a real backend URL (string) —
+// <Image source> needs a {uri} wrapper for the latter, a bare string isn't a valid source.
+const resolveImageSource = (image: unknown) => {
+  if (!image) return undefined;
+  if (typeof image === 'string') return { uri: image };
+  return image as any;
+};
+
 export const EventInterestCard: React.FC<Props> = ({ event, width, onPress }) => {
   return (
     <TouchableOpacity
@@ -32,7 +40,7 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress }) =>
       onPress={onPress}
     >
       <View style={styles.imageWrap}>
-        <Image source={event.image} style={styles.image} resizeMode="cover" />
+        <Image source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />
 
         <View style={styles.topLeftBadge}>
           <Text style={styles.topLeftBadgeText}>

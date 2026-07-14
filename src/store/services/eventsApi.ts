@@ -33,6 +33,10 @@ export interface BackendEvent {
   status: string;
   createdAt: string;
   updatedAt: string;
+  // Eager-loaded by the backend on both GET /events and GET /events/:id
+  // (events.service.ts findAllFiltered/findOne relations: ['organizer', 'organizer.user', 'category']).
+  category?: { id: string; name: string; emoji?: string; colorHex?: string };
+  organizer?: { id: string; userId: string; companyName: string; companyLogoUrl?: string; user?: { id: string; fullName: string } };
 }
 
 export interface CreateEventPayload {
@@ -62,23 +66,39 @@ export interface EnrollmentRecord {
   quantity: number;
   totalAmount: number;
   status: string;
+  paymentStatus?: string;
   bookingReference: string;
   ticketCode?: string;
   checkedInAt?: string;
   bookingDate?: string;
   user?: { id: string; email: string; fullName: string };
+  // Eager-loaded on GET /events/my-enrollments (relations: ['event', 'ticketType']).
+  event?: BackendEvent;
+  ticketType?: { id: string; name: string; price: number };
 }
 
 export interface UploadUrlResponse {
-  signedUrl: string;
-  path: string;
-  token: string;
+  uploadUrl: string;
+  publicUrl: string;
 }
+
+export type UploadPurpose = 'profile-picture' | 'event-image' | 'event-cover' | 'company-logo';
+export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp';
+export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp'];
 
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments'],
+  // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
+  // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
+  // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
+  // (window/tab regains focus, via the setupListeners() call in store/index.ts) is the
+  // one that actually fires when just switching back to a tab in a browser session.
+  // refetchOnMountOrArgChange covers the case where the screen genuinely does remount
+  // (e.g. after an app reload) with cached data older than 10s.
+  refetchOnMountOrArgChange: 10,
+  refetchOnFocus: true,
   endpoints: (builder) => ({
     getEvents: builder.query<BackendEvent[], { categoryId?: string; isOnline?: boolean; page?: number; limit?: number }>({
       query: (filters) => {
@@ -89,6 +109,8 @@ export const eventsApi = createApi({
         if (filters.limit) params.append('limit', String(filters.limit));
         return `events?${params.toString()}`;
       },
+      // GET /events returns a paginated wrapper ({events, total, page, totalPages}), not a bare array.
+      transformResponse: (response: { events: BackendEvent[] }) => response.events,
       providesTags: ['Event'],
     }),
     getEventById: builder.query<BackendEvent, string>({
@@ -127,17 +149,21 @@ export const eventsApi = createApi({
         url: `events/${eventId}/enroll`,
         method: 'POST',
       }),
-      invalidatesTags: ['Event'],
+      invalidatesTags: ['Event', 'MyEnrollments'],
     }),
-    getUploadUrl: builder.mutation<UploadUrlResponse, string>({
-      query: (fileName) => ({
-        url: 'events/upload-url',
+    getUploadUrl: builder.mutation<UploadUrlResponse, { purpose: UploadPurpose; contentType: UploadContentType }>({
+      query: (body) => ({
+        url: 'uploads/signed-url',
         method: 'POST',
-        body: { fileName },
+        body,
       }),
     }),
     getEventEnrollments: builder.query<EnrollmentRecord[], string>({
       query: (eventId) => `events/${eventId}/enrollments`,
+    }),
+    getMyEnrollments: builder.query<EnrollmentRecord[], void>({
+      query: () => 'events/my-enrollments',
+      providesTags: ['MyEnrollments'],
     }),
     checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string }>({
       query: (body) => ({
@@ -145,6 +171,7 @@ export const eventsApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['MyEnrollments'],
     }),
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
       query: (enrollmentId) => `events/enrollments/${enrollmentId}`,
@@ -162,6 +189,7 @@ export const {
   useEnrollEventMutation,
   useGetUploadUrlMutation,
   useGetEventEnrollmentsQuery,
+  useGetMyEnrollmentsQuery,
   useCheckInMutation,
   useGetEnrollmentByIdQuery,
 } = eventsApi;

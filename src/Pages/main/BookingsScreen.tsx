@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MOCK_BOOKINGS, MockBooking } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { EnrollmentRecord, useGetMyEnrollmentsQuery } from '../../store/services/eventsApi';
+import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 
 type TabId = 'upcoming' | 'previous' | 'cancelled';
 
@@ -19,29 +20,36 @@ const TABS: { id: TabId; label: string }[] = [
 
 const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
   confirmed: { bg: '#D1FAE5', text: '#065F46', label: 'Confirmed' },
-  upcoming: { bg: '#FEF3C7', text: '#92400E', label: 'Upcoming' },
+  pending: { bg: '#FEF3C7', text: '#92400E', label: 'Pending Payment' },
   completed: { bg: '#E0E7FF', text: '#3730A3', label: 'Completed' },
   cancelled: { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled' },
+  refunded: { bg: '#E0E7FF', text: '#3730A3', label: 'Refunded' },
 };
 
-const filterBookings = (tab: TabId): MockBooking[] => {
-  switch (tab) {
-    case 'upcoming':
-      return MOCK_BOOKINGS.filter((b) => b.status === 'upcoming' || b.status === 'confirmed');
-    case 'previous':
-      return MOCK_BOOKINGS.filter((b) => b.status === 'completed');
-    case 'cancelled':
-      return MOCK_BOOKINGS.filter((b) => b.status === 'cancelled');
-    default:
-      return MOCK_BOOKINGS;
-  }
-};
+function bucketFor(enrollment: EnrollmentRecord): TabId {
+  if (enrollment.status === 'cancelled' || enrollment.status === 'refunded') return 'cancelled';
+  const eventDate = enrollment.event?.eventDate ? new Date(enrollment.event.eventDate) : null;
+  if (eventDate && eventDate.getTime() < Date.now()) return 'previous';
+  return 'upcoming';
+}
+
+function statusKeyFor(enrollment: EnrollmentRecord): string {
+  if (enrollment.status === 'refunded') return 'refunded';
+  if (enrollment.status === 'cancelled') return 'cancelled';
+  if (enrollment.paymentStatus && enrollment.paymentStatus !== 'paid') return 'pending';
+  return bucketFor(enrollment) === 'previous' ? 'completed' : 'confirmed';
+}
 
 const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<TabId>('upcoming');
-  const bookings = useMemo(() => filterBookings(activeTab), [activeTab]);
+  const { data: enrollments = [], isLoading, isError, refetch } = useGetMyEnrollmentsQuery();
+
+  const bookings = useMemo(
+    () => enrollments.filter((e) => bucketFor(e) === activeTab),
+    [enrollments, activeTab],
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -62,56 +70,74 @@ const BookingsScreen: React.FC = () => {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {bookings.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🎫</Text>
-            <Text style={styles.emptyTitle}>No {activeTab} bookings</Text>
-            <Text style={styles.emptySub}>
-              {activeTab === 'upcoming'
-                ? 'Book an event to see your tickets here'
-                : 'Nothing to show in this tab yet'}
-            </Text>
-          </View>
-        ) : (
-          bookings.map((booking) => {
-            const status = STATUS_STYLE[booking.status];
-            return (
-              <TouchableOpacity
-                key={booking.id}
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.eventTitle}>{booking.title}</Text>
-                  <View style={[styles.status, { backgroundColor: status.bg }]}>
-                    <Text style={[styles.statusText, { color: status.text }]}>
-                      {status.label}
-                    </Text>
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+      ) : isError ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Couldn't load your bookings</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {bookings.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>🎫</Text>
+              <Text style={styles.emptyTitle}>No {activeTab} bookings</Text>
+              <Text style={styles.emptySub}>
+                {activeTab === 'upcoming'
+                  ? 'Book an event to see your tickets here'
+                  : 'Nothing to show in this tab yet'}
+              </Text>
+            </View>
+          ) : (
+            bookings.map((booking) => {
+              const statusKey = statusKeyFor(booking);
+              const status = STATUS_STYLE[statusKey];
+              const event = booking.event;
+              return (
+                <TouchableOpacity
+                  key={booking.id}
+                  style={styles.card}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
+                    <View style={[styles.status, { backgroundColor: status.bg }]}>
+                      <Text style={[styles.statusText, { color: status.text }]}>
+                        {status.label}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.meta}>📅 {booking.date} · {booking.time}</Text>
-                <Text style={styles.meta}>📍 {booking.venue}</Text>
-                <Text style={styles.ticketType}>{booking.ticketType}</Text>
+                  {event ? (
+                    <>
+                      <Text style={styles.meta}>📅 {formatEventDate(event.eventDate)} · {formatEventTime(event.startTime)}</Text>
+                      <Text style={styles.meta}>📍 {event.venueName}</Text>
+                    </>
+                  ) : null}
+                  <Text style={styles.ticketType}>{booking.ticketType?.name ?? 'General Admission'}</Text>
 
-                {booking.status !== 'cancelled' ? (
-                  <View style={styles.qrSection}>
-                    <View style={styles.qrBox}>
-                      <Text style={styles.qrPlaceholder}>▦▦▦</Text>
+                  {booking.status !== 'cancelled' && booking.ticketCode ? (
+                    <View style={styles.qrSection}>
+                      <View style={styles.qrBox}>
+                        <Text style={styles.qrPlaceholder}>▦▦▦</Text>
+                      </View>
+                      <View style={styles.qrInfo}>
+                        <Text style={styles.qrLabel}>Booking Ref</Text>
+                        <Text style={styles.qrCode}>{booking.bookingReference}</Text>
+                        <Text style={styles.viewTicket}>Tap to view full ticket →</Text>
+                      </View>
                     </View>
-                    <View style={styles.qrInfo}>
-                      <Text style={styles.qrLabel}>Ticket ID</Text>
-                      <Text style={styles.qrCode}>{booking.qrCode}</Text>
-                      <Text style={styles.viewTicket}>Tap to view full ticket →</Text>
-                    </View>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -163,6 +189,9 @@ const styles = StyleSheet.create({
     color: colors.brandPink,
     fontWeight: '600',
   },
+  loader: {
+    marginTop: spacing.xxl,
+  },
   scroll: {
     paddingBottom: spacing.xxl,
   },
@@ -183,6 +212,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryText: {
+    color: colors.white,
+    fontWeight: '600',
   },
   card: {
     borderWidth: 1,

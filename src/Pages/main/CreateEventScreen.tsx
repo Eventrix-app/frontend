@@ -8,7 +8,6 @@ import {
   View,
   Switch,
   ActivityIndicator,
-  Alert,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,9 +21,12 @@ import {
   useUpdateEventMutation,
   useGetUploadUrlMutation,
   useGetEventByIdQuery,
+  ALLOWED_UPLOAD_CONTENT_TYPES,
+  UploadContentType,
 } from '../../store/services/eventsApi';
+import { useGetCategoriesQuery } from '../../store/services/userApi';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../utils/crossPlatformAlert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateEvent'>;
 
@@ -62,6 +64,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [updateEvent, { isLoading: isUpdating }] = useUpdateEventMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
   const { data: existingEvent } = useGetEventByIdQuery(eventId!, { skip: !isEdit });
+  const { data: categories = [] } = useGetCategoriesQuery();
 
   const isBusy = isCreating || isUpdating;
 
@@ -112,7 +115,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const validate = () => {
     if (!title.trim()) return 'Title is required';
-    if (!categoryId) return 'Category ID is required';
+    if (!categoryId) return 'Please select a category';
     if (!venueName.trim()) return 'Venue name is required';
     if (!venueAddress.trim()) return 'Venue address is required';
     if (!eventDate) return 'Event date is required (YYYY-MM-DD)';
@@ -125,7 +128,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleUploadCoverImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to select a cover image.');
+      showAlert('Permission needed', 'Allow photo library access to select a cover image.');
       return;
     }
 
@@ -141,32 +144,33 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
     const asset = pickerResult.assets[0];
     if (!asset.uri) {
-      Alert.alert('Upload failed', 'Could not read the selected image.');
+      showAlert('Upload failed', 'Could not read the selected image.');
       return;
     }
 
     setIsUploadingCover(true);
     try {
-      const fileName = asset.fileName ?? `cover-${Date.now()}.jpg`;
-      const uploadResponse = await getUploadUrl(fileName).unwrap();
+      const contentType = (ALLOWED_UPLOAD_CONTENT_TYPES.includes(asset.mimeType as UploadContentType)
+        ? asset.mimeType
+        : 'image/jpeg') as UploadContentType;
+      const uploadResponse = await getUploadUrl({ purpose: 'event-cover', contentType }).unwrap();
+
       const fileResponse = await fetch(asset.uri);
       const fileBlob = await fileResponse.blob();
 
-      const { error } = await supabase.storage
-        .from('event-images')
-        .uploadToSignedUrl(uploadResponse.path, uploadResponse.token, fileBlob, {
-          contentType: asset.mimeType ?? 'image/jpeg',
-          upsert: true,
-        });
+      const putResponse = await fetch(uploadResponse.uploadUrl, {
+        method: 'PUT',
+        body: fileBlob,
+        headers: { 'Content-Type': contentType },
+      });
 
-      if (error) {
-        throw new Error(error.message);
+      if (!putResponse.ok) {
+        throw new Error('Image upload to storage failed.');
       }
 
-      const { data } = supabase.storage.from('event-images').getPublicUrl(uploadResponse.path);
-      setCoverImageUrl(data.publicUrl);
+      setCoverImageUrl(uploadResponse.publicUrl);
     } catch (error) {
-      Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload the image.');
+      showAlert('Upload failed', error instanceof Error ? error.message : 'Could not upload the image.');
     } finally {
       setIsUploadingCover(false);
     }
@@ -174,7 +178,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleSave = async (asDraft: boolean) => {
     const err = validate();
-    if (err) { Alert.alert('Validation', err); return; }
+    if (err) { showAlert('Validation', err); return; }
 
     try {
       const payload = buildPayload(asDraft);
@@ -185,7 +189,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       }
       navigation.navigate('MyEvents');
     } catch (e: any) {
-      Alert.alert('Error', e?.data?.message ?? 'Something went wrong');
+      showAlert('Error', e?.data?.message ?? 'Something went wrong');
     }
   };
 
@@ -205,8 +209,20 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.label}>Description</Text>
         <TextInput style={[styles.input, styles.multiline]} value={description} onChangeText={setDescription} placeholder="What's this event about?" placeholderTextColor={colors.textSecondary} multiline numberOfLines={3} />
 
-        <Text style={styles.label}>Category ID *</Text>
-        <TextInput style={styles.input} value={categoryId} onChangeText={setCategoryId} placeholder="UUID of category" placeholderTextColor={colors.textSecondary} autoCapitalize="none" />
+        <Text style={styles.label}>Category *</Text>
+        <View style={styles.categoryRow}>
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.refundPill, categoryId === cat.id && styles.refundPillActive]}
+              onPress={() => setCategoryId(cat.id)}
+            >
+              <Text style={[styles.refundPillText, categoryId === cat.id && styles.refundPillTextActive]}>
+                {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Text style={styles.label}>Venue Name *</Text>
         <TextInput style={styles.input} value={venueName} onChangeText={setVenueName} placeholder="Venue name" placeholderTextColor={colors.textSecondary} />
@@ -268,8 +284,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
           </>
         )}
 
-        <Text style={styles.label}>Cover Image URL</Text>
-        <TextInput style={styles.input} value={coverImageUrl} onChangeText={setCoverImageUrl} placeholder="https://... or use upload below" placeholderTextColor={colors.textSecondary} autoCapitalize="none" />
+        <Text style={styles.label}>Cover Image</Text>
         <TouchableOpacity
           style={[styles.uploadBtn, isUploadingCover && styles.uploadBtnDisabled]}
           onPress={handleUploadCoverImage}
@@ -345,6 +360,7 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   refundRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.sm },
   refundPill: {
     paddingHorizontal: spacing.md,

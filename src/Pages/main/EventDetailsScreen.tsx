@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,11 +26,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [saved, setSaved] = useState(false);
   const authUser = useSelector((state: RootState) => state.auth.user);
 
-  const { data: event, isLoading } = useGetEventByIdQuery(route.params.eventId);
+  const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
 
   // Owner check: event.organizer.userId matches the logged-in user's id
-  const isOwner = !!(event && authUser && (event as any).organizer?.userId === authUser.id);
+  const isOwner = !!(event && authUser && event.organizer?.userId === authUser.id);
 
   const handleEnroll = async () => {
     if (!authUser) { navigation.navigate('Auth'); return; }
@@ -42,7 +43,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  if (isLoading || !event) {
+  if (isLoading) {
     return (
       <View style={[styles.root, styles.center]}>
         <ActivityIndicator color={colors.brandPink} />
@@ -50,17 +51,39 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
+  if (isError || !event) {
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Text style={styles.errorText}>Couldn't load this event.</Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backLinkBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backLinkText}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const coverImage = event.coverImageUrl || event.imageUrl;
+
   return (
     <View style={styles.root}>
-      <View style={[styles.hero, { paddingTop: insets.top }]}>
+      <ImageBackground
+        source={coverImage ? { uri: coverImage } : undefined}
+        style={[styles.hero, { paddingTop: insets.top }]}
+        resizeMode="cover"
+      >
         <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.heroEmoji}>🎪</Text>
+        {!coverImage ? <Text style={styles.heroEmoji}>🎪</Text> : null}
         <TouchableOpacity style={styles.save} onPress={() => setSaved((v) => !v)}>
           <Text>{saved ? '❤️' : '🤍'}</Text>
         </TouchableOpacity>
-      </View>
+      </ImageBackground>
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
         {/* Owner-only: rejection banner */}
@@ -106,13 +129,17 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        <Text style={styles.category}>{(event as any).category?.name ?? ''}</Text>
+        <Text style={styles.category}>{event.category?.name ?? ''}</Text>
         <Text style={styles.title}>{event.title}</Text>
 
         <GlassSurface style={styles.infoGlass} contentStyle={styles.infoCard}>
           <Text style={styles.infoRow}>📍 {event.venueName}</Text>
+          {event.venueAddress ? <Text style={styles.infoSubRow}>{event.venueAddress}</Text> : null}
           <Text style={styles.infoRow}>📅 {event.eventDate}</Text>
           <Text style={styles.infoRow}>🕐 {event.startTime}</Text>
+          <Text style={styles.infoRow}>
+            👤 {event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer'}
+          </Text>
           <Text style={styles.price}>
             {event.isPaid ? `₹${event.pricePerTicket}` : 'Free'}
           </Text>
@@ -179,7 +206,13 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  center: { justifyContent: 'center', alignItems: 'center' },
+  center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
+  errorText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
+  errorActions: { flexDirection: 'row', gap: spacing.sm },
+  retryBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  retryText: { color: colors.white, fontWeight: '600' },
+  backLinkBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  backLinkText: { color: colors.textSecondary, fontWeight: '600' },
   hero: {
     height: 280,
     backgroundColor: colors.brandPink,
@@ -266,6 +299,7 @@ const styles = StyleSheet.create({
   infoGlass: { borderRadius: borderRadius.lg, marginBottom: spacing.lg },
   infoCard: { gap: spacing.sm, padding: spacing.md },
   infoRow: { fontSize: 14, color: colors.textSecondary },
+  infoSubRow: { fontSize: 13, color: colors.textSecondary, marginTop: -6, marginLeft: 20 },
   price: { fontSize: 20, fontWeight: '700', color: colors.brandPink, marginTop: spacing.sm },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.md },
   description: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },

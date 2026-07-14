@@ -16,7 +16,8 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   
-  const dashboardUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'http://localhost:5173';
+  const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://enevtrix1.vercel.app/admin';
+  const dashboardUrl = `${dashboardBaseUrl}${dashboardBaseUrl.includes('?') ? '&' : '?'}loggedIn=true`;
 
   const handleRedirect = async () => {
     try {
