@@ -3,11 +3,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import FeaturedCarousel from '../../components/events/FeaturedCarousel';
-import FilterPills from '../../components/events/FilterPills';
-import { MainEventCard } from '../../components/events/MainEventCard';
+import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
-import { CategoryScroller } from '../../components/events/CategoryScroller';
 import { MOCK_EVENTS } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -26,6 +23,10 @@ const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [filter, setFilter] = useState('all');
 
+  const openEvent = (eventId: string) => {
+    navigation.navigate('EventDetails', { eventId });
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -41,36 +42,33 @@ const ExploreScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <FilterPills options={FILTER_OPTIONS} selected={filter} onSelect={setFilter} />
-
+      {/* Inline filter pills — no external component dependency */}
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pillsRow}
       >
-        <SectionHeader title="Featured" />
-        <FeaturedCarousel
-          events={MOCK_EVENTS.map((event) => ({
-            id: event.id,
-            title: event.title,
-            date: event.date,
-            location: event.venue,
-            price: event.price,
-            image: event.image,
-            featured: event.featured,
-          }))}
-          onEventPress={(eventId) => navigation.navigate('EventDetails', { eventId })}
-        />
+        {FILTER_OPTIONS.map((option) => {
+          const active = filter === option.id;
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.pill, active && styles.pillActive]}
+              onPress={() => setFilter(option.id)}
+            >
+              <Text style={styles.pillIcon}>{option.icon}</Text>
+              <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-        <SectionHeader title="Browse by Category" />
-        <CategoryScroller />
-
-        <SectionHeader title="Trending near you" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <SectionHeader title="All Events" />
         {MOCK_EVENTS.map((event) => (
-          <MainEventCard
-            key={event.id}
-            event={event}
-            onPress={() => navigation.navigate('EventDetails', { eventId: event.id })}
-          />
+          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
         ))}
 
         <View style={styles.footer}>
@@ -111,13 +109,55 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E5E5E5',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.white,
   },
   filterIcon: {
     fontSize: 16,
+  },
+   pillsRow: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: colors.white,
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#EDEDED',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pillActive: {
+    backgroundColor: colors.brandPink,
+    borderColor: colors.brandPink,
+    shadowColor: colors.brandPink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pillIcon: {
+    fontSize: 15,
+  },
+  pillLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  pillLabelActive: {
+    color: colors.white,
   },
   scroll: {
     padding: spacing.md,

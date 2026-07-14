@@ -37,7 +37,12 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
             >
               {active ? <View style={styles.indicator} /> : null}
               <Text style={[styles.icon, !active && styles.iconMuted]}>{tab.icon}</Text>
-              <Text style={[styles.label, active ? styles.labelActive : styles.labelMuted]}>
+              <Text
+                style={[styles.label, active ? styles.labelActive : styles.labelMuted]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -50,7 +55,7 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -63,11 +68,11 @@ const styles = StyleSheet.create({
   glass: {
     borderRadius: 28,
     overflow: 'hidden',
+    width: '100%',
   },
   bar: {
     flexDirection: 'row',
     height: 60,
-    paddingHorizontal: spacing.lg,
     backgroundColor: 'transparent',
     paddingTop: spacing.sm,
   },
@@ -76,6 +81,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    paddingHorizontal: 2,
   },
   indicator: {
     position: 'absolute',
@@ -87,13 +93,14 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 1000,
   },
   icon: {
-    fontSize: 22,
+    fontSize: 20,
   },
   iconMuted: {
     opacity: 0.5,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
+    textAlign: 'center',
   },
   labelActive: {
     color: colors.brandPink,

@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { createFallbackBaseQuery } from './baseQuery';
 
 // Types
 export interface LoginCredentials {
@@ -31,15 +32,13 @@ export interface AuthResponse {
   id: string;
   email: string;
   full_name: string;
-  role: string;
+  roles: string[];
   expiresIn?: number;
 }
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/',
-  }),
+  baseQuery: createFallbackBaseQuery(),
   tagTypes: ['Auth'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({

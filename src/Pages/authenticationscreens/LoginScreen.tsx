@@ -9,6 +9,9 @@ import GlassSurface from '../../components/common/GlassSurface';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useLoginMutation } from '../../store/services/authApi';
+import { useDispatch } from 'react-redux';
+import { AppDispatch, store } from '../../store';
+import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -42,12 +45,15 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   // Enable scrolling if content exceeds 70% of screen height (leaves room for header and padding)
   const shouldScroll = contentHeight > screenHeight * 0.7;
 
+  const dispatch = useDispatch<AppDispatch>();
+
   const handleLogin = async () => {
     try {
       setErrorMessage(null);
       const result = await login({ email, password }).unwrap();
-      // If admin role, navigate to AdminRedirect screen; otherwise navigate to main app
-      if (result?.role?.toLowerCase() === 'admin') {
+      // Fire-and-forget: sync onboarding draft in background, navigate immediately
+      syncOnboardingDraft(dispatch, store.getState);
+      if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
       } else {
         navigation.getParent()?.navigate('Main' as never);

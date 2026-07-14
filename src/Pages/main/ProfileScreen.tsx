@@ -37,6 +37,16 @@ const MENU_ITEMS: MenuItem[] = [
     onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
   },
   {
+    icon: '➕',
+    label: 'Create Event',
+    onPress: (nav) => nav.navigate('CreateEvent', {}),
+  },
+  {
+    icon: '📅',
+    label: 'My Events',
+    onPress: (nav) => nav.navigate('MyEvents'),
+  },
+  {
     icon: '🔔',
     label: 'Notifications',
     onPress: (nav) => nav.navigate('Notifications'),

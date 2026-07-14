@@ -12,6 +12,9 @@ export type RootStackParamList = {
   Settings: undefined;
   SavedEvents: undefined;
   Notifications: undefined;
+  MyEvents: undefined;
+  CreateEvent: { eventId?: string };
+  CheckIn: { eventId: string };
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
 };
@@ -19,7 +22,6 @@ export type RootStackParamList = {
 export type AuthStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
-  RoleSelection: undefined;
   InterestSelection: undefined;
   LocationAccess: undefined;
   NotificationPreferences: undefined;
@@ -33,5 +35,6 @@ export type MainTabParamList = {
   Home: undefined;
   Explore: undefined;
   Shorts: undefined;
+  MyEvents: undefined;
   Bookings: undefined;
 };

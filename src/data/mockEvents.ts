@@ -31,7 +31,7 @@ export const MOCK_EVENTS: MockEvent[] = [
     date: 'Sat, 12 Jul 2026',
     time: '7:00 PM',
     price: '₹499',
-    image: '🎸',
+    image: require('../../assets/events/e1.jpg'),
     featured: true,
     description:
       'An electrifying night of live bands, DJs, and immersive light shows. Food trucks and merch zones on site.',
@@ -45,7 +45,8 @@ export const MOCK_EVENTS: MockEvent[] = [
     date: 'Fri, 18 Jul 2026',
     time: '10:00 AM',
     price: 'Free',
-    image: '💡',
+    featured: true,
+    image: require('../../assets/events/e1.jpg'),
     description:
       'Talks on AI, cloud, and mobile. Hands-on workshops and networking with industry leaders.',
   },
@@ -58,7 +59,8 @@ export const MOCK_EVENTS: MockEvent[] = [
     date: 'Sun, 3 Aug 2026',
     time: '5:30 AM',
     price: '₹799',
-    image: '🏃',
+    featured: true,
+    image: require('../../assets/events/e1.jpg'),
     description: '5K, 10K, and half-marathon categories. Chip timing and finisher medals included.',
   },
   {
@@ -70,7 +72,7 @@ export const MOCK_EVENTS: MockEvent[] = [
     date: 'Sat, 26 Jul 2026',
     time: '4:00 PM',
     price: '₹299',
-    image: '🍔',
+    image: require('../../assets/events/e1.jpg'),
     description: '50+ stalls, live cooking demos, and family-friendly activities.',
   },
   {
@@ -82,7 +84,7 @@ export const MOCK_EVENTS: MockEvent[] = [
     date: 'Sun, 10 Aug 2026',
     time: '11:00 AM',
     price: '₹199',
-    image: '🎨',
+    image: require('../../assets/events/e1.jpg'),
     description: 'Guided tour of murals and installations with local artists.',
   },
 ];
