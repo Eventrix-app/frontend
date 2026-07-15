@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from './GlassSurface';
+import { Text } from './Text';
 
 type ScreenHeaderProps = {
   title: string;
@@ -70,9 +71,9 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 18,
-    fontWeight: '600',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   titleLight: {
     color: colors.white,
   },

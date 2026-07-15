@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -8,6 +8,7 @@ import { useGetFeeEstimateQuery } from '../../store/services/paymentsApi';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { parseDateValue, dateOnlyToStartOfDayIso, dateOnlyToEndOfDayIso } from '../../utils/dateFormat';
 import InlineDatePicker from '../common/InlineDatePicker';
+import { Text } from '../common/Text';
 
 // Local draft shape while the organizer is still editing — numeric/date fields stay as
 // strings so they bind directly to TextInput, and are parsed only when building the

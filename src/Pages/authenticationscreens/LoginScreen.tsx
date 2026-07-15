@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -13,6 +13,7 @@ import { useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { Text } from '../../components/common/Text';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
   forgotLink: { textDecorationLine: 'underline', fontWeight: '600' },
   loginBtn: {
     // width: 'auto',
-    backgroundColor: '#f03131',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

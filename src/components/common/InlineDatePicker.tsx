@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { parseDateValue, formatDateValue, DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
+import { Text } from './Text';
 
 interface Props {
   value: string; // 'YYYY-MM-DD' or ''

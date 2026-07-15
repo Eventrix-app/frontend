@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -20,6 +19,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventsQuery } from '../../store/services/eventsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -230,11 +230,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -266,9 +266,9 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   emptySub: {
     fontSize: 14,
     color: colors.textSecondary,

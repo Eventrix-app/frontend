@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 

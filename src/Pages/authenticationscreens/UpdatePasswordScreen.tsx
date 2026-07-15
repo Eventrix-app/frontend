@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -11,6 +11,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import GlassSurface from '../../components/common/GlassSurface';
 import { useResetPasswordMutation } from '../../store/services/authApi';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'UpdatePassword'>;
 
@@ -278,10 +279,10 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: 22,
-    fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   successText: {
     fontSize: 15,
     color: colors.textSecondary,
@@ -324,8 +325,8 @@ const styles = StyleSheet.create({
   reqHeaderTitle: {
     fontSize: 14,
     color: 'rgba(0,0,0,0.5)',
-    fontWeight: '500',
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   reqHeaderLine: {
     flex: 1,
     height: 1,

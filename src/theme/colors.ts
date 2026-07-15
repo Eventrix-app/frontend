@@ -15,7 +15,7 @@ export const colors = {
   error: '#EF4444',
   shadow: '#FF3366',
   secondary: '#3B82F6',
-  brandPink: '#f03131',
+  brandPink: '#FF3366',
   brandNavy: '#142767',
   neutralLine: '#D8D8D8',
   stone600: '#57534E',

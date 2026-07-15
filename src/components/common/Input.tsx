@@ -1,10 +1,11 @@
 import React from 'react';
-import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import { TextInput, View, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import GlassSurface from './GlassSurface';
+import { Text } from './Text';
 
 interface InputProps extends TextInputProps {
   label?: string;

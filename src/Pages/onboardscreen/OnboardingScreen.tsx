@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   StatusBar,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +19,7 @@ import { Dots } from '../../components/Dots';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { Text } from '../../components/common/Text';
 
 type Slide = {
   image: ImageSourcePropType;
@@ -302,8 +302,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
-    fontFamily: 'Zalando Sans Expanded',
-    fontWeight: '500',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 24,
     lineHeight: 24,
     color: colors.white,
@@ -312,8 +311,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...typography.subtitle,
-    fontFamily: 'Poppins',
-    fontWeight: '500',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 16,
     lineHeight: 24,
     color: 'rgba(255,255,255,0.88)',

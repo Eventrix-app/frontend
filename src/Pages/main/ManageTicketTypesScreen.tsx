@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -20,6 +20,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { dateOnlyToStartOfDayIso, dateOnlyToEndOfDayIso } from '../../utils/dateFormat';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ManageTicketTypes'>;
 
@@ -314,10 +315,14 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
   empty: { alignItems: 'center', paddingVertical: spacing.xxl * 2, gap: spacing.sm },
   emptyIcon: { fontSize: 48 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+  emptyTitle: { fontSize: 18, color: colors.text,
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   retryBtn: { marginTop: spacing.sm, backgroundColor: colors.brandPink, borderRadius: borderRadius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   retryText: { color: colors.white, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: spacing.sm },
+  sectionTitle: { fontSize: 16, color: colors.text, marginTop: spacing.sm,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   card: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,

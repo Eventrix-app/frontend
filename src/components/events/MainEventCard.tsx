@@ -1,10 +1,11 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MockEvent } from '../../data/mockEvents';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type MainEventCardProps = {
   event: MockEvent;
@@ -145,10 +146,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '700',
     color: colors.text,
     lineHeight: 23,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

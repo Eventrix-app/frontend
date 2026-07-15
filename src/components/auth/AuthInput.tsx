@@ -3,7 +3,6 @@ import {
   Image,
   ImageSourcePropType,
   StyleSheet,
-  Text,
   TextInput,
   TextInputProps,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type AuthInputProps = TextInputProps & {
   icon?: string | ImageSourcePropType;

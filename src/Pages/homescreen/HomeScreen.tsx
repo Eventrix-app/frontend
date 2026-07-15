@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +20,7 @@ import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { useGetEventsQuery } from '../../store/services/eventsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
 
 const bgImage = require('../../../assets/bg.png');
 

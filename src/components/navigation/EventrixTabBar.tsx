@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 const TABS: { name: string; label: string; icon: string }[] = [
   { name: 'Home', label: 'Home', icon: '🏠' },

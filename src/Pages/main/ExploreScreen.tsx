@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useGetEventsQuery } from '../../store/services/eventsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
 import NoEvents from '../../components/common/Noevents';
 
 const FILTER_CHIPS = [
@@ -145,9 +146,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',

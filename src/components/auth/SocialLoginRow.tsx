@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type SocialLoginRowProps = {
   compact?: boolean;

@@ -3,7 +3,6 @@ import {
   ImageBackground,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -27,6 +26,7 @@ import {
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 
@@ -442,7 +442,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.xs,
   },
-  rejectionTitle: { fontWeight: '700', color: '#DC2626', fontSize: 15 },
+  rejectionTitle: { color: '#DC2626', fontSize: 15,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   rejectionReason: { color: '#7F1D1D', fontSize: 13 },
   resubmitBtn: {
     marginTop: spacing.sm,
@@ -479,12 +481,16 @@ const styles = StyleSheet.create({
   salesText: { fontWeight: '600', color: '#065F46' },
   salesCount: { fontSize: 13, color: '#047857' },
   category: { color: colors.brandPink, fontWeight: '600', fontSize: 13, marginBottom: spacing.xs },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 24, color: colors.text, marginBottom: spacing.md,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   infoGlass: { borderRadius: borderRadius.lg, marginBottom: spacing.lg },
   infoCard: { gap: spacing.sm, padding: spacing.md },
   infoRow: { fontSize: 14, color: colors.textSecondary },
   infoSubRow: { fontSize: 13, color: colors.textSecondary, marginTop: -6, marginLeft: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.md },
+  sectionTitle: { fontSize: 18, color: colors.text, marginBottom: spacing.sm, marginTop: spacing.md,
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   description: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
   tierList: { gap: spacing.sm },
   tierRow: {

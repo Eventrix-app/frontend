@@ -127,13 +127,13 @@ const styles = StyleSheet.create({
   },
   appName: {
     color: colors.white,
-    fontWeight: '800',
+    fontFamily: 'ZalandoSansExpanded_800ExtraBold',
     lineHeight: 60,
     marginBottom: spacing.sm,
   },
   tagline: {
     color: colors.white,
-    fontWeight: '600',
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
     lineHeight: 30,
     opacity: 0.9,
   },

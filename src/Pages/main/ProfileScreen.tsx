@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassSurface from '../../components/common/GlassSurface';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: 'ZalandoSansExpanded_700Bold',
     color: colors.white,
   },
   username: {
@@ -212,11 +213,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.textSecondary,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   menuGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',

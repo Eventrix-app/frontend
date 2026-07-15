@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -16,6 +15,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventEnrollmentsQuery, useCheckInMutation, EnrollmentRecord } from '../../store/services/eventsApi';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CheckIn'>;
 
@@ -198,7 +198,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, fontWeight: '700', color: colors.text },
+  title: { fontSize: 20, color: colors.text,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   modeTabs: {
     flexDirection: 'row',
     marginHorizontal: spacing.md,

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 export interface HighlightItem {
   id: string;
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 12,
-    fontWeight: '600',
     color: '#1a1a1a',
     marginTop: 6,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
 });

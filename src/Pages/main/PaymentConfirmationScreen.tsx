@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MOCK_BOOKINGS, MOCK_EVENTS } from '../../data/mockEvents';
@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PaymentConfirmation'>;
 
@@ -100,10 +101,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   subtitle: {
     fontSize: 15,
     color: colors.textSecondary,
@@ -111,7 +112,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: spacing.xl,
     paddingHorizontal: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   cardGlass: {
     borderRadius: borderRadius.lg,
     marginHorizontal: 0,
@@ -130,10 +132,10 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 16,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.xs,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   meta: {
     fontSize: 13,
     color: colors.textSecondary,

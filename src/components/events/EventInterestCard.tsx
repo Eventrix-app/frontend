@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 // Extend your real event type/mock data with these optional fields as the
 // API/schema fills them in. Falls back to placeholder copy until then.
@@ -175,10 +176,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

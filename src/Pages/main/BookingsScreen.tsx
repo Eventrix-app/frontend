@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
 
 type TabId = 'upcoming' | 'previous' | 'cancelled' | 'waitlist';
 
@@ -208,15 +209,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
     color: '#0D0D0D',
     marginTop: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   subtitle: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   tabs: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundSecondary,
@@ -263,9 +265,9 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   emptySub: {
     fontSize: 14,
     color: colors.textSecondary,
@@ -300,9 +302,9 @@ const styles = StyleSheet.create({
   eventTitle: {
     flex: 1,
     fontSize: 17,
-    fontWeight: '700',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   status: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,

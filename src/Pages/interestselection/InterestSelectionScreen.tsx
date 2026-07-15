@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Pressable,
@@ -14,6 +13,7 @@ import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { setInterests } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
 import { useSelector } from 'react-redux';
+import { Text } from '../../components/common/Text';
 
 const { width: screenWidth } = Dimensions.get('window');
 const MIN_SELECTIONS = 3;
@@ -168,19 +168,20 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 60 },
   heading: {
     fontSize: 28,
-    fontWeight: '700',
     color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 32,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   subtitle: {
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   skeletonGrid: {
     flexDirection: 'row',

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -38,6 +37,7 @@ import TicketTypeEditor, {
   tierDraftToPayload,
   validateTiers,
 } from '../../components/events/TicketTypeEditor';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateEvent'>;
 
@@ -486,7 +486,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, fontWeight: '700', color: colors.text },
+  title: { fontSize: 20, color: colors.text,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   scroll: { padding: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
   input: {

@@ -1,10 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ErrorGeneric'>;
 
@@ -38,18 +39,19 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   subtitle: {
     fontSize: 15,
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: spacing.xl,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   btn: {
     backgroundColor: colors.brandPink,
     paddingHorizontal: spacing.xl,

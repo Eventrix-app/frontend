@@ -3,11 +3,11 @@ import {
   Animated,
   StyleProp,
   StyleSheet,
-  Text,
   TextStyle,
   TouchableWithoutFeedback,
 } from 'react-native';
 import { colors } from '../../theme/colors';
+import { Text } from './Text';
 
 type AnimatedLinkProps = {
   label: string;

@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from '../common/GlassSurface';
 import { LeftArrow, RightArrow } from '../common/Icons';
+import { Text } from '../common/Text';
 
 type AuthActionsProps = {
   primaryLabel: string;

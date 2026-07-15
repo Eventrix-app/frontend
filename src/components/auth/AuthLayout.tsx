@@ -7,7 +7,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type AuthLayoutProps = {
   children: React.ReactNode;
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: 36,
-    fontWeight: '700',
+    fontFamily: 'ZalandoSansExpanded_700Bold',
     color: colors.brandNavy,
     textTransform: 'capitalize',
   },
@@ -224,9 +224,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontFamily: 'Zalando Sans Expanded',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 32,
-    fontWeight: '500',
     lineHeight: 24,
     letterSpacing: 0,
     textAlign: 'center',
@@ -234,9 +233,8 @@ const styles = StyleSheet.create({
     color: '#0D0D0D',
   },
   subtitle: {
-    fontFamily: 'Poppins',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 16,
-    fontWeight: '500',
     lineHeight: 21,
     letterSpacing: 0,
     textAlign: 'center',
