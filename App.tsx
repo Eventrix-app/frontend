@@ -9,7 +9,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { store, persistor } from './src/store';
 import { AppDispatch, RootState } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
+import NetworkGate from './src/components/common/NetworkGate';
 import { syncOnboardingDraft } from './src/utils/syncOnboardingDraft';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
+import ServerGate from './src/components/common/ServerGate';
 
 function AppStateSync() {
   const dispatch = useDispatch<AppDispatch>();
@@ -41,7 +44,13 @@ export default function App() {
           <BottomSheetModalProvider>
             <SafeAreaProvider>
               <AppStateSync />
-              <RootNavigator />
+              <NetworkGate>
+                 <ServerGate>
+                  <ErrorBoundary>
+                    <RootNavigator />
+                  </ErrorBoundary>
+                 </ServerGate>
+              </NetworkGate>
               <StatusBar style="auto" />
             </SafeAreaProvider>
           </BottomSheetModalProvider>

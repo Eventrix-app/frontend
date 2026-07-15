@@ -35,6 +35,7 @@ export interface FeaturedEvent {
 interface Props {
   events: FeaturedEvent[];
   onEventPress: (eventId: string) => void;
+  cardWidth?: number;
 }
 
 const resolveImageSource = (image: unknown) => {
@@ -43,7 +44,9 @@ const resolveImageSource = (image: unknown) => {
   return image as any;
 };
 
-const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
+const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: cardWidthProp }) => {
+  const effectiveCardWidth = cardWidthProp ?? CARD_WIDTH;
+  const effectiveSlotWidth = effectiveCardWidth + CARD_SPACING;
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const currentRawIndex = useRef(0);
@@ -78,12 +81,12 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
   const updateActiveIndexFromOffset = useCallback(
     (offsetX: number) => {
       if (events.length === 0) return;
-      const rawIndex = Math.round(offsetX / SLOT_WIDTH);
+      const rawIndex = Math.round(offsetX / effectiveSlotWidth);
       currentRawIndex.current = rawIndex;
       const normalized = ((rawIndex % events.length) + events.length) % events.length;
       setActiveIndex(normalized);
     },
-    [events.length],
+    [events.length, effectiveSlotWidth],
   );
 
   const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -99,9 +102,9 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
       flatListRef.current?.scrollToIndex({ index: currentRawIndex.current, animated: true });
       // scrollToIndex's own momentum-end will also fire and correct this,
       // but setting it immediately keeps the dot in sync with the animation.
-      updateActiveIndexFromOffset(currentRawIndex.current * SLOT_WIDTH);
+      updateActiveIndexFromOffset(currentRawIndex.current * effectiveSlotWidth);
     }, AUTO_SCROLL_INTERVAL);
-  }, [events.length, updateActiveIndexFromOffset]);
+  }, [events.length, updateActiveIndexFromOffset, effectiveSlotWidth]);
 
   useEffect(() => {
     startAutoScroll();
@@ -126,7 +129,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
       return (
         <TouchableOpacity
           activeOpacity={0.9}
-          style={styles.card}
+          style={[styles.card, { width: effectiveCardWidth }]}
           onPress={() => onEventPress(event.id)}
         >
           <ImageBackground
@@ -163,20 +166,21 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
         </TouchableOpacity>
       );
     },
-    [onEventPress, events.length, activeIndex],
+    [onEventPress, events.length, activeIndex, effectiveCardWidth],
   );
 
   if (events.length === 0) return null;
 
   return (
     <FlatList
+      style={{ height: CARD_HEIGHT, flexGrow: 0 }}
       ref={flatListRef}
       data={loopedEvents}
       keyExtractor={(item: any) => item.__loopKey}
       renderItem={renderItem}
       horizontal
       showsHorizontalScrollIndicator={false}
-      snapToInterval={SLOT_WIDTH}
+      snapToInterval={effectiveSlotWidth}
       decelerationRate="fast"
       onMomentumScrollEnd={handleMomentumScrollEnd}
       onTouchStart={handleTouchStart}
@@ -184,14 +188,14 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
       onScrollToIndexFailed={(info) => {
         setTimeout(() => {
           flatListRef.current?.scrollToOffset({
-            offset: info.index * SLOT_WIDTH,
+            offset: info.index * effectiveSlotWidth,
             animated: false,
           });
         }, 50);
       }}
       getItemLayout={(_, index) => ({
-        length: SLOT_WIDTH,
-        offset: SLOT_WIDTH * index,
+        length: effectiveSlotWidth,
+        offset: effectiveSlotWidth * index,
         index,
       })}
       initialScrollIndex={initialIndex}
@@ -202,7 +206,6 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    width: CARD_WIDTH,
     height: CARD_HEIGHT,
     marginRight: CARD_SPACING,
     borderRadius: 20,

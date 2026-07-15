@@ -192,11 +192,12 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   categoriesScroll: {
-    maxHeight: 48,
     flexGrow: 0,
+    flexShrink: 0,
   },
   categories: {
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
     gap: spacing.sm,
     alignItems: 'center',
