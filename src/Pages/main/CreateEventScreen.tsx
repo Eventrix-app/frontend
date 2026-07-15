@@ -23,14 +23,21 @@ import {
   useUpdateEventMutation,
   useGetUploadUrlMutation,
   useGetEventByIdQuery,
-  useLazyGetTicketTypesQuery,
-  useCreateTicketTypeMutation,
   ALLOWED_UPLOAD_CONTENT_TYPES,
   UploadContentType,
 } from '../../store/services/eventsApi';
 import { useGetCategoriesQuery } from '../../store/services/userApi';
 import * as ImagePicker from 'expo-image-picker';
 import { showAlert } from '../../utils/crossPlatformAlert';
+import { extractErrorMessage } from '../../utils/apiError';
+import { parseDateValue, parseTimeValue, formatTimeValue, formatTimeDisplay } from '../../utils/dateFormat';
+import InlineDatePicker from '../../components/common/InlineDatePicker';
+import TicketTypeEditor, {
+  TierDraft,
+  createBlankTier,
+  tierDraftToPayload,
+  validateTiers,
+} from '../../components/events/TicketTypeEditor';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateEvent'>;
 
@@ -39,61 +46,6 @@ const REFUND_OPTIONS = [
   { value: 'partial_refund', label: 'Partial Refund' },
   { value: 'full_refund', label: 'Full Refund' },
 ];
-
-const DATE_DISPLAY_FORMATTER = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-
-function parseDateValue(value: string): Date {
-  if (value) {
-    const [y, m, d] = value.split('-').map(Number);
-    if (y && m && d) return new Date(y, m - 1, d);
-  }
-  return new Date();
-}
-
-function formatDateValue(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function parseTimeValue(value: string): Date {
-  const base = new Date();
-  if (value) {
-    const [h, m] = value.split(':').map(Number);
-    if (!Number.isNaN(h) && !Number.isNaN(m)) {
-      base.setHours(h, m, 0, 0);
-      return base;
-    }
-  }
-  base.setSeconds(0, 0);
-  return base;
-}
-
-function formatTimeValue(date: Date): string {
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-function formatTimeDisplay(value: string): string {
-  if (!value) return '';
-  const [hourStr, minuteStr] = value.split(':');
-  const hour = Number(hourStr);
-  if (Number.isNaN(hour)) return value;
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${hour12}:${minuteStr ?? '00'} ${period}`;
-}
-
-// NestJS's ValidationPipe returns `message` as either a single string or an array of
-// per-field validation strings — surface both cases instead of "[object Object]".
-function extractErrorMessage(e: any, fallback: string): string {
-  const msg = e?.data?.message;
-  if (Array.isArray(msg)) return msg.join('\n');
-  if (typeof msg === 'string' && msg) return msg;
-  return fallback;
-}
 
 const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -109,9 +61,8 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [eventDate, setEventDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [capacity, setCapacity] = useState('');
   const [isFree, setIsFree] = useState(true);
-  const [price, setPrice] = useState('');
+  const [tiers, setTiers] = useState<TierDraft[]>(() => [createBlankTier()]);
   const [isOnline, setIsOnline] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
   const [refundPolicyType, setRefundPolicyType] = useState('no_refunds');
@@ -124,7 +75,6 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   // brand-new user has no way to pass the role check before their first event is saved).
   const [pendingImage, setPendingImage] = useState<{ uri: string; contentType: UploadContentType } | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   // Tracks which footer button triggered the save, so only that one shows a spinner —
@@ -139,8 +89,6 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [createEvent, { isLoading: isCreating }] = useCreateEventMutation();
   const [updateEvent, { isLoading: isUpdating }] = useUpdateEventMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
-  const [fetchTicketTypes] = useLazyGetTicketTypesQuery();
-  const [createTicketType] = useCreateTicketTypeMutation();
   const { data: existingEvent } = useGetEventByIdQuery(eventId!, { skip: !isEdit });
   const { data: categories = [] } = useGetCategoriesQuery();
 
@@ -157,9 +105,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     setEventDate(existingEvent.eventDate ?? '');
     setStartTime(existingEvent.startTime ?? '');
     setEndTime(existingEvent.endTime ?? '');
-    setCapacity(existingEvent.totalCapacity != null ? String(existingEvent.totalCapacity) : '');
     setIsFree(!existingEvent.isPaid);
-    setPrice(existingEvent.pricePerTicket != null ? String(existingEvent.pricePerTicket) : '');
     setIsOnline(existingEvent.isOnline ?? false);
     setMeetingLink(existingEvent.meetingLink ?? '');
     setRefundPolicyType(existingEvent.refundPolicyType ?? 'no_refunds');
@@ -169,38 +115,35 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     prefilledRef.current = true;
   }, [existingEvent, isEdit]);
 
-  // A single implicit "General Admission" tier built from the free/price + capacity
-  // fields this screen already collects. Real multi-tier authoring is a separate,
-  // larger feature — this just ensures every event actually has a bookable tier,
-  // since EventsService.enroll() 400s on an event with zero ticket types.
-  const buildDefaultTicketType = () => ({
-    name: 'General Admission',
-    price: isFree ? 0 : parseFloat(price) || 0,
-    quantityTotal: capacity ? parseInt(capacity, 10) : undefined,
-  });
+  const buildPayload = (asDraft: boolean) => {
+    // Legacy display-only fields (card badges on Home/Explore/Search read
+    // BackendEvent.pricePerTicket directly — see eventCardAdapter.ts) derived from the
+    // real tiers so they stay roughly accurate; ticketTypes below is the source of truth.
+    const paidPrices = tiers.map((t) => Number(t.price) || 0).filter((p) => p > 0);
+    const representativePrice = isFree ? 0 : (paidPrices.length ? Math.min(...paidPrices) : 0);
 
-  const buildPayload = (asDraft: boolean) => ({
-    title: title.trim(),
-    description: description.trim() || undefined,
-    categoryId,
-    venueName: venueName.trim(),
-    venueAddress: venueAddress.trim(),
-    eventDate,
-    startTime,
-    endTime: endTime || undefined,
-    totalCapacity: capacity ? parseInt(capacity, 10) : undefined,
-    pricePerTicket: isFree ? 0 : parseFloat(price) || 0,
-    isPaid: !isFree,
-    isOnline,
-    meetingLink: isOnline ? meetingLink : undefined,
-    coverImageUrl: coverImageUrl || undefined,
-    approvalStatus: asDraft ? ('draft' as const) : ('pending_approval' as const),
-    refundPolicyType: !isFree ? refundPolicyType : undefined,
-    refundPolicyText: !isFree && refundPolicyText ? refundPolicyText : undefined,
-    // PATCH /events/:id (edit) rejects ticketTypes — nested ticket-type endpoints own
-    // edits to tiers after creation, so this is create-only.
-    ...(isEdit ? {} : { ticketTypes: [buildDefaultTicketType()] }),
-  });
+    return {
+      title: title.trim(),
+      description: description.trim() || undefined,
+      categoryId,
+      venueName: venueName.trim(),
+      venueAddress: venueAddress.trim(),
+      eventDate,
+      startTime,
+      endTime: endTime || undefined,
+      pricePerTicket: representativePrice,
+      isPaid: !isFree,
+      isOnline,
+      meetingLink: isOnline ? meetingLink : undefined,
+      coverImageUrl: coverImageUrl || undefined,
+      approvalStatus: asDraft ? ('draft' as const) : ('pending_approval' as const),
+      refundPolicyType: !isFree ? refundPolicyType : undefined,
+      refundPolicyText: !isFree && refundPolicyText ? refundPolicyText : undefined,
+      // PATCH /events/:id (edit) rejects ticketTypes — nested ticket-type endpoints
+      // (Manage Ticket Types) own edits to tiers after creation, so this is create-only.
+      ...(isEdit ? {} : { ticketTypes: tiers.map((t) => tierDraftToPayload(t, isFree)) }),
+    };
+  };
 
   const validate = () => {
     if (!title.trim()) return 'Title is required';
@@ -215,8 +158,11 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     if (endTime && parseTimeValue(endTime) <= parseTimeValue(startTime)) {
       return 'End time must be after start time';
     }
-    if (!isFree && !price) return 'Price is required for paid events';
     if (isOnline && !meetingLink) return 'Meeting link is required for online events';
+    if (!isEdit) {
+      const tierError = validateTiers(tiers, isFree);
+      if (tierError) return tierError;
+    }
     return null;
   };
 
@@ -271,21 +217,6 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     return uploadResponse.publicUrl;
   };
 
-  // Best-effort: an existing (pre-fix or otherwise tier-less) event may have zero
-  // ticket types, which would silently 400 every enroll attempt. Backfill exactly one
-  // default tier if none exist yet; leave events that already have tiers untouched —
-  // editing tiers themselves is a separate, not-yet-built management surface.
-  const backfillTicketTypeIfMissing = async () => {
-    try {
-      const existingTiers = await fetchTicketTypes(eventId!).unwrap();
-      if (existingTiers.length === 0) {
-        await createTicketType({ eventId: eventId!, body: buildDefaultTicketType() }).unwrap();
-      }
-    } catch {
-      // Non-fatal — the event save itself already succeeded.
-    }
-  };
-
   const handleSave = async (asDraft: boolean) => {
     if (isSubmittingRef.current) return;
     const err = validate();
@@ -301,10 +232,6 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       let savedEvent = isEdit
         ? await updateEvent({ id: eventId!, body: payload }).unwrap()
         : await createEvent(payload).unwrap();
-
-      if (isEdit) {
-        await backfillTicketTypeIfMissing();
-      }
 
       if (pendingImage) {
         setIsUploadingCover(true);
@@ -384,30 +311,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         <TextInput style={styles.input} value={venueAddress} onChangeText={setVenueAddress} placeholder="Full address" placeholderTextColor={colors.textSecondary} />
 
         <Text style={styles.label}>Date *</Text>
-        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
-          <Text style={eventDate ? styles.pickerValue : styles.pickerPlaceholder}>
-            {eventDate ? DATE_DISPLAY_FORMATTER.format(parseDateValue(eventDate)) : 'Select event date'}
-          </Text>
-        </TouchableOpacity>
-        {showDatePicker && (
-          <View style={styles.pickerWrap}>
-            <DateTimePicker
-              value={parseDateValue(eventDate)}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'inline' : 'default'}
-              minimumDate={new Date()}
-              onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
-                if (Platform.OS === 'android') setShowDatePicker(false);
-                if (event.type === 'set' && selectedDate) setEventDate(formatDateValue(selectedDate));
-              }}
-            />
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
-                <Text style={styles.pickerDoneText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+        <InlineDatePicker value={eventDate} onChange={setEventDate} placeholder="Select event date" minimumDate={new Date()} />
 
         <Text style={styles.label}>Start Time *</Text>
         <TouchableOpacity style={styles.input} onPress={() => setShowStartTimePicker(true)}>
@@ -461,19 +365,25 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        <Text style={styles.label}>Capacity</Text>
-        <TextInput style={styles.input} value={capacity} onChangeText={setCapacity} placeholder="Max attendees" placeholderTextColor={colors.textSecondary} keyboardType="numeric" />
-
         <View style={styles.row}>
           <Text style={styles.label}>Free Event</Text>
           <Switch value={isFree} onValueChange={setIsFree} trackColor={{ true: colors.brandPink }} />
         </View>
 
+        <Text style={styles.label}>Ticket Types *</Text>
+        {isEdit ? (
+          <View style={styles.tierEditNote}>
+            <Text style={styles.tierEditNoteText}>
+              Ticket tiers are managed from "Manage Ticket Types" on the event page — adding, editing or removing
+              tiers here isn't supported once an event exists.
+            </Text>
+          </View>
+        ) : (
+          <TicketTypeEditor tiers={tiers} onChange={setTiers} isFree={isFree} />
+        )}
+
         {!isFree && (
           <>
-            <Text style={styles.label}>Price per Ticket (INR) *</Text>
-            <TextInput style={styles.input} value={price} onChangeText={setPrice} placeholder="499" placeholderTextColor={colors.textSecondary} keyboardType="decimal-pad" />
-
             <Text style={styles.label}>Refund Policy *</Text>
             <View style={styles.refundRow}>
               {REFUND_OPTIONS.map((opt) => (
@@ -612,6 +522,12 @@ const styles = StyleSheet.create({
   pickerDoneText: { color: colors.white, fontWeight: '600' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
   categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
+  tierEditNote: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+  },
+  tierEditNoteText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   refundRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.sm },
   refundPill: {
     paddingHorizontal: spacing.md,

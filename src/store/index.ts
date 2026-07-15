@@ -20,6 +20,7 @@ import onboardingDraftReducer from './slices/onboardingDraftSlice';
 import { eventsApi } from './services/eventsApi';
 import { authApi } from './services/authApi';
 import { userApi } from './services/userApi';
+import { paymentsApi } from './services/paymentsApi';
 
 // Persist only the onboarding draft so it survives app kills mid-onboarding
 const onboardingDraftPersistConfig = {
@@ -35,6 +36,7 @@ const rootReducer = combineReducers({
   [eventsApi.reducerPath]: eventsApi.reducer,
   [authApi.reducerPath]: authApi.reducer,
   [userApi.reducerPath]: userApi.reducer,
+  [paymentsApi.reducerPath]: paymentsApi.reducer,
 });
 
 export const store = configureStore({
@@ -45,7 +47,7 @@ export const store = configureStore({
         // redux-persist actions are non-serializable by design
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(eventsApi.middleware, authApi.middleware, userApi.middleware),
+    }).concat(eventsApi.middleware, authApi.middleware, userApi.middleware, paymentsApi.middleware),
 });
 
 export const persistor = persistStore(store);

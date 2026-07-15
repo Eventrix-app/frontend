@@ -7,14 +7,15 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { EnrollmentRecord, useGetMyEnrollmentsQuery } from '../../store/services/eventsApi';
+import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 
-type TabId = 'upcoming' | 'previous' | 'cancelled';
+type TabId = 'upcoming' | 'previous' | 'cancelled' | 'waitlist';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'upcoming', label: 'Upcoming' },
   { id: 'previous', label: 'Previous' },
+  { id: 'waitlist', label: 'Waitlist' },
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -44,11 +45,33 @@ const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<TabId>('upcoming');
-  const { data: enrollments = [], isLoading, isError, refetch } = useGetMyEnrollmentsQuery();
+  const {
+    data: enrollments = [],
+    isLoading: isLoadingEnrollments,
+    isError: isErrorEnrollments,
+    refetch: refetchEnrollments,
+  } = useGetMyEnrollmentsQuery();
+  const {
+    data: waitlistEntries = [],
+    isLoading: isLoadingWaitlist,
+    isError: isErrorWaitlist,
+    refetch: refetchWaitlist,
+  } = useGetMyWaitlistQuery();
+
+  const isWaitlistTab = activeTab === 'waitlist';
+  const isLoading = isWaitlistTab ? isLoadingWaitlist : isLoadingEnrollments;
+  const isError = isWaitlistTab ? isErrorWaitlist : isErrorEnrollments;
+  const refetch = isWaitlistTab ? refetchWaitlist : refetchEnrollments;
 
   const bookings = useMemo(
     () => enrollments.filter((e) => bucketFor(e) === activeTab),
     [enrollments, activeTab],
+  );
+  // Promoted/expired/cancelled entries have moved on — a promoted one now shows up as a
+  // real enrollment in Upcoming, so only entries still actually queued belong here.
+  const waitingEntries = useMemo(
+    () => waitlistEntries.filter((w) => w.status === 'waiting'),
+    [waitlistEntries],
   );
 
   return (
@@ -75,11 +98,46 @@ const BookingsScreen: React.FC = () => {
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>⚠️</Text>
-          <Text style={styles.emptyTitle}>Couldn't load your bookings</Text>
+          <Text style={styles.emptyTitle}>
+            {isWaitlistTab ? "Couldn't load your waitlist" : "Couldn't load your bookings"}
+          </Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
+      ) : isWaitlistTab ? (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {waitingEntries.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>⏳</Text>
+              <Text style={styles.emptyTitle}>No waitlist entries</Text>
+              <Text style={styles.emptySub}>You'll see it here when you join a sold-out ticket's waitlist</Text>
+            </View>
+          ) : (
+            waitingEntries.map((entry) => {
+              const event = entry.event;
+              return (
+                <View key={entry.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
+                    <View style={[styles.status, { backgroundColor: '#FEF3C7' }]}>
+                      <Text style={[styles.statusText, { color: '#92400E' }]}>#{entry.position} in line</Text>
+                    </View>
+                  </View>
+                  {event ? (
+                    <>
+                      <Text style={styles.meta}>📅 {formatEventDate(event.eventDate)} · {formatEventTime(event.startTime)}</Text>
+                      <Text style={styles.meta}>📍 {event.venueName}</Text>
+                    </>
+                  ) : null}
+                  <Text style={styles.ticketType}>
+                    {entry.ticketType?.name ?? 'General Admission'} · Qty {entry.quantity}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {bookings.length === 0 ? (

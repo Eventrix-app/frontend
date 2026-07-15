@@ -21,6 +21,7 @@ import ErrorNoInternetScreen from '../Pages/screens/ErrorNoInternetScreen';
 import ErrorGenericScreen from '../Pages/screens/ErrorGenericScreen';
 import MyEventsScreen from '../Pages/main/MyEventsScreen';
 import CreateEventScreen from '../Pages/main/CreateEventScreen';
+import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 
@@ -54,6 +55,7 @@ const RootNavigator = () => {
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+        <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />

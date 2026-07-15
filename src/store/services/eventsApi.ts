@@ -99,6 +99,34 @@ export interface EnrollmentRecord {
   ticketType?: { id: string; name: string; price: number };
 }
 
+export interface WaitlistEntryRecord {
+  id: string;
+  eventId: string;
+  ticketTypeId: string;
+  userId: string;
+  quantity: number;
+  status: 'waiting' | 'promoted' | 'expired' | 'cancelled';
+  // 1-indexed FIFO position among still-WAITING entries for the same tier; 0 once the
+  // entry has moved on (promoted/expired/cancelled). See WaitlistService.getPosition().
+  position: number;
+  promotedAt?: string;
+  promotedEnrollmentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Eager-loaded on GET /events/my-waitlist (relations: ['event', 'ticketType']).
+  event?: BackendEvent;
+  ticketType?: { id: string; name: string; price: number };
+}
+
+// EventsService.enroll() returns a confirmed Enrollment when a tier has room, or a
+// WaitlistEntryRecord when it's sold out — `position` only ever appears on the latter,
+// so its presence is what the UI branches on (see EventDetailsScreen's handleEnroll).
+export type EnrollResult = EnrollmentRecord | WaitlistEntryRecord;
+
+export function isWaitlistResult(result: EnrollResult): result is WaitlistEntryRecord {
+  return 'position' in result;
+}
+
 export interface UploadUrlResponse {
   uploadUrl: string;
   publicUrl: string;
@@ -111,7 +139,7 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', '
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents', 'MyEnrollments'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType'],
   // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
   // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
   // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
@@ -166,12 +194,19 @@ export const eventsApi = createApi({
       }),
       invalidatesTags: ['Event', 'MyEvents'],
     }),
-    enrollEvent: builder.mutation<{ id: string; ticketCode?: string }, string>({
-      query: (eventId) => ({
+    enrollEvent: builder.mutation<EnrollResult, { eventId: string; ticketTypeId: string; quantity: number }>({
+      query: ({ eventId, ticketTypeId, quantity }) => ({
         url: `events/${eventId}/enroll`,
         method: 'POST',
+        body: { ticketTypeId, quantity },
       }),
-      invalidatesTags: ['Event', 'MyEnrollments'],
+      invalidatesTags: (result, error, { eventId }) => [
+        { type: 'Event', id: eventId },
+        { type: 'TicketType', id: eventId },
+        'Event',
+        'MyEnrollments',
+        'MyWaitlist',
+      ],
     }),
     getUploadUrl: builder.mutation<UploadUrlResponse, { purpose: UploadPurpose; contentType: UploadContentType }>({
       query: (body) => ({
@@ -187,6 +222,10 @@ export const eventsApi = createApi({
       query: () => 'events/my-enrollments',
       providesTags: ['MyEnrollments'],
     }),
+    getMyWaitlist: builder.query<WaitlistEntryRecord[], void>({
+      query: () => 'events/my-waitlist',
+      providesTags: ['MyWaitlist'],
+    }),
     checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string }>({
       query: (body) => ({
         url: 'events/check-in',
@@ -200,6 +239,7 @@ export const eventsApi = createApi({
     }),
     getTicketTypes: builder.query<TicketTypeRecord[], string>({
       query: (eventId) => `events/${eventId}/ticket-types`,
+      providesTags: (result, error, eventId) => [{ type: 'TicketType', id: eventId }],
     }),
     createTicketType: builder.mutation<TicketTypeRecord, { eventId: string; body: CreateTicketTypePayload }>({
       query: ({ eventId, body }) => ({
@@ -207,6 +247,22 @@ export const eventsApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
+    }),
+    updateTicketType: builder.mutation<TicketTypeRecord, { eventId: string; ticketTypeId: string; body: Partial<CreateTicketTypePayload> }>({
+      query: ({ eventId, ticketTypeId, body }) => ({
+        url: `events/${eventId}/ticket-types/${ticketTypeId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
+    }),
+    deleteTicketType: builder.mutation<void, { eventId: string; ticketTypeId: string }>({
+      query: ({ eventId, ticketTypeId }) => ({
+        url: `events/${eventId}/ticket-types/${ticketTypeId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
     }),
   }),
 });
@@ -222,8 +278,12 @@ export const {
   useGetUploadUrlMutation,
   useGetEventEnrollmentsQuery,
   useGetMyEnrollmentsQuery,
+  useGetMyWaitlistQuery,
   useCheckInMutation,
   useGetEnrollmentByIdQuery,
+  useGetTicketTypesQuery,
   useLazyGetTicketTypesQuery,
   useCreateTicketTypeMutation,
+  useUpdateTicketTypeMutation,
+  useDeleteTicketTypeMutation,
 } = eventsApi;

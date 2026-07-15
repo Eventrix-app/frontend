@@ -13,3 +13,19 @@ export function showAlert(title: string, message?: string, onDismiss?: () => voi
   }
   Alert.alert(title, message, onDismiss ? [{ text: 'OK', onPress: onDismiss }] : undefined);
 }
+
+// Two-button confirm (Cancel/destructive action) — window.confirm() on web actually
+// blocks and returns a boolean, unlike Alert.alert's no-op, so this one genuinely works
+// cross-platform rather than needing the same workaround as showAlert.
+export function showConfirm(title: string, message: string | undefined, onConfirm: () => void, confirmLabel = 'Delete') {
+  if (Platform.OS === 'web') {
+    if ((globalThis as any).confirm(message ? `${title}\n\n${message}` : title)) {
+      onConfirm();
+    }
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: confirmLabel, style: 'destructive', onPress: onConfirm },
+  ]);
+}
