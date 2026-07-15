@@ -73,10 +73,8 @@ const styles = StyleSheet.create({
   },
   fieldGlass: {
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#9CA3AF',
-    backgroundColor: colors.white,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
   },
   field: {
     flexDirection: 'row',

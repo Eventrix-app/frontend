@@ -6,6 +6,7 @@ import { AuthInput } from '../../components/auth/AuthInput';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
 import GlassSurface from '../../components/common/GlassSurface';
+import AnimatedLink from '../../components/common/AnimatedLink';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useLoginMutation } from '../../store/services/authApi';
@@ -35,12 +36,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const isFormValid = email.trim() !== '' && password.trim() !== '';
   
   const isCompact = screenHeight < 720 || screenWidth < 360;
-  const loginBtnHeight = isCompact ? 52 : 60;
+  const loginBtnHeight = isCompact ? 48 : 52;
   const loginBtnRadius = isCompact ? 16 : 20;
-  const secondaryBtnHeight = isCompact ? 44 : 48;
-  const secondaryBtnRadius = isCompact ? 18 : 22;
-  const loginBtnTextSize = isCompact ? 15 : 16;
-  const secondaryBtnTextSize = isCompact ? 12.5 : 13.5;
+  const loginBtnTextSize = isCompact ? 18 : 19;
 
   // Enable scrolling if content exceeds 70% of screen height (leaves room for header and padding)
   const shouldScroll = contentHeight > screenHeight * 0.7;
@@ -147,6 +145,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           activeOpacity={0.9}
         >
           <GlassSurface
+            variant="solid"
             style={[
               styles.loginBtn,
               { height: loginBtnHeight, borderRadius: loginBtnRadius },
@@ -177,31 +176,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </GlassSurface>
         </TouchableOpacity>
 
-        <View style={[styles.secondaryButtons, { gap: isCompact ? spacing.sm : spacing.md }]}> 
-          <TouchableOpacity
-            style={styles.secondaryWrap}
-            onPress={() => navigation.navigate('Register')}
-            activeOpacity={0.8}
-          >
-            <GlassSurface
-              style={[styles.secondaryBtn, { height: secondaryBtnHeight, borderRadius: secondaryBtnRadius }]}
-              contentStyle={styles.secondaryContent}
-            >
-              <Text style={[styles.secondaryBtnText, { fontSize: secondaryBtnTextSize }]}>Register New User</Text>
-            </GlassSurface>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryWrap}
-            onPress={() => navigation.getParent()?.navigate('Main' as never)}
-            activeOpacity={0.8}
-          >
-            <GlassSurface
-              style={[styles.secondaryBtn, { height: secondaryBtnHeight, borderRadius: secondaryBtnRadius }]}
-              contentStyle={styles.secondaryContent}
-            >
-              <Text style={[styles.secondaryBtnText, { fontSize: secondaryBtnTextSize }]}>Continue as Guest</Text>
-            </GlassSurface>
-          </TouchableOpacity>
+        <View style={styles.registerLinkWrap}>
+          <Text style={styles.registerHint}>Don&apos;t have an account?</Text>
+          <AnimatedLink label="Register New User" onPress={() => navigation.navigate('Register')} />
         </View>
 
         <SocialLoginRow compact />
@@ -246,7 +223,8 @@ const styles = StyleSheet.create({
   forgot: { fontSize: 14, color: colors.textMuted },
   forgotLink: { textDecorationLine: 'underline', fontWeight: '600' },
   loginBtn: {
-    backgroundColor: '#F43362',
+    // width: 'auto',
+    backgroundColor: '#f03131',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -254,17 +232,17 @@ const styles = StyleSheet.create({
   },
   loginWrap: {
     borderRadius: 20,
-    overflow: 'hidden',
+    alignSelf: 'center',
+    width: '70%',
   },
   loginContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm + 2,
+    gap: spacing.sm,
   },
   loginBtnText: {
     color: colors.white,
-    fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -274,27 +252,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   loginBtnTextDisabled: { color: '#B5B5BD' },
-  secondaryButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  secondaryWrap: {
-    flex: 1,
-    borderRadius: 22,
-    overflow: 'hidden',
-  },
-  secondaryBtn: {
-    flex: 1,
-  },
-  secondaryContent: {
+  registerLinkWrap: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: spacing.md,
+    gap: spacing.xs,
   },
-  secondaryBtnText: {
-    color: colors.brandPink,
-    fontSize: 13.5,
-    fontWeight: '700',
+  registerHint: {
+    fontSize: 14,
+    color: colors.textMuted,
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',

@@ -20,7 +20,10 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface style={styles.socialGlass} contentStyle={styles.socialGlassContent}>
+        <GlassSurface
+          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
+          contentStyle={styles.socialGlassContent}
+        >
           <Image
             source={require('../../../assets/login screen/Facebookpng.png')}
             style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
@@ -32,7 +35,10 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface style={styles.socialGlass} contentStyle={styles.socialGlassContent}>
+        <GlassSurface
+          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
+          contentStyle={styles.socialGlassContent}
+        >
           <Image
             source={require('../../../assets/login screen/google.png')}
             style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
@@ -44,7 +50,10 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface style={styles.socialGlass} contentStyle={styles.socialGlassContent}>
+        <GlassSurface
+          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
+          contentStyle={styles.socialGlassContent}
+        >
           <Image
             source={require('../../../assets/login screen/apple.png')}
             style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
@@ -83,7 +92,7 @@ const styles = StyleSheet.create({
   icons: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.s,
+    gap: spacing.md,
   },
   socialBtn: {
     width: 300,
@@ -91,29 +100,34 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
   socialBtnCompact: {
     width: 72,
-    height: 64,
-    borderRadius: 18,
+    height: 72,
+    borderRadius: 20,
   },
   socialGlass: {
     borderRadius: 32,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
     width: '100%',
     height: '100%',
   },
+  socialGlassCompact: {
+    borderRadius: 20,
+  },
   socialGlassContent: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   socialIconImage: {
-    width: 96,
-    height: 96,
+    width: 104,
+    height: 104,
   },
   socialIconImageCompact: {
-    width: 96,
-    height: 96,
+    width: 72,
+    height: 72,
   },
 });

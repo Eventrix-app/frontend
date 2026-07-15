@@ -9,9 +9,11 @@ import {
   Switch,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -21,6 +23,8 @@ import {
   useUpdateEventMutation,
   useGetUploadUrlMutation,
   useGetEventByIdQuery,
+  useLazyGetTicketTypesQuery,
+  useCreateTicketTypeMutation,
   ALLOWED_UPLOAD_CONTENT_TYPES,
   UploadContentType,
 } from '../../store/services/eventsApi';
@@ -35,6 +39,61 @@ const REFUND_OPTIONS = [
   { value: 'partial_refund', label: 'Partial Refund' },
   { value: 'full_refund', label: 'Full Refund' },
 ];
+
+const DATE_DISPLAY_FORMATTER = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+function parseDateValue(value: string): Date {
+  if (value) {
+    const [y, m, d] = value.split('-').map(Number);
+    if (y && m && d) return new Date(y, m - 1, d);
+  }
+  return new Date();
+}
+
+function formatDateValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseTimeValue(value: string): Date {
+  const base = new Date();
+  if (value) {
+    const [h, m] = value.split(':').map(Number);
+    if (!Number.isNaN(h) && !Number.isNaN(m)) {
+      base.setHours(h, m, 0, 0);
+      return base;
+    }
+  }
+  base.setSeconds(0, 0);
+  return base;
+}
+
+function formatTimeValue(date: Date): string {
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function formatTimeDisplay(value: string): string {
+  if (!value) return '';
+  const [hourStr, minuteStr] = value.split(':');
+  const hour = Number(hourStr);
+  if (Number.isNaN(hour)) return value;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${minuteStr ?? '00'} ${period}`;
+}
+
+// NestJS's ValidationPipe returns `message` as either a single string or an array of
+// per-field validation strings — surface both cases instead of "[object Object]".
+function extractErrorMessage(e: any, fallback: string): string {
+  const msg = e?.data?.message;
+  if (Array.isArray(msg)) return msg.join('\n');
+  if (typeof msg === 'string' && msg) return msg;
+  return fallback;
+}
 
 const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -58,15 +117,32 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [refundPolicyType, setRefundPolicyType] = useState('no_refunds');
   const [refundPolicyText, setRefundPolicyText] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
+  // An image picked locally but not yet uploaded — the actual upload only happens once
+  // the organizer taps Save/Publish, both because uploading before the event exists is
+  // wasted work if they abandon the form, and because the upload-URL endpoint requires
+  // the 'organizer' role, which the backend only grants at event-creation time (a
+  // brand-new user has no way to pass the role check before their first event is saved).
+  const [pendingImage, setPendingImage] = useState<{ uri: string; contentType: UploadContentType } | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  // Tracks which footer button triggered the save, so only that one shows a spinner —
+  // and doubles as the re-entrancy guard for handleSave (see isSubmittingRef below).
+  const [savingMode, setSavingMode] = useState<'draft' | 'publish' | null>(null);
+  // TouchableOpacity's onPress isn't debounced, and setSavingMode's re-render (which
+  // disables the buttons) can lag a frame behind a fast double-tap — a plain ref check,
+  // set synchronously before any await, closes that gap and is what actually prevents
+  // two events from being created from one rapid double-tap.
+  const isSubmittingRef = useRef(false);
 
   const [createEvent, { isLoading: isCreating }] = useCreateEventMutation();
   const [updateEvent, { isLoading: isUpdating }] = useUpdateEventMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
+  const [fetchTicketTypes] = useLazyGetTicketTypesQuery();
+  const [createTicketType] = useCreateTicketTypeMutation();
   const { data: existingEvent } = useGetEventByIdQuery(eventId!, { skip: !isEdit });
   const { data: categories = [] } = useGetCategoriesQuery();
-
-  const isBusy = isCreating || isUpdating;
 
   useEffect(() => {
     if (!isEdit || !existingEvent || prefilledRef.current) {
@@ -93,6 +169,16 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     prefilledRef.current = true;
   }, [existingEvent, isEdit]);
 
+  // A single implicit "General Admission" tier built from the free/price + capacity
+  // fields this screen already collects. Real multi-tier authoring is a separate,
+  // larger feature — this just ensures every event actually has a bookable tier,
+  // since EventsService.enroll() 400s on an event with zero ticket types.
+  const buildDefaultTicketType = () => ({
+    name: 'General Admission',
+    price: isFree ? 0 : parseFloat(price) || 0,
+    quantityTotal: capacity ? parseInt(capacity, 10) : undefined,
+  });
+
   const buildPayload = (asDraft: boolean) => ({
     title: title.trim(),
     description: description.trim() || undefined,
@@ -111,6 +197,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     approvalStatus: asDraft ? ('draft' as const) : ('pending_approval' as const),
     refundPolicyType: !isFree ? refundPolicyType : undefined,
     refundPolicyText: !isFree && refundPolicyText ? refundPolicyText : undefined,
+    // PATCH /events/:id (edit) rejects ticketTypes — nested ticket-type endpoints own
+    // edits to tiers after creation, so this is create-only.
+    ...(isEdit ? {} : { ticketTypes: [buildDefaultTicketType()] }),
   });
 
   const validate = () => {
@@ -118,14 +207,22 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     if (!categoryId) return 'Please select a category';
     if (!venueName.trim()) return 'Venue name is required';
     if (!venueAddress.trim()) return 'Venue address is required';
-    if (!eventDate) return 'Event date is required (YYYY-MM-DD)';
-    if (!startTime) return 'Start time is required (HH:MM)';
+    if (!eventDate) return 'Please choose an event date';
+    if (!startTime) return 'Please choose a start time';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parseDateValue(eventDate) < today) return 'Event date cannot be in the past';
+    if (endTime && parseTimeValue(endTime) <= parseTimeValue(startTime)) {
+      return 'End time must be after start time';
+    }
     if (!isFree && !price) return 'Price is required for paid events';
     if (isOnline && !meetingLink) return 'Meeting link is required for online events';
     return null;
   };
 
-  const handleUploadCoverImage = async () => {
+  // Picks an image locally only — no network call. The actual upload is deferred to
+  // handleSave, once the event this image belongs to actually exists.
+  const handlePickCoverImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       showAlert('Permission needed', 'Allow photo library access to select a cover image.');
@@ -144,52 +241,108 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
     const asset = pickerResult.assets[0];
     if (!asset.uri) {
-      showAlert('Upload failed', 'Could not read the selected image.');
+      showAlert('Selection failed', 'Could not read the selected image.');
       return;
     }
 
-    setIsUploadingCover(true);
+    const contentType = (ALLOWED_UPLOAD_CONTENT_TYPES.includes(asset.mimeType as UploadContentType)
+      ? asset.mimeType
+      : 'image/jpeg') as UploadContentType;
+    setPendingImage({ uri: asset.uri, contentType });
+  };
+
+  const uploadPendingCoverImage = async (): Promise<string> => {
+    const image = pendingImage!;
+    const uploadResponse = await getUploadUrl({ purpose: 'event-cover', contentType: image.contentType }).unwrap();
+
+    const fileResponse = await fetch(image.uri);
+    const fileBlob = await fileResponse.blob();
+
+    const putResponse = await fetch(uploadResponse.uploadUrl, {
+      method: 'PUT',
+      body: fileBlob,
+      headers: { 'Content-Type': image.contentType },
+    });
+
+    if (!putResponse.ok) {
+      throw new Error('Image upload to storage failed.');
+    }
+
+    return uploadResponse.publicUrl;
+  };
+
+  // Best-effort: an existing (pre-fix or otherwise tier-less) event may have zero
+  // ticket types, which would silently 400 every enroll attempt. Backfill exactly one
+  // default tier if none exist yet; leave events that already have tiers untouched —
+  // editing tiers themselves is a separate, not-yet-built management surface.
+  const backfillTicketTypeIfMissing = async () => {
     try {
-      const contentType = (ALLOWED_UPLOAD_CONTENT_TYPES.includes(asset.mimeType as UploadContentType)
-        ? asset.mimeType
-        : 'image/jpeg') as UploadContentType;
-      const uploadResponse = await getUploadUrl({ purpose: 'event-cover', contentType }).unwrap();
-
-      const fileResponse = await fetch(asset.uri);
-      const fileBlob = await fileResponse.blob();
-
-      const putResponse = await fetch(uploadResponse.uploadUrl, {
-        method: 'PUT',
-        body: fileBlob,
-        headers: { 'Content-Type': contentType },
-      });
-
-      if (!putResponse.ok) {
-        throw new Error('Image upload to storage failed.');
+      const existingTiers = await fetchTicketTypes(eventId!).unwrap();
+      if (existingTiers.length === 0) {
+        await createTicketType({ eventId: eventId!, body: buildDefaultTicketType() }).unwrap();
       }
-
-      setCoverImageUrl(uploadResponse.publicUrl);
-    } catch (error) {
-      showAlert('Upload failed', error instanceof Error ? error.message : 'Could not upload the image.');
-    } finally {
-      setIsUploadingCover(false);
+    } catch {
+      // Non-fatal — the event save itself already succeeded.
     }
   };
 
   const handleSave = async (asDraft: boolean) => {
+    if (isSubmittingRef.current) return;
     const err = validate();
     if (err) { showAlert('Validation', err); return; }
 
+    isSubmittingRef.current = true;
+    setSavingMode(asDraft ? 'draft' : 'publish');
+
+    let imageWarning: string | null = null;
+
     try {
       const payload = buildPayload(asDraft);
+      let savedEvent = isEdit
+        ? await updateEvent({ id: eventId!, body: payload }).unwrap()
+        : await createEvent(payload).unwrap();
+
       if (isEdit) {
-        await updateEvent({ id: eventId!, body: payload }).unwrap();
-      } else {
-        await createEvent(payload).unwrap();
+        await backfillTicketTypeIfMissing();
       }
-      navigation.navigate('MyEvents');
+
+      if (pendingImage) {
+        setIsUploadingCover(true);
+        try {
+          const publicUrl = await uploadPendingCoverImage();
+          savedEvent = await updateEvent({ id: savedEvent.id, body: { coverImageUrl: publicUrl } }).unwrap();
+          setCoverImageUrl(publicUrl);
+          setPendingImage(null);
+        } catch {
+          imageWarning = 'The cover image failed to upload — you can add it again from Edit.';
+        } finally {
+          setIsUploadingCover(false);
+        }
+      }
+
+      const successTitle = asDraft ? 'Draft Saved' : 'Event Published';
+      const successMessage = asDraft
+        ? 'Your event has been saved as a draft.'
+        : isFree
+          ? 'Your event is now live.'
+          : 'Your event has been submitted for approval.';
+
+      // Navigating only happens once the user dismisses this dialog — that ordering is
+      // deliberate: it's the confirmation that the save actually succeeded, and it stops
+      // the screen from silently sitting on the (still-tappable, pre-fix) form afterward.
+      showAlert(
+        successTitle,
+        imageWarning ? `${successMessage}\n\n${imageWarning}` : successMessage,
+        () => navigation.navigate('MyEvents'),
+      );
     } catch (e: any) {
-      showAlert('Error', e?.data?.message ?? 'Something went wrong');
+      showAlert(
+        asDraft ? "Couldn't save draft" : "Couldn't publish event",
+        extractErrorMessage(e, 'Something went wrong. Please check your connection and try again.'),
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setSavingMode(null);
     }
   };
 
@@ -230,14 +383,83 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.label}>Venue Address *</Text>
         <TextInput style={styles.input} value={venueAddress} onChangeText={setVenueAddress} placeholder="Full address" placeholderTextColor={colors.textSecondary} />
 
-        <Text style={styles.label}>Date * (YYYY-MM-DD)</Text>
-        <TextInput style={styles.input} value={eventDate} onChangeText={setEventDate} placeholder="2025-12-31" placeholderTextColor={colors.textSecondary} />
+        <Text style={styles.label}>Date *</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <Text style={eventDate ? styles.pickerValue : styles.pickerPlaceholder}>
+            {eventDate ? DATE_DISPLAY_FORMATTER.format(parseDateValue(eventDate)) : 'Select event date'}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <View style={styles.pickerWrap}>
+            <DateTimePicker
+              value={parseDateValue(eventDate)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              minimumDate={new Date()}
+              onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                if (Platform.OS === 'android') setShowDatePicker(false);
+                if (event.type === 'set' && selectedDate) setEventDate(formatDateValue(selectedDate));
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.pickerDoneText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
-        <Text style={styles.label}>Start Time * (HH:MM)</Text>
-        <TextInput style={styles.input} value={startTime} onChangeText={setStartTime} placeholder="18:00" placeholderTextColor={colors.textSecondary} />
+        <Text style={styles.label}>Start Time *</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowStartTimePicker(true)}>
+          <Text style={startTime ? styles.pickerValue : styles.pickerPlaceholder}>
+            {startTime ? formatTimeDisplay(startTime) : 'Select start time'}
+          </Text>
+        </TouchableOpacity>
+        {showStartTimePicker && (
+          <View style={styles.pickerWrap}>
+            <DateTimePicker
+              value={parseTimeValue(startTime)}
+              mode="time"
+              is24Hour={false}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                if (Platform.OS === 'android') setShowStartTimePicker(false);
+                if (event.type === 'set' && selectedTime) setStartTime(formatTimeValue(selectedTime));
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowStartTimePicker(false)}>
+                <Text style={styles.pickerDoneText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
-        <Text style={styles.label}>End Time (HH:MM)</Text>
-        <TextInput style={styles.input} value={endTime} onChangeText={setEndTime} placeholder="21:00" placeholderTextColor={colors.textSecondary} />
+        <Text style={styles.label}>End Time</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowEndTimePicker(true)}>
+          <Text style={endTime ? styles.pickerValue : styles.pickerPlaceholder}>
+            {endTime ? formatTimeDisplay(endTime) : 'Select end time'}
+          </Text>
+        </TouchableOpacity>
+        {showEndTimePicker && (
+          <View style={styles.pickerWrap}>
+            <DateTimePicker
+              value={parseTimeValue(endTime)}
+              mode="time"
+              is24Hour={false}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                if (Platform.OS === 'android') setShowEndTimePicker(false);
+                if (event.type === 'set' && selectedTime) setEndTime(formatTimeValue(selectedTime));
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowEndTimePicker(false)}>
+                <Text style={styles.pickerDoneText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <Text style={styles.label}>Capacity</Text>
         <TextInput style={styles.input} value={capacity} onChangeText={setCapacity} placeholder="Max attendees" placeholderTextColor={colors.textSecondary} keyboardType="numeric" />
@@ -286,21 +508,22 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <Text style={styles.label}>Cover Image</Text>
         <TouchableOpacity
-          style={[styles.uploadBtn, isUploadingCover && styles.uploadBtnDisabled]}
-          onPress={handleUploadCoverImage}
-          disabled={isUploadingCover}
+          style={[styles.uploadBtn, savingMode !== null && styles.uploadBtnDisabled]}
+          onPress={handlePickCoverImage}
+          disabled={savingMode !== null}
         >
-          {isUploadingCover ? (
-            <ActivityIndicator color={colors.brandPink} />
-          ) : (
-            <Text style={styles.uploadBtnText}>Choose and Upload Cover Image</Text>
-          )}
+          <Text style={styles.uploadBtnText}>
+            {pendingImage || coverImageUrl ? 'Change Cover Image' : 'Choose Cover Image'}
+          </Text>
         </TouchableOpacity>
+        {pendingImage ? (
+          <Text style={styles.previewHint}>Uploaded when you save this event.</Text>
+        ) : null}
 
-        {coverImageUrl ? (
+        {pendingImage || coverImageUrl ? (
           <View style={styles.previewWrap}>
             <Text style={styles.previewLabel}>Preview</Text>
-            <Image source={{ uri: coverImageUrl }} style={styles.previewImage} />
+            <Image source={{ uri: pendingImage?.uri ?? coverImageUrl }} style={styles.previewImage} />
           </View>
         ) : null}
       </ScrollView>
@@ -309,18 +532,26 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity
           style={[styles.btn, styles.draftBtn]}
           onPress={() => handleSave(true)}
-          disabled={isBusy}
+          disabled={savingMode !== null}
         >
-          {isBusy ? <ActivityIndicator color={colors.text} /> : <Text style={styles.draftBtnText}>Save as Draft</Text>}
+          {savingMode === 'draft' ? (
+            <ActivityIndicator color={colors.text} />
+          ) : (
+            <Text style={styles.draftBtnText}>Save as Draft</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.btn, styles.publishBtn]}
           onPress={() => handleSave(false)}
-          disabled={isBusy}
+          disabled={savingMode !== null}
         >
-          <Text style={styles.publishBtnText}>
-            {isFree ? 'Publish Event' : 'Submit for Approval'}
-          </Text>
+          {savingMode === 'publish' ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.publishBtnText}>
+              {isFree ? 'Publish Event' : 'Submit for Approval'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -359,6 +590,26 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
+  pickerValue: { fontSize: 15, color: colors.text },
+  pickerPlaceholder: { fontSize: 15, color: colors.textSecondary },
+  pickerWrap: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+  },
+  pickerDoneBtn: {
+    alignSelf: 'stretch',
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  pickerDoneText: { color: colors.white, fontWeight: '600' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
   categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   refundRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.sm },
@@ -395,6 +646,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  previewHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   previewImage: {
     width: '100%',

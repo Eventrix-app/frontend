@@ -82,7 +82,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
         centerTitle
       >
         <View style={styles.successContainer}>
-          <GlassSurface style={styles.successIconGlass} contentStyle={styles.successIconContent}>
+          <GlassSurface variant="solid" style={styles.successIconGlass} contentStyle={styles.successIconContent}>
             <Text style={styles.successIcon}>✓</Text>
           </GlassSurface>
           
@@ -96,7 +96,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.9}
           >
-            <GlassSurface style={styles.loginBtn} contentStyle={styles.loginBtnContent}>
+            <GlassSurface variant="solid" style={styles.loginBtn} contentStyle={styles.loginBtnContent}>
               <Text style={styles.loginBtnText}>Back to Log In</Text>
             </GlassSurface>
           </TouchableOpacity>
@@ -293,7 +293,6 @@ const styles = StyleSheet.create({
   loginBtnWrap: {
     width: '100%',
     borderRadius: 16,
-    overflow: 'hidden',
   },
   loginBtn: {
     backgroundColor: colors.brandPink,

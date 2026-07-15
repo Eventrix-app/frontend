@@ -39,6 +39,25 @@ export interface BackendEvent {
   organizer?: { id: string; userId: string; companyName: string; companyLogoUrl?: string; user?: { id: string; fullName: string } };
 }
 
+export interface CreateTicketTypePayload {
+  name: string;
+  price: number;
+  currency?: string;
+  quantityTotal?: number;
+  salesStartAt?: string;
+  salesEndAt?: string;
+  minPerOrder?: number;
+  maxPerOrder?: number;
+  isHidden?: boolean;
+  accessPassword?: string;
+}
+
+export interface TicketTypeRecord extends CreateTicketTypePayload {
+  id: string;
+  eventId: string;
+  quantitySold: number;
+}
+
 export interface CreateEventPayload {
   title: string;
   description?: string;
@@ -57,6 +76,9 @@ export interface CreateEventPayload {
   isPaid?: boolean;
   refundPolicyType?: string;
   refundPolicyText?: string;
+  // Only accepted by POST /events — PATCH /events/:id omits it (nested ticket-type
+  // endpoints own edits to tiers after creation).
+  ticketTypes?: CreateTicketTypePayload[];
 }
 
 export interface EnrollmentRecord {
@@ -176,6 +198,16 @@ export const eventsApi = createApi({
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
       query: (enrollmentId) => `events/enrollments/${enrollmentId}`,
     }),
+    getTicketTypes: builder.query<TicketTypeRecord[], string>({
+      query: (eventId) => `events/${eventId}/ticket-types`,
+    }),
+    createTicketType: builder.mutation<TicketTypeRecord, { eventId: string; body: CreateTicketTypePayload }>({
+      query: ({ eventId, body }) => ({
+        url: `events/${eventId}/ticket-types`,
+        method: 'POST',
+        body,
+      }),
+    }),
   }),
 });
 
@@ -192,4 +224,6 @@ export const {
   useGetMyEnrollmentsQuery,
   useCheckInMutation,
   useGetEnrollmentByIdQuery,
+  useLazyGetTicketTypesQuery,
+  useCreateTicketTypeMutation,
 } = eventsApi;

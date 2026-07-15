@@ -108,12 +108,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onBack={() => navigation.goBack()}
         primaryDisabled={!canSubmit}
       />
-      <OutlineButtonRow
+      {/* <OutlineButtonRow
         leftLabel="Log In"
         rightLabel="Continue as Guest"
         onLeft={() => navigation.navigate('Login')}
         onRight={handleRegister}
-      />
+      /> */}
 
       <SocialLoginRow compact />
       <LegalFooter />
