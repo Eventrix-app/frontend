@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
-import { CategoryIconCard, CATEGORIES } from '../../components/events/CategoryIconCard';
+import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
+import HalfScreenModal from '../../components/common/halfscreenmodal';
+import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -31,6 +33,7 @@ const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { data: events = [] } = useGetEventsQuery({});
   const cardEvents = events.map(toCardEvent);
+  const [showInterestSheet, setShowInterestSheet] = useState(false);
 
   const featuredCards = cardEvents.slice(0, 5).map((event) => ({
     id: event.id,
@@ -49,6 +52,9 @@ const ExploreScreen: React.FC = () => {
   const openCategory = (categoryKey: string) => {
     navigation.navigate('Search', { category: categoryKey } as never);
   };
+
+  const openInterestSheet = () => setShowInterestSheet(true);
+  const closeInterestSheet = () => setShowInterestSheet(false);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -94,40 +100,40 @@ const ExploreScreen: React.FC = () => {
           </TouchableOpacity>
         ))}
       </ScrollView>
-      
+
       {cardEvents.length === 0 ? (
-      <NoEvents
-        onBack={() => navigation.goBack()}
-        onGoHome={() => navigation.navigate('Home' as never)}
-      />
-    ) : (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {featuredCards.length > 0 && (
-          <>
-            <SectionHeader title="Featured" />
-            <FeaturedCarousel events={featuredCards} onEventPress={openEvent} />
-          </>
-        )}
+        <NoEvents
+          onBack={() => navigation.goBack()}
+          onGoHome={() => navigation.navigate('Home' as never)}
+        />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          <SectionHeader title="Browse by Category" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+            {CATEGORIES.map((category) => (
+              <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+            ))}
+            <ViewAllCategoryIconCard onPress={openInterestSheet} />
+          </ScrollView>
 
-        <SectionHeader title="Browse by Category" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {CATEGORIES.map((category) => (
-            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          <SectionHeader title="You Might Also Like" />
+          {cardEvents.map((event) => (
+            <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
           ))}
-        </ScrollView>
-          
-      
-        
-        <SectionHeader title="You Might Also Like" />
-        {cardEvents.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
-        ))}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
-        </View>
-      </ScrollView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
+          </View>
+        </ScrollView>
       )}
+
+     <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
+      <InterestSelectionScreen
+    mode="sheet"
+    onComplete={closeInterestSheet}
+    onDismiss={closeInterestSheet}
+  />
+</HalfScreenModal>
     </View>
   );
 };
@@ -147,8 +153,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     color: colors.text,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
+    fontFamily: 'ZalandoSansExpanded_700Bold',
+  },
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',

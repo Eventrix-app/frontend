@@ -20,6 +20,7 @@ import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventsQuery } from '../../store/services/eventsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
+import Noevents from '../../components/common/Noevents';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -144,12 +145,11 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
               {results.length} result{results.length === 1 ? '' : 's'}
             </Text>
             {results.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔎</Text>
-                <Text style={styles.emptyTitle}>No events found</Text>
-                <Text style={styles.emptySub}>Try a different keyword or category</Text>
-              </View>
-            ) : (
+            <Noevents 
+                inline
+              subtitle={query ? `No events matching "${query}"` : 'Try a different keyword or category'}
+  />
+) : (
               results.map((event) => (
                 <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
               ))

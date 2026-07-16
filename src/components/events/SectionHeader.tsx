@@ -7,12 +7,13 @@ import { Text } from '../common/Text';
 type SectionHeaderProps = {
   title: string;
   light?: boolean;
+  hideLine?: boolean;
 };
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light }) => (
+export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light, hideLine }) => (
   <View style={styles.row}>
     <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
-    <View style={[styles.line, light && styles.lineLight]} />
+    {!hideLine && <View style={[styles.line, light && styles.lineLight]} />}
   </View>
 );
 

@@ -1,16 +1,21 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
-const TABS: { name: string; label: string; icon: string }[] = [
-  { name: 'Home', label: 'Home', icon: '🏠' },
-  { name: 'Explore', label: 'Explore', icon: '🔷' },
-  { name: 'Shorts', label: 'Shorts', icon: '▶️' },
-  { name: 'Bookings', label: 'Bookings', icon: '🎫' },
+import HouseIcon from '../../../assets/icons/navbar/House.svg';
+import ShapesIcon from '../../../assets/icons/navbar/Shapes.svg';
+import PlayCircleIcon from '../../../assets/icons/navbar/PlayCircle.svg';
+import TicketIcon from '../../../assets/icons/navbar/Ticket.svg';
+
+const TABS: { name: string; label: string; icon: any }[] = [
+  { name: 'Home', label: 'Home', icon: HouseIcon },
+  { name: 'Explore', label: 'Explore', icon: ShapesIcon },
+  { name: 'Shorts', label: 'Shorts', icon: PlayCircleIcon },
+  { name: 'Bookings', label: 'Bookings', icon: TicketIcon },
 ];
 
 export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
@@ -25,7 +30,7 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
         {state.routes.map((route, index) => {
           const tab = TABS.find((t) => t.name === route.name) ?? {
             label: route.name,
-            icon: '•',
+            icon: HouseIcon,
           };
           const active = state.index === index;
 
@@ -37,7 +42,14 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
               activeOpacity={0.7}
             >
               {active ? <View style={styles.indicator} /> : null}
-              <Text style={[styles.icon, !active && styles.iconMuted]}>{tab.icon}</Text>
+              <Image
+                source={tab.icon}
+                style={[
+                  styles.icon,
+                  { tintColor: active ? colors.brandPink : colors.stone600 },
+                ]}
+                resizeMode="contain"
+              />
               <Text
                 style={[styles.label, active ? styles.labelActive : styles.labelMuted]}
                 numberOfLines={1}
@@ -84,20 +96,19 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 2,
   },
-  indicator: {
-    position: 'absolute',
-    top: 0,
-    width: '70%',
-    height: 4,
-    backgroundColor: colors.brandPink,
-    borderBottomLeftRadius: 1000,
-    borderBottomRightRadius: 1000,
-  },
+ indicator: {
+  position: 'absolute',
+  top: -spacing.sm,     // was: top: 0 — pulls it up into bar's paddingTop, flush with the navbar's top edge
+  alignSelf: 'center',
+  width: '70%',
+  height: 4,
+  backgroundColor: colors.brandPink,
+  borderBottomLeftRadius: 1000,
+  borderBottomRightRadius: 1000,
+},
   icon: {
-    fontSize: 20,
-  },
-  iconMuted: {
-    opacity: 0.5,
+    width: 22,
+    height: 22,
   },
   label: {
     fontSize: 12,
