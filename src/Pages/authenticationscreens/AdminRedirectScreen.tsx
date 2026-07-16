@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { AuthLayout } from '../../components/auth/AuthLayout';
@@ -9,6 +9,7 @@ import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminRedirect'>;
 
@@ -16,7 +17,8 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   
-  const dashboardUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'http://localhost:5173';
+  const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://enevtrix1.vercel.app/admin';
+  const dashboardUrl = `${dashboardBaseUrl}${dashboardBaseUrl.includes('?') ? '&' : '?'}loggedIn=true`;
 
   const handleRedirect = async () => {
     try {

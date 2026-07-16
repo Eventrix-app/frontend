@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { CATEGORIES } from '../../data/mockEvents';
 import { RightArrow } from '../common/Icons';
 import { spacing } from '../../theme/spacing';
 import { colors } from '../../theme/colors';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type CategoryScrollerProps = {
   onCategoryPress?: (id: string) => void;

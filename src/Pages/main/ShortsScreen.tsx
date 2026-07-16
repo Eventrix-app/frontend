@@ -3,7 +3,6 @@ import {
   Dimensions,
   FlatList,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -12,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MOCK_SHORTS } from '../../data/mockEvents';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../../components/common/Text';
 
 const { height } = Dimensions.get('window');
 
@@ -107,11 +107,11 @@ const styles = StyleSheet.create({
   topTitle: {
     color: colors.white,
     fontSize: 18,
-    fontWeight: '500',
     textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   topActions: {
     flexDirection: 'row',
     gap: spacing.md,

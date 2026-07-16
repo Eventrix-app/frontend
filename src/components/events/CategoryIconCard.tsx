@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from '../common/GlassSurface';
@@ -8,6 +8,7 @@ import MusicIcon from '../../../assets/home-screen-categories/music.svg';
 import TechIcon from '../../../assets/home-screen-categories/tech.svg';
 import SportsIcon from '../../../assets/home-screen-categories/sport.svg';
 import HealthIcon from '../../../assets/home-screen-categories/health.svg';
+import { Text } from '../common/Text';
 
 export interface CategoryItem {
   key: string;

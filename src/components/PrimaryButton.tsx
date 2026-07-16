@@ -3,11 +3,11 @@ import {
   Animated,
   Pressable,
   StyleSheet,
-  Text,
   ViewStyle,
 } from 'react-native';
 import { colors, radius, typography } from '../theme';
 import GlassSurface from './common/GlassSurface';
+import { Text } from './common/Text';
 
 type Variant = 'solid' | 'ghost' | 'onGradient' | 'ghostOnGradient';
 

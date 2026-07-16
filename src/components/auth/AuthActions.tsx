@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import GlassSurface from '../common/GlassSurface';
 import { LeftArrow, RightArrow } from '../common/Icons';
+import { Text } from '../common/Text';
 
 type AuthActionsProps = {
   primaryLabel: string;
@@ -30,7 +31,7 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
       disabled={primaryDisabled}
       activeOpacity={0.9}
     >
-      <GlassSurface style={styles.primaryBtn} contentStyle={styles.primaryContent}>
+      <GlassSurface variant="solid" style={styles.primaryBtn} contentStyle={styles.primaryContent}>
         <Text style={styles.primaryText}>{primaryLabel}</Text>
         <RightArrow color={colors.white} />
       </GlassSurface>
@@ -52,11 +53,15 @@ export const OutlineButtonRow: React.FC<OutlineButtonRowProps> = ({
   onRight,
 }) => (
   <View style={styles.outlineRow}>
-    <TouchableOpacity style={styles.outlineBtn} onPress={onLeft} activeOpacity={0.8}>
-      <Text style={styles.outlineText}>{leftLabel}</Text>
+    <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
+      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
+        <Text style={styles.outlineText}>{leftLabel}</Text>
+      </GlassSurface>
     </TouchableOpacity>
-    <TouchableOpacity style={styles.outlineBtn} onPress={onRight} activeOpacity={0.8}>
-      <Text style={styles.outlineText}>{rightLabel}</Text>
+    <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
+      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
+        <Text style={styles.outlineText}>{rightLabel}</Text>
+      </GlassSurface>
     </TouchableOpacity>
   </View>
 );
@@ -69,15 +74,13 @@ const styles = StyleSheet.create({
   },
   backWrap: {
     borderRadius: 16,
-    overflow: 'hidden',
   },
   backBtn: {
     width: 56,
     height: 56,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: colors.brandPink,
-    backgroundColor: colors.white,
+    borderColor: 'rgba(244,51,98,0.35)',
   },
   backContent: {
     alignItems: 'center',
@@ -87,7 +90,6 @@ const styles = StyleSheet.create({
   primaryWrap: {
     flex: 1,
     borderRadius: 16,
-    overflow: 'hidden',
   },
   primaryContent: {
     flexDirection: 'row',
@@ -124,14 +126,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md,
   },
-  outlineBtn: {
+  outlineWrap: {
     flex: 1,
-    height: 37,
+  },
+  outlineBtn: {
+    height: 48,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: colors.brandPink,
+    borderColor: 'rgba(244,51,98,0.35)',
+  },
+  outlineContent: {
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
   },
   outlineText: {
     color: colors.brandPink,

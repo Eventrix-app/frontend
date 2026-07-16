@@ -33,6 +33,10 @@
         "projectId": "8652e400-bcb5-4a21-877f-18cbdbb501e8"
       }
     },
-    "owner": "aarish33"
+    "owner": "aarish33",
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ]
   }
 }

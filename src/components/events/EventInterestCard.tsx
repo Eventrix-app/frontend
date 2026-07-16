@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 // Extend your real event type/mock data with these optional fields as the
 // API/schema fills them in. Falls back to placeholder copy until then.
@@ -24,6 +25,14 @@ interface Props {
   onPress: () => void;
 }
 
+// event.image may be a require()'d local asset (number) or a real backend URL (string) —
+// <Image source> needs a {uri} wrapper for the latter, a bare string isn't a valid source.
+const resolveImageSource = (image: unknown) => {
+  if (!image) return undefined;
+  if (typeof image === 'string') return { uri: image };
+  return image as any;
+};
+
 export const EventInterestCard: React.FC<Props> = ({ event, width, onPress }) => {
   return (
     <TouchableOpacity
@@ -32,7 +41,7 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress }) =>
       onPress={onPress}
     >
       <View style={styles.imageWrap}>
-        <Image source={event.image} style={styles.image} resizeMode="cover" />
+        <Image source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />
 
         <View style={styles.topLeftBadge}>
           <Text style={styles.topLeftBadgeText}>
@@ -167,10 +176,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

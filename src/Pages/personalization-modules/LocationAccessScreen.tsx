@@ -6,7 +6,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
   Image,
   TextInput,
@@ -20,6 +19,7 @@ import { setLocation, setManualCity } from '../../store/slices/onboardingDraftSl
 import { AppDispatch, RootState } from '../../store';
 import { colors, spacing } from '../../theme';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { Text } from '../../components/common/Text';
 
 const { height } = Dimensions.get('window');
 
@@ -251,21 +251,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: {
-    fontWeight: '500',
     fontSize: 20,
     lineHeight: 20,
     textAlign: 'center',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   subtitle: {
-    fontWeight: '500',
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
     color: colors.subtext,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
 
   // ── Content ──────────────────────────────────────────────────────────────

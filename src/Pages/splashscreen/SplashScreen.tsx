@@ -2,7 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Image, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSelector } from 'react-redux';
 import { AuthStackParamList } from '../../navigation/types';
+import { RootState } from '../../store';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -14,6 +16,12 @@ const EXIT_MS  = 700;
 const SplashScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList, 'Splash'>>();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // Persisted per-device (see onboardingDraftSlice) — a returning user who has already
+  // been through the onboarding chain on this device (or just authenticated) skips
+  // straight to Login instead of replaying Onboarding/InterestSelection/etc. every time.
+  const hasCompletedOnboarding = useSelector(
+    (state: RootState) => state.onboardingDraft.hasCompletedOnboarding,
+  );
 
   const isSmallScreen  = windowWidth < 375;
   const isMediumScreen = windowWidth >= 375 && windowWidth < 414;
@@ -62,11 +70,11 @@ const SplashScreen = () => {
           easing: easeOut,
           useNativeDriver: true,
         }),
-      ]).start(() => navigation.replace('Onboarding'));
+      ]).start(() => navigation.replace(hasCompletedOnboarding ? 'Login' : 'Onboarding'));
     }, 3200);
 
     return () => clearTimeout(timeout);
-  }, []);
+  }, [hasCompletedOnboarding]);
 
   return (
     <Animated.View
@@ -119,13 +127,13 @@ const styles = StyleSheet.create({
   },
   appName: {
     color: colors.white,
-    fontWeight: '800',
+    fontFamily: 'ZalandoSansExpanded_800ExtraBold',
     lineHeight: 60,
     marginBottom: spacing.sm,
   },
   tagline: {
     color: colors.white,
-    fontWeight: '600',
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
     lineHeight: 30,
     opacity: 0.9,
   },

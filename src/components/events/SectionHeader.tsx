@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 type SectionHeaderProps = {
   title: string;
@@ -24,11 +25,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   line: {
     flex: 1,
     height: 1,

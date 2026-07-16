@@ -1,73 +1,125 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import FeaturedCarousel from '../../components/events/FeaturedCarousel';
+import { CategoryIconCard, CATEGORIES } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
-import { MOCK_EVENTS } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { toCardEvent } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
+import NoEvents from '../../components/common/Noevents';
 
-const FILTER_OPTIONS = [
-  { id: 'all', label: 'All', icon: '✨' },
-  { id: 'today', label: 'Today', icon: '📅' },
-  { id: 'weekend', label: 'Weekend', icon: '🎉' },
-  { id: 'free', label: 'Free', icon: '🆓' },
-  { id: 'nearby', label: 'Nearby', icon: '📍' },
+const FILTER_CHIPS = [
+  { id: 'date', label: 'Date' },
+  { id: 'price', label: 'Price' },
+  { id: 'distance', label: 'Distance' },
+  { id: 'category', label: 'Category' },
 ];
+
+// TODO: source from user profile / auth state instead of hardcoding
+const CURRENT_USER_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
+const hasUnread = true; // TODO: replace with real unread count from notification context/API
 
 const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [filter, setFilter] = useState('all');
+  const { data: events = [] } = useGetEventsQuery({});
+  const cardEvents = events.map(toCardEvent);
+
+  const featuredCards = cardEvents.slice(0, 5).map((event) => ({
+    id: event.id,
+    title: event.title,
+    date: (event as any).date,
+    location: (event as any).venue,
+    price: (event as any).price,
+    image: (event as any).image,
+    featured: true,
+  }));
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
   };
 
+  const openCategory = (categoryKey: string) => {
+    navigation.navigate('Search', { category: categoryKey } as never);
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      {/* Top bar: back, title, search, bell, avatar */}
       <View style={styles.topBar}>
-        <View>
-          <Text style={styles.kicker}>Discover</Text>
-          <Text style={styles.title}>Explore events</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={() => navigation.navigate('Search')}
-        >
-          <Text style={styles.filterIcon}>🔍</Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
+
+        <Text style={styles.title}>Explore</Text>
+
+        <View style={styles.topBarRight}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+            <Text style={styles.iconText}>🔍</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={styles.iconText}>🔔</Text>
+            {hasUnread && <View style={styles.bellDot} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Image source={CURRENT_USER_AVATAR} style={styles.avatarImg} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Inline filter pills — no external component dependency */}
+      {/* Dropdown-style filter chips */}
       <ScrollView
         horizontal
+        style={styles.chipsScroll}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillsRow}
+        contentContainerStyle={styles.chipsRow}
       >
-        {FILTER_OPTIONS.map((option) => {
-          const active = filter === option.id;
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.pill, active && styles.pillActive]}
-              onPress={() => setFilter(option.id)}
-            >
-              <Text style={styles.pillIcon}>{option.icon}</Text>
-              <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+        <TouchableOpacity style={styles.slidersBtn}>
+          <Text style={styles.slidersIcon}>☰</Text>
+        </TouchableOpacity>
 
+        {FILTER_CHIPS.map((chip) => (
+          <TouchableOpacity key={chip.id} style={styles.chip}>
+            <Text style={styles.chipLabel}>{chip.label}</Text>
+            <Text style={styles.chipChevron}>⌄</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      
+      {cardEvents.length === 0 ? (
+      <NoEvents
+        onBack={() => navigation.goBack()}
+        onGoHome={() => navigation.navigate('Home' as never)}
+      />
+    ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <SectionHeader title="All Events" />
-        {MOCK_EVENTS.map((event) => (
+        {featuredCards.length > 0 && (
+          <>
+            <SectionHeader title="Featured" />
+            <FeaturedCarousel events={featuredCards} onEventPress={openEvent} />
+          </>
+        )}
+
+        <SectionHeader title="Browse by Category" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {CATEGORIES.map((category) => (
+            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          ))}
+        </ScrollView>
+          
+      
+        
+        <SectionHeader title="You Might Also Like" />
+        {cardEvents.map((event) => (
           <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
         ))}
 
@@ -75,6 +127,7 @@ const ExploreScreen: React.FC = () => {
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -86,82 +139,100 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: colors.brandPink,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    paddingVertical: spacing.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 20,
     color: colors.text,
-  },
-  filterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white,
-  },
-  filterIcon: {
-    fontSize: 16,
-  },
-   pillsRow: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  pill: {
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
+  topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
-    backgroundColor: colors.white,
-    marginRight: spacing.sm,
+    gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: {
+    fontSize: 18,
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  avatarImg: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  chipsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  chipsRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  slidersBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#EDEDED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs ?? 4,
   },
-  pillActive: {
-    backgroundColor: colors.brandPink,
-    borderColor: colors.brandPink,
-    shadowColor: colors.brandPink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  pillIcon: {
+  slidersIcon: {
     fontSize: 15,
+    color: colors.textSecondary,
   },
-  pillLabel: {
-    fontSize: 14,
-    fontWeight: '700',
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#EDEDED',
+    backgroundColor: colors.white,
+    marginRight: spacing.sm,
+  },
+  chipLabel: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.text,
   },
-  pillLabelActive: {
-    color: colors.white,
+  chipChevron: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingBottom: spacing.sm,
   },
   footer: {
     alignItems: 'center',

@@ -33,6 +33,29 @@ export interface BackendEvent {
   status: string;
   createdAt: string;
   updatedAt: string;
+  // Eager-loaded by the backend on both GET /events and GET /events/:id
+  // (events.service.ts findAllFiltered/findOne relations: ['organizer', 'organizer.user', 'category']).
+  category?: { id: string; name: string; emoji?: string; colorHex?: string };
+  organizer?: { id: string; userId: string; companyName: string; companyLogoUrl?: string; user?: { id: string; fullName: string } };
+}
+
+export interface CreateTicketTypePayload {
+  name: string;
+  price: number;
+  currency?: string;
+  quantityTotal?: number;
+  salesStartAt?: string;
+  salesEndAt?: string;
+  minPerOrder?: number;
+  maxPerOrder?: number;
+  isHidden?: boolean;
+  accessPassword?: string;
+}
+
+export interface TicketTypeRecord extends CreateTicketTypePayload {
+  id: string;
+  eventId: string;
+  quantitySold: number;
 }
 
 export interface CreateEventPayload {
@@ -53,6 +76,9 @@ export interface CreateEventPayload {
   isPaid?: boolean;
   refundPolicyType?: string;
   refundPolicyText?: string;
+  // Only accepted by POST /events — PATCH /events/:id omits it (nested ticket-type
+  // endpoints own edits to tiers after creation).
+  ticketTypes?: CreateTicketTypePayload[];
 }
 
 export interface EnrollmentRecord {
@@ -62,23 +88,67 @@ export interface EnrollmentRecord {
   quantity: number;
   totalAmount: number;
   status: string;
+  paymentStatus?: string;
   bookingReference: string;
   ticketCode?: string;
   checkedInAt?: string;
   bookingDate?: string;
   user?: { id: string; email: string; fullName: string };
+  // Eager-loaded on GET /events/my-enrollments (relations: ['event', 'ticketType']).
+  event?: BackendEvent;
+  ticketType?: { id: string; name: string; price: number };
+}
+
+export interface WaitlistEntryRecord {
+  id: string;
+  eventId: string;
+  ticketTypeId: string;
+  userId: string;
+  quantity: number;
+  status: 'waiting' | 'promoted' | 'expired' | 'cancelled';
+  // 1-indexed FIFO position among still-WAITING entries for the same tier; 0 once the
+  // entry has moved on (promoted/expired/cancelled). See WaitlistService.getPosition().
+  position: number;
+  promotedAt?: string;
+  promotedEnrollmentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Eager-loaded on GET /events/my-waitlist (relations: ['event', 'ticketType']).
+  event?: BackendEvent;
+  ticketType?: { id: string; name: string; price: number };
+}
+
+// EventsService.enroll() returns a confirmed Enrollment when a tier has room, or a
+// WaitlistEntryRecord when it's sold out — `position` only ever appears on the latter,
+// so its presence is what the UI branches on (see EventDetailsScreen's handleEnroll).
+export type EnrollResult = EnrollmentRecord | WaitlistEntryRecord;
+
+export function isWaitlistResult(result: EnrollResult): result is WaitlistEntryRecord {
+  return 'position' in result;
 }
 
 export interface UploadUrlResponse {
-  signedUrl: string;
-  path: string;
-  token: string;
+  uploadUrl: string;
+  publicUrl: string;
 }
+
+export type UploadPurpose = 'profile-picture' | 'event-image' | 'event-cover' | 'company-logo';
+export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp';
+export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp'];
 
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType'],
+  // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
+  // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
+  // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
+  // (window/tab regains focus, via the setupListeners() call in store/index.ts) is the
+  // one that actually fires when just switching back to a tab in a browser session.
+  // refetchOnMountOrArgChange covers the case where the screen genuinely does remount
+  // (e.g. after an app reload) with cached data older than 10s.
+  refetchOnMountOrArgChange: 10,
+  refetchOnFocus: true,
   endpoints: (builder) => ({
     getEvents: builder.query<BackendEvent[], { categoryId?: string; isOnline?: boolean; page?: number; limit?: number }>({
       query: (filters) => {
@@ -89,6 +159,8 @@ export const eventsApi = createApi({
         if (filters.limit) params.append('limit', String(filters.limit));
         return `events?${params.toString()}`;
       },
+      // GET /events returns a paginated wrapper ({events, total, page, totalPages}), not a bare array.
+      transformResponse: (response: { events: BackendEvent[] }) => response.events,
       providesTags: ['Event'],
     }),
     getEventById: builder.query<BackendEvent, string>({
@@ -122,22 +194,37 @@ export const eventsApi = createApi({
       }),
       invalidatesTags: ['Event', 'MyEvents'],
     }),
-    enrollEvent: builder.mutation<{ id: string; ticketCode?: string }, string>({
-      query: (eventId) => ({
+    enrollEvent: builder.mutation<EnrollResult, { eventId: string; ticketTypeId: string; quantity: number }>({
+      query: ({ eventId, ticketTypeId, quantity }) => ({
         url: `events/${eventId}/enroll`,
         method: 'POST',
+        body: { ticketTypeId, quantity },
       }),
-      invalidatesTags: ['Event'],
+      invalidatesTags: (result, error, { eventId }) => [
+        { type: 'Event', id: eventId },
+        { type: 'TicketType', id: eventId },
+        'Event',
+        'MyEnrollments',
+        'MyWaitlist',
+      ],
     }),
-    getUploadUrl: builder.mutation<UploadUrlResponse, string>({
-      query: (fileName) => ({
-        url: 'events/upload-url',
+    getUploadUrl: builder.mutation<UploadUrlResponse, { purpose: UploadPurpose; contentType: UploadContentType }>({
+      query: (body) => ({
+        url: 'uploads/signed-url',
         method: 'POST',
-        body: { fileName },
+        body,
       }),
     }),
     getEventEnrollments: builder.query<EnrollmentRecord[], string>({
       query: (eventId) => `events/${eventId}/enrollments`,
+    }),
+    getMyEnrollments: builder.query<EnrollmentRecord[], void>({
+      query: () => 'events/my-enrollments',
+      providesTags: ['MyEnrollments'],
+    }),
+    getMyWaitlist: builder.query<WaitlistEntryRecord[], void>({
+      query: () => 'events/my-waitlist',
+      providesTags: ['MyWaitlist'],
     }),
     checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string }>({
       query: (body) => ({
@@ -145,9 +232,37 @@ export const eventsApi = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['MyEnrollments'],
     }),
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
       query: (enrollmentId) => `events/enrollments/${enrollmentId}`,
+    }),
+    getTicketTypes: builder.query<TicketTypeRecord[], string>({
+      query: (eventId) => `events/${eventId}/ticket-types`,
+      providesTags: (result, error, eventId) => [{ type: 'TicketType', id: eventId }],
+    }),
+    createTicketType: builder.mutation<TicketTypeRecord, { eventId: string; body: CreateTicketTypePayload }>({
+      query: ({ eventId, body }) => ({
+        url: `events/${eventId}/ticket-types`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
+    }),
+    updateTicketType: builder.mutation<TicketTypeRecord, { eventId: string; ticketTypeId: string; body: Partial<CreateTicketTypePayload> }>({
+      query: ({ eventId, ticketTypeId, body }) => ({
+        url: `events/${eventId}/ticket-types/${ticketTypeId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
+    }),
+    deleteTicketType: builder.mutation<void, { eventId: string; ticketTypeId: string }>({
+      query: ({ eventId, ticketTypeId }) => ({
+        url: `events/${eventId}/ticket-types/${ticketTypeId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
     }),
   }),
 });
@@ -162,6 +277,13 @@ export const {
   useEnrollEventMutation,
   useGetUploadUrlMutation,
   useGetEventEnrollmentsQuery,
+  useGetMyEnrollmentsQuery,
+  useGetMyWaitlistQuery,
   useCheckInMutation,
   useGetEnrollmentByIdQuery,
+  useGetTicketTypesQuery,
+  useLazyGetTicketTypesQuery,
+  useCreateTicketTypeMutation,
+  useUpdateTicketTypeMutation,
+  useDeleteTicketTypeMutation,
 } = eventsApi;

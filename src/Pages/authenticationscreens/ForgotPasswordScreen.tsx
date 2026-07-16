@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -9,6 +9,7 @@ import { AuthStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useForgotPasswordMutation } from '../../store/services/authApi';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 

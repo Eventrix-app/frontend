@@ -1,10 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MockEvent } from '../../data/mockEvents';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type MainEventCardProps = {
   event: MockEvent;
@@ -26,7 +27,13 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
             <Text style={styles.pricePillText}>{event.price}</Text>
           </View>
         </View>
-        <Text style={styles.emoji}>{event.image}</Text>
+        {typeof event.image === 'string' && event.image.startsWith('http') ? (
+          <Image source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
+        ) : typeof event.image !== 'string' ? (
+          <Image source={event.image} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <Text style={styles.emoji}>🎪</Text>
+        )}
         {event.featured ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>Featured</Text>
@@ -87,6 +94,9 @@ const styles = StyleSheet.create({
   emoji: {
     fontSize: 60,
   },
+  cardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
   badge: {
     position: 'absolute',
     bottom: spacing.sm,
@@ -136,10 +146,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '700',
     color: colors.text,
     lineHeight: 23,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

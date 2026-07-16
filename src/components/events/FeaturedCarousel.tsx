@@ -6,13 +6,13 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { Text } from '../common/Text';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - spacing.md * 2;
@@ -35,6 +35,7 @@ export interface FeaturedEvent {
 interface Props {
   events: FeaturedEvent[];
   onEventPress: (eventId: string) => void;
+  cardWidth?: number;
 }
 
 const resolveImageSource = (image: unknown) => {
@@ -43,7 +44,9 @@ const resolveImageSource = (image: unknown) => {
   return image as any;
 };
 
-const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
+const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: cardWidthProp }) => {
+  const effectiveCardWidth = cardWidthProp ?? CARD_WIDTH;
+  const effectiveSlotWidth = effectiveCardWidth + CARD_SPACING;
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const currentRawIndex = useRef(0);
@@ -78,12 +81,12 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
   const updateActiveIndexFromOffset = useCallback(
     (offsetX: number) => {
       if (events.length === 0) return;
-      const rawIndex = Math.round(offsetX / SLOT_WIDTH);
+      const rawIndex = Math.round(offsetX / effectiveSlotWidth);
       currentRawIndex.current = rawIndex;
       const normalized = ((rawIndex % events.length) + events.length) % events.length;
       setActiveIndex(normalized);
     },
-    [events.length],
+    [events.length, effectiveSlotWidth],
   );
 
   const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -95,13 +98,29 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
     autoScrollTimer.current = setInterval(() => {
       if (isUserInteracting.current) return;
-      currentRawIndex.current += 1;
-      flatListRef.current?.scrollToIndex({ index: currentRawIndex.current, animated: true });
+      let nextIndex = currentRawIndex.current + 1;
+
+      // currentRawIndex only ever grows; left unchecked it eventually walks off
+      // the end of loopedEvents (a fixed-size padded array) and scrollToIndex
+      // throws. Once we're within one lap of the edge, snap back (no animation)
+      // to the same position in the middle copy of the loop — same underlying
+      // event, so the reset is visually a no-op.
+      if (nextIndex >= loopedEvents.length - events.length) {
+        const normalized = ((nextIndex % events.length) + events.length) % events.length;
+        nextIndex = initialIndex + normalized;
+        currentRawIndex.current = nextIndex;
+        flatListRef.current?.scrollToIndex({ index: nextIndex, animated: false });
+        updateActiveIndexFromOffset(nextIndex * SLOT_WIDTH);
+        return;
+      }
+
+      currentRawIndex.current = nextIndex;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
       // scrollToIndex's own momentum-end will also fire and correct this,
       // but setting it immediately keeps the dot in sync with the animation.
-      updateActiveIndexFromOffset(currentRawIndex.current * SLOT_WIDTH);
+      updateActiveIndexFromOffset(nextIndex * effectiveSlotWidth);
     }, AUTO_SCROLL_INTERVAL);
-  }, [events.length, updateActiveIndexFromOffset]);
+  }, [events.length, loopedEvents.length, initialIndex, updateActiveIndexFromOffset, effectiveSlotWidth]);
 
   useEffect(() => {
     startAutoScroll();
@@ -126,7 +145,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
       return (
         <TouchableOpacity
           activeOpacity={0.9}
-          style={styles.card}
+          style={[styles.card, { width: effectiveCardWidth }]}
           onPress={() => onEventPress(event.id)}
         >
           <ImageBackground
@@ -163,20 +182,21 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
         </TouchableOpacity>
       );
     },
-    [onEventPress, events.length, activeIndex],
+    [onEventPress, events.length, activeIndex, effectiveCardWidth],
   );
 
   if (events.length === 0) return null;
 
   return (
     <FlatList
+      style={{ height: CARD_HEIGHT, flexGrow: 0 }}
       ref={flatListRef}
       data={loopedEvents}
       keyExtractor={(item: any) => item.__loopKey}
       renderItem={renderItem}
       horizontal
       showsHorizontalScrollIndicator={false}
-      snapToInterval={SLOT_WIDTH}
+      snapToInterval={effectiveSlotWidth}
       decelerationRate="fast"
       onMomentumScrollEnd={handleMomentumScrollEnd}
       onTouchStart={handleTouchStart}
@@ -184,14 +204,14 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
       onScrollToIndexFailed={(info) => {
         setTimeout(() => {
           flatListRef.current?.scrollToOffset({
-            offset: info.index * SLOT_WIDTH,
+            offset: info.index * effectiveSlotWidth,
             animated: false,
           });
         }, 50);
       }}
       getItemLayout={(_, index) => ({
-        length: SLOT_WIDTH,
-        offset: SLOT_WIDTH * index,
+        length: effectiveSlotWidth,
+        offset: effectiveSlotWidth * index,
         index,
       })}
       initialScrollIndex={initialIndex}
@@ -202,7 +222,6 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    width: CARD_WIDTH,
     height: CARD_HEIGHT,
     marginRight: CARD_SPACING,
     borderRadius: 20,
@@ -251,9 +270,9 @@ const styles = StyleSheet.create({
   title: {
     color: colors.white,
     fontSize: 20,
-    fontWeight: '700',
     marginBottom: 4,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   metaRow: {
     flexDirection: 'row',
     gap: spacing.md,

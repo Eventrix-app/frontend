@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
@@ -144,8 +144,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   scroll: {
     padding: spacing.md,
     paddingBottom: 120,
@@ -168,9 +168,9 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 16,
-    fontWeight: '700',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   eventMeta: {
     fontSize: 13,
     color: colors.textSecondary,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -105,13 +106,13 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontSize: 13,
-    fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing.sm,
     marginTop: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   groupGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
@@ -142,7 +143,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
-  },
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   chevron: {
     fontSize: 20,
     color: colors.textSecondary,

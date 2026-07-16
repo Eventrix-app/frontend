@@ -7,13 +7,14 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
+import GlassSurface from '../common/GlassSurface';
+import { Text } from '../common/Text';
 
 type AuthLayoutProps = {
   children: React.ReactNode;
@@ -73,14 +74,14 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </View>
       </View>
 
-      <View style={styles.bodyContent}>
+      <GlassSurface style={styles.bodyCard} contentStyle={styles.bodyContent} intensity={42}>
         <View style={[styles.headingBlock, centerTitle && styles.headingCenter]}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
 
         {children}
-      </View>
+      </GlassSurface>
     </>
   );
 
@@ -139,16 +140,16 @@ const styles = StyleSheet.create({
   },
   orbTop: {
     position: 'absolute',
-    top: -100,
-    left: -32,
+    top: -200,
+    left: -28,
     right: 0,
     width: '120%',
-    height: 240,
+    height: 850,
   },
   orbBottom: {
     position: 'absolute',
-    bottom: 40,
-    left: -90,
+    bottom: 10,
+    left: 80,
     width: 220,
     height: 220,
     borderRadius: 110,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: 36,
-    fontWeight: '700',
+    fontFamily: 'ZalandoSansExpanded_700Bold',
     color: colors.brandNavy,
     textTransform: 'capitalize',
   },
@@ -206,17 +207,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
+  bodyCard: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
   bodyContent: {
     paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   headingCenter: {
     alignItems: 'center',
   },
   title: {
-    fontFamily: 'Zalando Sans Expanded',
-    fontSize: 24,
-    fontWeight: '500',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
+    fontSize: 32,
     lineHeight: 24,
     letterSpacing: 0,
     textAlign: 'center',
@@ -224,9 +233,8 @@ const styles = StyleSheet.create({
     color: '#0D0D0D',
   },
   subtitle: {
-    fontFamily: 'Poppins',
-    fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'ZalandoSansExpanded_500Medium',
+    fontSize: 16,
     lineHeight: 21,
     letterSpacing: 0,
     textAlign: 'center',

@@ -14,6 +14,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   MyEvents: undefined;
   CreateEvent: { eventId?: string };
+  ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;

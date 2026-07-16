@@ -3,19 +3,17 @@ import { userApi } from '../store/services/userApi';
 import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
 
 /**
- * Syncs the locally-cached onboarding draft to the backend after auth.
- *
- * TODO: backend /api/users/me/* routes not implemented yet.
- * Temporarily disabled to stop console spam / retry loop.
- * Re-enable by uncommenting the block below once the backend routes exist.
+ * Syncs the locally-cached onboarding draft (interests/location/notification prefs) to
+ * the backend after auth. The backend routes (PUT /users/me/interests, PATCH
+ * /users/me/location, PATCH /users/me/notification-preferences) exist and are covered in
+ * testing.md Phase 3 — this was previously left disabled behind a stale "not implemented
+ * yet" TODO, so onboarding data was captured in the UI but never actually reached the
+ * server.
  */
 export async function syncOnboardingDraft(
   dispatch: AppDispatch,
   getState: () => RootState,
 ): Promise<void> {
-  return;
-
-  /*
   const draft = getState().onboardingDraft;
 
   if (draft.isSynced) return;
@@ -67,5 +65,4 @@ export async function syncOnboardingDraft(
       results.filter((r) => r.status === 'rejected'),
     );
   }
-  */
 }

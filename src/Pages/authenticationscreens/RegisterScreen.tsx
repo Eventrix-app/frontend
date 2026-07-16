@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -12,6 +12,7 @@ import { useRegisterMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -108,12 +109,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onBack={() => navigation.goBack()}
         primaryDisabled={!canSubmit}
       />
-      <OutlineButtonRow
+      {/* <OutlineButtonRow
         leftLabel="Log In"
         rightLabel="Continue as Guest"
         onLeft={() => navigation.navigate('Login')}
         onRight={handleRegister}
-      />
+      /> */}
 
       <SocialLoginRow compact />
       <LegalFooter />

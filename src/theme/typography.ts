@@ -1,7 +1,9 @@
+import { ZalandoSansExpanded, Poppins } from './fonts';
+
 export const typography = {
-  title: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.5 },
-  subtitle: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
-  button: { fontSize: 16, fontWeight: '600' as const, letterSpacing: 0.3 },
+  title: { fontFamily: ZalandoSansExpanded[700], fontSize: 28, letterSpacing: -0.5 },
+  subtitle: { fontFamily: ZalandoSansExpanded[500], fontSize: 16, lineHeight: 24 },
+  button: { fontFamily: Poppins[600], fontSize: 16, letterSpacing: 0.3 },
 } as const;
 
 export type Typography = typeof typography;

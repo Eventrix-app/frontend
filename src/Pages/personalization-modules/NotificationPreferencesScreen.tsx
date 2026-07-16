@@ -6,7 +6,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +18,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing } from '../../theme';
 import { setNotificationPrefs } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
+import { Text } from '../../components/common/Text';
 
 type Pref = 'eventReminders' | 'nearbyEvents' | 'reelsAndCommunity' | 'specialOffers';
 
@@ -172,21 +172,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: {
-    fontWeight: '500',
     fontSize: 20,
     lineHeight: 20,
     textAlign: 'center',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   subtitle: {
-    fontWeight: '500',
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
     color: colors.subtext,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
-  },
+      fontFamily: 'ZalandoSansExpanded_500Medium'
+},
   divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
   list: {},
   row: {

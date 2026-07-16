@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -12,11 +12,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import GlassSurface from '../../components/common/GlassSurface';
-import { CATEGORIES, MOCK_EVENTS, MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
+import { CATEGORIES, MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
+import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { toCardEvent } from '../../utils/eventCardAdapter';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -24,10 +27,12 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
+  const { data: events = [], isLoading, isError, refetch } = useGetEventsQuery({});
+  const cardEvents = useMemo(() => events.map(toCardEvent), [events]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOCK_EVENTS.filter((event) => {
+    return cardEvents.filter((event) => {
       const matchesQuery =
         !q ||
         event.title.toLowerCase().includes(q) ||
@@ -36,7 +41,7 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
       const matchesCategory = !category || event.category.toLowerCase() === category;
       return matchesQuery && matchesCategory;
     });
-  }, [query, category]);
+  }, [cardEvents, query, category]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -66,6 +71,7 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
 
       <ScrollView
         horizontal
+        style={styles.categoriesScroll}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.categories}
       >
@@ -122,19 +128,33 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
           </>
         ) : null}
 
-        <Text style={styles.sectionTitle}>
-          {results.length} result{results.length === 1 ? '' : 's'}
-        </Text>
-        {results.length === 0 ? (
+        {isLoading ? (
+          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        ) : isError ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🔎</Text>
-            <Text style={styles.emptyTitle}>No events found</Text>
-            <Text style={styles.emptySub}>Try a different keyword or category</Text>
+            <Text style={styles.emptyIcon}>⚠️</Text>
+            <Text style={styles.emptyTitle}>Couldn't load events</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          results.map((event) => (
-            <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
-          ))
+          <>
+            <Text style={styles.sectionTitle}>
+              {results.length} result{results.length === 1 ? '' : 's'}
+            </Text>
+            {results.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🔎</Text>
+                <Text style={styles.emptyTitle}>No events found</Text>
+                <Text style={styles.emptySub}>Try a different keyword or category</Text>
+              </View>
+            ) : (
+              results.map((event) => (
+                <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -171,10 +191,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     padding: 4,
   },
+  categoriesScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   categories: {
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
     gap: spacing.sm,
+    alignItems: 'center',
   },
   chipWrap: {
     marginRight: spacing.sm,
@@ -204,11 +230,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -240,12 +266,26 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
     color: colors.text,
-  },
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   emptySub: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  loader: {
+    marginTop: spacing.xxl,
+  },
+  retryBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.brandPink,
+    borderRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryText: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

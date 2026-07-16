@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { colors } from '../theme';
+import { Text } from './common/Text';
 
 type Props = { checked: boolean };
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -8,6 +8,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetMyEventsQuery } from '../../store/services/eventsApi';
+import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyEvents'>;
 
@@ -128,7 +129,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, fontWeight: '700', color: colors.text, flex: 1 },
+  title: { fontSize: 20, color: colors.text, flex: 1,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   createBtn: {
     backgroundColor: colors.brandPink,
     borderRadius: borderRadius.md,
@@ -151,8 +154,12 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md },
   empty: { alignItems: 'center', marginTop: spacing.xxl, gap: spacing.sm },
   emptyEmoji: { fontSize: 56 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
-  emptySubtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', maxWidth: 260 },
+  emptyTitle: { fontSize: 18, color: colors.text,
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
+  emptySubtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', maxWidth: 260,
+      fontFamily: 'ZalandoSansExpanded_700Bold'
+},
   emptyCreate: {
     marginTop: spacing.md,
     backgroundColor: colors.brandPink,
@@ -169,7 +176,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardText: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  cardTitle: { fontSize: 15, color: colors.text,
+      fontFamily: 'ZalandoSansExpanded_600SemiBold'
+},
   cardDate: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, color: colors.white, fontWeight: '600', textTransform: 'capitalize' },
