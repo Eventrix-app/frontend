@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ErrorScreen from './ErrorScreen';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+// Was hardcoded to localhost, so this health check always reported the server as
+// unreachable in any non-local build. Read the same source of truth as baseQuery.ts.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/';
 const CHECK_INTERVAL = 10000; // re-check every 10s while down
 
 const ServerGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
