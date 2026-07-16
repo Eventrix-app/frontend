@@ -163,7 +163,7 @@ const HomeScreen: React.FC = () => {
             <View style={styles.featuredBgWrap}>
               <Image source={bgImage} style={styles.featuredBg} resizeMode="cover" />
             </View>
-            <SectionHeader title="Featured Near You" light />
+            <SectionHeader title="Featured Near You" light hideLine />
             <FeaturedCarousel
               cardWidth={SCREEN_WIDTH - spacing.sm * 2}
               events={featured.map((event) => ({
@@ -361,8 +361,8 @@ const styles = StyleSheet.create({
   },
   featuredBg: {
     position: 'absolute',
-    top: -18,
-    left: -68,
+    top: -62,
+    left: -80,
     width: '135%',
     height: '135%',
     transform: [{ scale: 0.78 }],

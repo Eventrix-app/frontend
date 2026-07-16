@@ -4,41 +4,44 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 interface Props {
-  onBack: () => void;
-  onGoHome: () => void;
+  onBack?: () => void;
+  onGoHome?: () => void;
   title?: string;
   subtitle?: string;
+  inline?: boolean; // true = fits inside existing scroll content, no flex:1, no Back/Home buttons
 }
 
-const NoEvents: React.FC<Props> = ({
+const Noevents: React.FC<Props> = ({
   onBack,
   onGoHome,
   title = 'No events found',
   subtitle = 'Try adjusting your filters or interests.',
+  inline = false,
 }) => {
   return (
-    <View style={styles.root}>
+    <View style={inline ? styles.rootInline : styles.root}>
       <Image
-
         source={require('../../../assets/NoEvents.png')}
-        style={styles.illustration}
+        style={inline ? styles.illustrationInline : styles.illustration}
         resizeMode="contain"
       />
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
-          <Text style={styles.backIcon}>←</Text>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+      {!inline && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
+            <Text style={styles.backIcon}>←</Text>
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.homeBtn} onPress={onGoHome} activeOpacity={0.85}>
-          <Text style={styles.homeText}>Go to Home</Text>
-          <Text style={styles.homeIcon}>→</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.homeBtn} onPress={onGoHome} activeOpacity={0.85}>
+            <Text style={styles.homeText}>Go to Home</Text>
+            <Text style={styles.homeIcon}>→</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -51,10 +54,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
+  rootInline: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+  },
   illustration: {
     width: 260,
     height: 260,
     marginBottom: spacing.xl,
+  },
+  illustrationInline: {
+    width: 180,
+    height: 180,
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: 20,
@@ -114,4 +128,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default NoEvents;
+export default Noevents;

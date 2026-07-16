@@ -31,6 +31,16 @@ import { Text } from '../../components/common/Text';
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 
 type TierAvailability = 'available' | 'sold_out' | 'not_started' | 'ended';
+type DetailsTab = 'about' | 'schedule' | 'tickets' | 'community' | 'reviews' | 'gallery';
+
+const TABS: { key: DetailsTab; label: string }[] = [
+  { key: 'about', label: 'About' },
+  { key: 'schedule', label: 'Schedule' },
+  { key: 'tickets', label: 'Tickets' },
+  { key: 'community', label: 'Community' },
+  { key: 'reviews', label: 'Reviews' },
+  { key: 'gallery', label: 'Gallery' },
+];
 
 function remainingForTier(tier: TicketTypeRecord): number | null {
   return tier.quantityTotal == null ? null : Math.max(tier.quantityTotal - tier.quantitySold, 0);
@@ -62,11 +72,26 @@ function quantityBoundsForTier(tier: TicketTypeRecord): { min: number; max: numb
   return { min, max: Math.max(max, min) };
 }
 
+// Days-to-go badge — gracefully returns null (badge hidden) if eventDate isn't parseable.
+function daysToGoLabel(eventDate: string): string | null {
+  const target = new Date(eventDate);
+  if (isNaN(target.getTime())) return null;
+  const now = new Date();
+  const diffMs = target.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return null;
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return '1 Day to go';
+  return `${diffDays} Days to go`;
+}
+
 const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [saved, setSaved] = useState(false);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [activeTab, setActiveTab] = useState<DetailsTab>('about');
+  const [descExpanded, setDescExpanded] = useState(false);
   const authUser = useSelector((state: RootState) => state.auth.user);
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
@@ -174,6 +199,24 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     selectedAvailability === 'not_started' ||
     selectedAvailability === 'ended';
 
+  // --- Badge pills: only include ones we actually have real data for ---
+  const badges: string[] = [];
+  const daysToGo = daysToGoLabel(event.eventDate);
+  if (daysToGo) badges.push(daysToGo);
+  if (event.availableTickets != null) badges.push(`${event.availableTickets} seats left`);
+  const soonEndingTier = ticketTypes.find((t) => {
+    if (!t.salesEndAt) return false;
+    const hoursLeft = (new Date(t.salesEndAt).getTime() - Date.now()) / (1000 * 60 * 60);
+    return hoursLeft > 0 && hoursLeft <= 48;
+  });
+  if (soonEndingTier) badges.push('Ending Soon');
+  const earlyBirdTier = ticketTypes.find(
+    (t) => t.name?.toLowerCase().includes('early bird') && tierAvailability(t) === 'available',
+  );
+  if (earlyBirdTier) badges.push('Early Bird');
+
+  const organizerName = event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer';
+
   return (
     <View style={styles.root}>
       <ImageBackground
@@ -234,115 +277,260 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        <Text style={styles.category}>{event.category?.name ?? ''}</Text>
+        {/* Title */}
         <Text style={styles.title}>{event.title}</Text>
 
-        <GlassSurface style={styles.infoGlass} contentStyle={styles.infoCard}>
-          <Text style={styles.infoRow}>📍 {event.venueName}</Text>
-          {event.venueAddress ? <Text style={styles.infoSubRow}>{event.venueAddress}</Text> : null}
-          <Text style={styles.infoRow}>📅 {event.eventDate}</Text>
-          <Text style={styles.infoRow}>🕐 {event.startTime}</Text>
-          <Text style={styles.infoRow}>
-            👤 {event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer'}
-          </Text>
-        </GlassSurface>
+        {/* Badge pills */}
+        {badges.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.badgeRow}
+          >
+            {badges.map((label) => (
+              <View key={label} style={styles.badgePill}>
+                <Text style={styles.badgeText}>{label}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
+        {/* Organizer row */}
+        <View style={styles.organizerRow}>
+          <View style={styles.organizerAvatar}>
+            <Text style={styles.organizerAvatarText}>👤</Text>
+          </View>
+          <View style={styles.organizerInfo}>
+            <Text style={styles.organizerName}>{organizerName}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                // TODO: navigate once an OrganizerProfile screen/route exists
+              }}
+            >
+              <Text style={styles.viewProfileText}>View Profile ›</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.organizerActions}>
+            {/* TODO: wire these to your messaging/call flow once built */}
+            <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
+              <Text style={styles.organizerActionIcon}>💬</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
+              <Text style={styles.organizerActionIcon}>📞</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Description card */}
         {event.description ? (
           <>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.description}>{event.description}</Text>
+            <Text style={styles.sectionLabel}>Description</Text>
+            <View style={styles.descCard}>
+              <Text style={styles.descText} numberOfLines={descExpanded ? undefined : 3}>
+                {event.description}
+              </Text>
+              <TouchableOpacity onPress={() => setDescExpanded((v) => !v)}>
+                <Text style={styles.readMore}>{descExpanded ? 'Show Less' : '...Read More'}</Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : null}
 
-        {/* Participant-facing tier picker — the footer's Book Now/Join Waitlist button
-            acts on whichever tier is selected here. */}
-        {!isOwner && ticketTypes.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Tickets</Text>
-            <View style={styles.tierList}>
-              {ticketTypes.map((tier) => {
-                const remaining = remainingForTier(tier);
-                const availability = tierAvailability(tier);
-                const selectable = availability === 'available' || availability === 'sold_out';
-                const selected = tier.id === selectedTierId;
-                const metaText =
-                  availability === 'not_started'
-                    ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
-                    : availability === 'ended'
-                      ? 'Sales closed'
-                      : availability === 'sold_out'
-                        ? 'Sold out — join waitlist'
-                        : remaining !== null ? `${remaining} left` : 'Available';
-                return (
-                  <TouchableOpacity
-                    key={tier.id}
-                    style={[
-                      styles.tierRow,
-                      selected && styles.tierRowSelected,
-                      !selectable && styles.tierRowDisabled,
-                    ]}
-                    onPress={() => selectable && setSelectedTierId(tier.id)}
-                    disabled={!selectable}
-                  >
-                    <View style={styles.tierInfo}>
-                      <Text style={styles.tierName}>{tier.name}</Text>
-                      <Text
-                        style={[
-                          styles.tierMeta,
-                          availability === 'sold_out' && styles.tierMetaSoldOut,
-                          (availability === 'not_started' || availability === 'ended') && styles.tierMetaClosed,
-                        ]}
-                      >
-                        {metaText}
-                      </Text>
-                    </View>
-                    <Text style={styles.tierPrice}>{tier.price > 0 ? `₹${tier.price}` : 'Free'}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {/* When-n-where */}
+        <Text style={styles.sectionLabel}>When-n-where?</Text>
+        <View style={styles.whenWhereBlock}>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoIcon}>🗓️</Text>
+            <Text style={styles.infoLineText}>{event.eventDate}</Text>
+          </View>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoIcon}>🕐</Text>
+            <Text style={styles.infoLineText}>{event.startTime}</Text>
+          </View>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoIcon}>📍</Text>
+            <Text style={styles.infoLineText}>{event.venueName}</Text>
+          </View>
+        </View>
 
-            {selectedTier && (() => {
-              const { min, max } = quantityBoundsForTier(selectedTier);
-              const atMin = quantity <= min;
-              const atMax = quantity >= max;
-              return (
-                <View style={styles.stepperRow}>
-                  <Text style={styles.stepperLabel}>Quantity</Text>
-                  <View style={styles.stepper}>
-                    <TouchableOpacity
-                      style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
-                      onPress={() => adjustQuantity(-1)}
-                      disabled={atMin}
-                    >
-                      <Text style={styles.stepperBtnText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.stepperValue}>{quantity}</Text>
-                    <TouchableOpacity
-                      style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
-                      onPress={() => adjustQuantity(1)}
-                      disabled={atMax}
-                    >
-                      <Text style={styles.stepperBtnText}>+</Text>
-                    </TouchableOpacity>
+        {/* Quick info */}
+        <Text style={styles.sectionLabel}>Quick info</Text>
+        <View style={styles.quickInfoRow}>
+          {event.totalCapacity != null && (
+            <View style={styles.quickInfoCard}>
+              <Text style={styles.quickInfoIcon}>👥</Text>
+              <View>
+                <Text style={styles.quickInfoLabel}>Capacity</Text>
+                <Text style={styles.quickInfoValue}>{event.totalCapacity} Participants</Text>
+              </View>
+            </View>
+          )}
+          <View style={styles.quickInfoCard}>
+            <Text style={styles.quickInfoIcon}>🎟️</Text>
+            <View>
+              <Text style={styles.quickInfoLabel}>Entry Type</Text>
+              <Text style={styles.quickInfoValue}>{event.isPaid ? 'Paid (Online/Offline)' : 'Free'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Tab bar */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabBarScroll}
+          contentContainerStyle={styles.tabBarRow}
+        >
+          {TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tabItem, active && styles.tabItemActive]}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Tab content */}
+        {activeTab === 'about' && (
+          <View style={styles.tabContent}>
+            {event.description ? (
+              <>
+                <Text style={styles.sectionLabel}>About This Event</Text>
+                {event.description.split('\n').filter(Boolean).map((line, i) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>{line}</Text>
                   </View>
-                </View>
-              );
-            })()}
-          </>
+                ))}
+              </>
+            ) : null}
+          </View>
         )}
 
-        {/* Refund policy — shown before booking button for paid events */}
-        {event.isPaid && event.refundPolicyType && (
-          <>
-            <Text style={styles.sectionTitle}>Refund Policy</Text>
-            <GlassSurface style={styles.refundGlass} contentStyle={styles.refundCard}>
-              <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
-              {event.refundPolicyText ? (
-                <Text style={styles.refundText}>{event.refundPolicyText}</Text>
-              ) : null}
-            </GlassSurface>
-          </>
+        {activeTab === 'schedule' && (
+          <View style={styles.tabContent}>
+            {/* TODO: wire to real schedule data once the API has it */}
+            <Text style={styles.emptyTabText}>Schedule details coming soon.</Text>
+          </View>
+        )}
+
+        {activeTab === 'tickets' && (
+          <View style={styles.tabContent}>
+            {!isOwner && ticketTypes.length > 0 ? (
+              <>
+                <View style={styles.tierList}>
+                  {ticketTypes.map((tier) => {
+                    const remaining = remainingForTier(tier);
+                    const availability = tierAvailability(tier);
+                    const selectable = availability === 'available' || availability === 'sold_out';
+                    const selected = tier.id === selectedTierId;
+                    const metaText =
+                      availability === 'not_started'
+                        ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
+                        : availability === 'ended'
+                          ? 'Sales closed'
+                          : availability === 'sold_out'
+                            ? 'Sold out — join waitlist'
+                            : remaining !== null ? `${remaining} left` : 'Available';
+                    return (
+                      <TouchableOpacity
+                        key={tier.id}
+                        style={[
+                          styles.tierRow,
+                          selected && styles.tierRowSelected,
+                          !selectable && styles.tierRowDisabled,
+                        ]}
+                        onPress={() => selectable && setSelectedTierId(tier.id)}
+                        disabled={!selectable}
+                      >
+                        <View style={styles.tierInfo}>
+                          <Text style={styles.tierName}>{tier.name}</Text>
+                          <Text
+                            style={[
+                              styles.tierMeta,
+                              availability === 'sold_out' && styles.tierMetaSoldOut,
+                              (availability === 'not_started' || availability === 'ended') && styles.tierMetaClosed,
+                            ]}
+                          >
+                            {metaText}
+                          </Text>
+                        </View>
+                        <Text style={styles.tierPrice}>{tier.price > 0 ? `₹${tier.price}` : 'Free'}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {selectedTier && (() => {
+                  const { min, max } = quantityBoundsForTier(selectedTier);
+                  const atMin = quantity <= min;
+                  const atMax = quantity >= max;
+                  return (
+                    <View style={styles.stepperRow}>
+                      <Text style={styles.stepperLabel}>Quantity</Text>
+                      <View style={styles.stepper}>
+                        <TouchableOpacity
+                          style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
+                          onPress={() => adjustQuantity(-1)}
+                          disabled={atMin}
+                        >
+                          <Text style={styles.stepperBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.stepperValue}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
+                          onPress={() => adjustQuantity(1)}
+                          disabled={atMax}
+                        >
+                          <Text style={styles.stepperBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {event.isPaid && event.refundPolicyType && (
+                  <>
+                    <Text style={styles.sectionLabel}>Refund Policy</Text>
+                    <GlassSurface style={styles.refundGlass} contentStyle={styles.refundCard}>
+                      <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
+                      {event.refundPolicyText ? (
+                        <Text style={styles.refundText}>{event.refundPolicyText}</Text>
+                      ) : null}
+                    </GlassSurface>
+                  </>
+                )}
+              </>
+            ) : (
+              <Text style={styles.emptyTabText}>No ticket information available.</Text>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'community' && (
+          <View style={styles.tabContent}>
+            {/* TODO: wire to real community/discussion data once the API has it */}
+            <Text style={styles.emptyTabText}>Community discussion coming soon.</Text>
+          </View>
+        )}
+
+        {activeTab === 'reviews' && (
+          <View style={styles.tabContent}>
+            {/* TODO: wire to real reviews data once the API has it */}
+            <Text style={styles.emptyTabText}>Reviews coming soon.</Text>
+          </View>
+        )}
+
+        {activeTab === 'gallery' && (
+          <View style={styles.tabContent}>
+            {/* TODO: wire to real event gallery/reels once the API has it */}
+            <Text style={styles.emptyTabText}>Gallery coming soon.</Text>
+          </View>
         )}
       </ScrollView>
 
@@ -442,9 +630,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.xs,
   },
-  rejectionTitle: { color: '#DC2626', fontSize: 15,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
+  rejectionTitle: { color: '#DC2626', fontSize: 15, fontFamily: 'ZalandoSansExpanded_700Bold' },
   rejectionReason: { color: '#7F1D1D', fontSize: 13 },
   resubmitBtn: {
     marginTop: spacing.sm,
@@ -480,18 +666,101 @@ const styles = StyleSheet.create({
   },
   salesText: { fontWeight: '600', color: '#065F46' },
   salesCount: { fontSize: 13, color: '#047857' },
-  category: { color: colors.brandPink, fontWeight: '600', fontSize: 13, marginBottom: spacing.xs },
-  title: { fontSize: 24, color: colors.text, marginBottom: spacing.md,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
-  infoGlass: { borderRadius: borderRadius.lg, marginBottom: spacing.lg },
-  infoCard: { gap: spacing.sm, padding: spacing.md },
-  infoRow: { fontSize: 14, color: colors.textSecondary },
-  infoSubRow: { fontSize: 13, color: colors.textSecondary, marginTop: -6, marginLeft: 20 },
-  sectionTitle: { fontSize: 18, color: colors.text, marginBottom: spacing.sm, marginTop: spacing.md,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
-  description: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
+
+  title: { fontSize: 22, color: colors.text, fontFamily: 'ZalandoSansExpanded_700Bold' },
+
+  badgeRow: { gap: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.sm },
+  badgePill: {
+    backgroundColor: 'rgba(225,29,72,0.1)',
+    borderRadius: borderRadius.pill ?? 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    marginRight: spacing.sm,
+  },
+  badgeText: { fontSize: 12, fontWeight: '600', color: colors.brandPink },
+
+  organizerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    marginBottom: spacing.md,
+  },
+  organizerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  organizerAvatarText: { fontSize: 20 },
+  organizerInfo: { flex: 1 },
+  organizerName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  viewProfileText: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  organizerActions: { flexDirection: 'row', gap: spacing.sm },
+  organizerActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(225,29,72,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  organizerActionIcon: { fontSize: 15 },
+
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  descCard: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  descText: { fontSize: 14, lineHeight: 20, color: colors.text },
+  readMore: { fontSize: 13, color: colors.textSecondary, marginTop: 4, alignSelf: 'flex-end' },
+
+  whenWhereBlock: { gap: spacing.sm, marginBottom: spacing.md },
+  infoLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  infoIcon: { fontSize: 15, width: 22 },
+  infoLineText: { fontSize: 14, color: colors.text },
+
+  quickInfoRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  quickInfoCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#F3F4F6',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+  },
+  quickInfoIcon: { fontSize: 20 },
+  quickInfoLabel: { fontSize: 11, color: colors.textSecondary },
+  quickInfoValue: { fontSize: 13, fontWeight: '600', color: colors.text },
+
+  tabBarScroll: { flexGrow: 0, marginBottom: spacing.md },
+  tabBarRow: { gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  tabItem: { paddingBottom: spacing.sm, marginRight: spacing.md },
+  tabItemActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPink },
+  tabLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '600' },
+  tabLabelActive: { color: colors.brandPink },
+
+  tabContent: { paddingTop: spacing.xs },
+  bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
+  bulletDot: { fontSize: 14, color: colors.textSecondary },
+  bulletText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.textSecondary },
+  emptyTabText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
+
   tierList: { gap: spacing.sm },
   tierRow: {
     flexDirection: 'row',
@@ -531,7 +800,7 @@ const styles = StyleSheet.create({
   stepperBtnDisabled: { opacity: 0.4 },
   stepperBtnText: { fontSize: 18, fontWeight: '700', color: colors.text },
   stepperValue: { fontSize: 16, fontWeight: '600', color: colors.text, minWidth: 24, textAlign: 'center' },
-  refundGlass: { borderRadius: borderRadius.md, marginBottom: spacing.md },
+  refundGlass: { borderRadius: borderRadius.md, marginBottom: spacing.md, marginTop: spacing.md },
   refundCard: { padding: spacing.md, gap: 4 },
   refundType: { fontWeight: '600', color: colors.text, textTransform: 'capitalize' },
   refundText: { fontSize: 13, color: colors.textSecondary },
