@@ -21,6 +21,9 @@ import {
   useGetEventByIdQuery,
   useGetTicketTypesQuery,
   useEnrollEventMutation,
+  useGetMyFavoritesQuery,
+  useAddFavoriteMutation,
+  useRemoveFavoriteMutation,
   isWaitlistResult,
   TicketTypeRecord,
 } from '../../store/services/eventsApi';
@@ -184,7 +187,6 @@ function daysToGoLabel(eventDate: string): string | null {
 
 const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const [saved, setSaved] = useState(false);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<DetailsTab>('about');
@@ -194,6 +196,24 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const { data: ticketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
+  const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
+  const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
+  const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
+  const saved = !!event && favorites.some((f) => f.id === event.id);
+
+  const handleToggleSave = async () => {
+    if (!authUser) { navigation.navigate('Auth'); return; }
+    if (!event || isSaving || isUnsaving) return;
+    try {
+      if (saved) {
+        await removeFavorite(event.id).unwrap();
+      } else {
+        await addFavorite(event.id).unwrap();
+      }
+    } catch (e: any) {
+      showAlert('Error', extractErrorMessage(e, 'Failed to update saved events'));
+    }
+  };
   // isEnrolling only flips true on the next render after dispatch — a fast double-tap on
   // "Book Now" can fire two enroll requests before that happens, each of which would
   // atomically claim a ticket. This ref closes that gap synchronously.
@@ -325,7 +345,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         {!coverImage ? <Text style={styles.heroEmoji}>🎪</Text> : null}
-        <TouchableOpacity style={styles.save} onPress={() => setSaved((v) => !v)}>
+        <TouchableOpacity style={styles.save} onPress={handleToggleSave}>
           <Text>{saved ? '❤️' : '🤍'}</Text>
         </TouchableOpacity>
       </ImageBackground>

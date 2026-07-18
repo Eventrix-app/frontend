@@ -3,8 +3,6 @@ export type RootStackParamList = {
   Main: { screen?: keyof MainTabParamList } | undefined;
   AdminRedirect: undefined;
   EventDetails: { eventId: string };
-  Checkout: { eventId: string };
-  PaymentConfirmation: { eventId: string; quantity?: number; total?: string };
   TicketDetails: { bookingId: string };
   Search: undefined;
   Profile: undefined;

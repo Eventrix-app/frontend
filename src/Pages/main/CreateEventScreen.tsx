@@ -131,7 +131,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       eventDate,
       startTime,
       endTime: endTime || undefined,
-      pricePerTicket: representativePrice,
+      // Only meaningful on create — `tiers` isn't populated with the event's real ticket
+      // types in edit mode (pricing is owned by "Manage Ticket Types" post-creation), so
+      // representativePrice is always 0 here. Sending it on edit would make the backend's
+      // pricePerTicket-driven isPaid sync (events.service.ts update()) silently flip a
+      // paid event's isPaid to false on every unrelated edit.
+      pricePerTicket: isEdit ? undefined : representativePrice,
       isPaid: !isFree,
       isOnline,
       meetingLink: isOnline ? meetingLink : undefined,

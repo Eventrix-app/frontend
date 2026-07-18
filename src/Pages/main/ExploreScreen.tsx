@@ -31,7 +31,7 @@ const hasUnread = true; // TODO: replace with real unread count from notificatio
 const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { data: events = [] } = useGetEventsQuery({});
+  const { data: events = [] } = useGetEventsQuery({ limit: 100 });
   const cardEvents = events.map(toCardEvent);
   const [showInterestSheet, setShowInterestSheet] = useState(false);
 

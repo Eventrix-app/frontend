@@ -39,7 +39,10 @@ export interface AuthResponse {
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: createFallbackBaseQuery(),
+  // withAuth=true so POST /auth/refresh (the only endpoint here that requires a token) gets
+  // its Authorization header; login/register/forgot/reset-password are all @Public() on the
+  // backend and ignore it when there's no token yet (state.auth.token is null pre-login).
+  baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Auth'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
@@ -54,6 +57,16 @@ export const authApi = createApi({
         url: 'auth/register',
         method: 'POST',
         body: credentials,
+      }),
+    }),
+    // Re-issues a token with a fresh 2-day expiry — called on app foreground/launch (see
+    // AppStateSync in App.tsx) to keep an actively-used session from expiring. If the
+    // previous token had already expired (2+ days of not opening the app), this 401s and
+    // authErrorMiddleware turns that into an automatic logout.
+    refresh: builder.mutation<AuthResponse, void>({
+      query: () => ({
+        url: 'auth/refresh',
+        method: 'POST',
       }),
     }),
     logout: builder.mutation<void, void>({
@@ -86,6 +99,7 @@ export const authApi = createApi({
 export const {
   useLoginMutation,
   useRegisterMutation,
+  useRefreshMutation,
   useLogoutMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,

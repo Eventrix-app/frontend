@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
 import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
@@ -19,6 +20,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { useGetMeQuery } from '../../store/services/userApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 
@@ -32,12 +34,7 @@ const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="2
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// TODO: source from user profile / auth state instead of hardcoding
-const CURRENT_USER = {
-  name: 'Mubeen',
-  address: 'Sr. No. 1/2/3, Street Name, Residence, State...',
-  avatar: require('../../../assets/profile/avatar-placeholder.png'),
-};
+const DEFAULT_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
 
 // TODO: pull from a real "shorts"/highlights endpoint once available
 const HIGHLIGHTS: HighlightItem[] = [
@@ -54,6 +51,7 @@ const HomeScreen: React.FC = () => {
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
   const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const [accessedAddress, setAccessedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -67,10 +65,63 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { data: events = [] } = useGetEventsQuery({});
+  const { data: events = [] } = useGetEventsQuery({ limit: 100 });
+  const { data: me } = useGetMeQuery();
   const cardEvents = events.map(toCardEvent);
   const featured = cardEvents.filter((event) => event.featured);
   const recommended = cardEvents;
+
+  // Turns the coordinates captured during onboarding's location-access step (persisted on
+  // the user's account, GET /users/me) into a real, human-readable address — replaces the
+  // previous hardcoded placeholder string. No new location permission prompt needed here:
+  // this only reverse-geocodes coordinates already on file, it doesn't read live GPS.
+  useEffect(() => {
+    let cancelled = false;
+    if (me?.latitude == null || me?.longitude == null) {
+      setAccessedAddress(null);
+      return;
+    }
+    const { latitude, longitude } = me;
+
+    // expo-location's reverseGeocodeAsync has no web implementation at all — it always
+    // throws there (see expo-location/src/ExpoLocation.web.ts) — and some Android devices
+    // ship without a native Geocoder either. Nominatim's reverse endpoint is a plain HTTP
+    // call, so it works the same everywhere; same API LocationAccessScreen already uses
+    // for forward geocoding of a manually-typed city.
+    const reverseGeocodeViaNominatim = async (): Promise<string | null> => {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Eventrix/1.0 (eventrix-app)' } });
+      const data = await res.json();
+      const address = data?.address ?? {};
+      const parts = [
+        address.suburb || address.city_district || address.neighbourhood,
+        address.city || address.town || address.village || address.county,
+      ].filter((part): part is string => !!part);
+      return parts.length > 0 ? parts.join(', ') : address.state ?? null;
+    };
+
+    Location.reverseGeocodeAsync({ latitude, longitude })
+      .then((results) => {
+        if (cancelled) return null;
+        const first = results[0];
+        const parts = [first?.district || first?.subregion, first?.city].filter(
+          (part): part is string => !!part,
+        );
+        const resolved = parts.length > 0 ? parts.join(', ') : first?.region ?? null;
+        if (resolved) return resolved;
+        return reverseGeocodeViaNominatim();
+      })
+      .catch(() => (cancelled ? null : reverseGeocodeViaNominatim().catch(() => null)))
+      .then((resolved) => {
+        if (!cancelled && resolved !== null) setAccessedAddress(resolved);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [me?.latitude, me?.longitude]);
+
+  const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
+  const displayAddress = accessedAddress || me?.city || 'Add your location';
 
   // TODO: replace with real unread count from notification context/API
   const hasUnread = true;
@@ -104,13 +155,16 @@ const HomeScreen: React.FC = () => {
         {/* Row 1: greeting + address on the left, avatar on the right */}
         <View style={styles.headerTop}>
           <View style={styles.greetingCol}>
-            <Text style={styles.greeting}>Welcome, {CURRENT_USER.name} 👋</Text>
+            <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
             <Text style={styles.location} numberOfLines={1}>
-              📍 {CURRENT_USER.address}
+              📍 {displayAddress}
             </Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Image source={CURRENT_USER.avatar} style={styles.avatarImg} />
+            <Image
+              source={me?.profilePictureUrl ? { uri: me.profilePictureUrl } : DEFAULT_AVATAR}
+              style={styles.avatarImg}
+            />
           </TouchableOpacity>
         </View>
 
@@ -242,7 +296,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     overflow: 'hidden',
@@ -265,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   greetingCol: {
     flex: 1,

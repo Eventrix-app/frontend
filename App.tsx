@@ -33,6 +33,7 @@ import { AppDispatch, RootState } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import NetworkGate from './src/components/common/NetworkGate';
 import { syncOnboardingDraft } from './src/utils/syncOnboardingDraft';
+import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
 
@@ -46,6 +47,18 @@ function AppStateSync() {
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
   const isSynced = useSelector((s: RootState) => s.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
+  const [refresh] = useRefreshMutation();
+
+  // Extends the session on launch (covers: app was killed while logged in and reopened
+  // later) — if the persisted token already expired (2+ days unused), this 401s and
+  // authErrorMiddleware turns that into an automatic logout; no manual error handling
+  // needed here.
+  useEffect(() => {
+    if (isAuthenticated) {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
@@ -53,12 +66,18 @@ function AppStateSync() {
         appState.current.match(/inactive|background/) && next === 'active';
       appState.current = next;
 
-      if (comingToForeground && isAuthenticated && !isSynced) {
-        syncOnboardingDraft(dispatch, store.getState);
+      if (comingToForeground && isAuthenticated) {
+        // Same sliding-session refresh as on launch, triggered on every foreground so a
+        // daily-active user's session never expires; only 2+ days of not opening the app
+        // at all lets the token actually lapse.
+        refresh();
+        if (!isSynced) {
+          syncOnboardingDraft(dispatch, store.getState);
+        }
       }
     });
     return () => sub.remove();
-  }, [isAuthenticated, isSynced, dispatch]);
+  }, [isAuthenticated, isSynced, dispatch, refresh]);
 
   return null;
 }

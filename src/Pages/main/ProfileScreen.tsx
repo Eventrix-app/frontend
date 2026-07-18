@@ -2,14 +2,16 @@ import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import GlassSurface from '../../components/common/GlassSurface';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { MOCK_USER } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -20,47 +22,66 @@ type MenuItem = {
   onPress: (nav: Props['navigation']) => void;
 };
 
-const MENU_ITEMS: MenuItem[] = [
-  {
-    icon: '✏️',
-    label: 'Edit Profile',
-    onPress: (nav) => nav.navigate('EditProfile'),
-  },
-  {
-    icon: '❤️',
-    label: 'Saved Events',
-    subtitle: `${MOCK_USER.savedCount} events`,
-    onPress: (nav) => nav.navigate('SavedEvents'),
-  },
-  {
-    icon: '🎫',
-    label: 'My Bookings',
-    onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
-  },
-  {
-    icon: '➕',
-    label: 'Create Event',
-    onPress: (nav) => nav.navigate('CreateEvent', {}),
-  },
-  {
-    icon: '📅',
-    label: 'My Events',
-    onPress: (nav) => nav.navigate('MyEvents'),
-  },
-  {
-    icon: '🔔',
-    label: 'Notifications',
-    onPress: (nav) => nav.navigate('Notifications'),
-  },
-  {
-    icon: '⚙️',
-    label: 'Settings',
-    onPress: (nav) => nav.navigate('Settings'),
-  },
-];
-
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { data: me } = useGetMeQuery();
+  const { data: enrollments = [] } = useGetMyEnrollmentsQuery();
+  const { data: favorites = [] } = useGetMyFavoritesQuery();
+  const { data: myEvents = [] } = useGetMyEventsQuery();
+
+  // "Events" here means events this account has created/organizes, not attended — the
+  // "Bookings" stat right next to it already covers the enrolled/attended side, so having
+  // both measure enrollment would be redundant. findMyEvents returns [] for an account with
+  // no organizer profile, so this is safe to show for plain participants too.
+  const createdEventsCount = myEvents.length;
+  const savedCount = favorites.length;
+  const bookingsCount = enrollments.length;
+
+  const displayName = (me?.fullName ?? '').trim() || me?.email || '';
+  const initial = displayName.charAt(0).toUpperCase() || '?';
+  const memberSince = me?.createdAt
+    ? new Date(me.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : '';
+
+  const menuItems: MenuItem[] = [
+    {
+      icon: '✏️',
+      label: 'Edit Profile',
+      onPress: (nav) => nav.navigate('EditProfile'),
+    },
+    {
+      icon: '❤️',
+      label: 'Saved Events',
+      subtitle: `${savedCount} event${savedCount === 1 ? '' : 's'}`,
+      onPress: (nav) => nav.navigate('SavedEvents'),
+    },
+    {
+      icon: '🎫',
+      label: 'My Bookings',
+      onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
+    },
+    {
+      icon: '➕',
+      label: 'Create Event',
+      onPress: (nav) => nav.navigate('CreateEvent', {}),
+    },
+    {
+      icon: '📅',
+      label: 'My Events',
+      subtitle: `${createdEventsCount} event${createdEventsCount === 1 ? '' : 's'}`,
+      onPress: (nav) => nav.navigate('MyEvents'),
+    },
+    {
+      icon: '🔔',
+      label: 'Notifications',
+      onPress: (nav) => nav.navigate('Notifications'),
+    },
+    {
+      icon: '⚙️',
+      label: 'Settings',
+      onPress: (nav) => nav.navigate('Settings'),
+    },
+  ];
 
   return (
     <View style={styles.root}>
@@ -72,27 +93,29 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <View style={styles.avatarWrap}>
-          <Text style={styles.avatar}>{MOCK_USER.avatar}</Text>
+          {me?.profilePictureUrl ? (
+            <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatar}>{initial}</Text>
+          )}
         </View>
-        <Text style={styles.name}>
-          {MOCK_USER.firstName} {MOCK_USER.lastName}
-        </Text>
-        <Text style={styles.username}>{MOCK_USER.username}</Text>
-        <Text style={styles.location}>📍 {MOCK_USER.city}, India</Text>
+        <Text style={styles.name}>{displayName || 'Your Profile'}</Text>
+        {me?.email ? <Text style={styles.username}>{me.email}</Text> : null}
+        {me?.city ? <Text style={styles.location}>📍 {me.city}</Text> : null}
 
         <GlassSurface style={styles.statsGlass} contentStyle={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{MOCK_USER.eventsAttended}</Text>
+            <Text style={styles.statValue}>{createdEventsCount}</Text>
             <Text style={styles.statLabel}>Events</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{MOCK_USER.savedCount}</Text>
+            <Text style={styles.statValue}>{savedCount}</Text>
             <Text style={styles.statLabel}>Saved</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>4</Text>
+            <Text style={styles.statValue}>{bookingsCount}</Text>
             <Text style={styles.statLabel}>Bookings</Text>
           </View>
         </GlassSurface>
@@ -100,7 +123,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionTitle}>Account</Text>
-        {MENU_ITEMS.map((item) => (
+        {menuItems.map((item) => (
           <TouchableOpacity key={item.label} onPress={() => item.onPress(navigation)} activeOpacity={0.7}>
             <GlassSurface style={styles.menuGlass} contentStyle={styles.menuItem}>
               <Text style={styles.menuIcon}>{item.icon}</Text>
@@ -115,9 +138,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         ))}
 
-        <View style={styles.memberSince}>
-          <Text style={styles.memberText}>Member since {MOCK_USER.memberSince}</Text>
-        </View>
+        {memberSince ? (
+          <View style={styles.memberSince}>
+            <Text style={styles.memberText}>Member since {memberSince}</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -162,6 +187,13 @@ const styles = StyleSheet.create({
   },
   avatar: {
     fontSize: 40,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
   },
   name: {
     fontSize: 22,

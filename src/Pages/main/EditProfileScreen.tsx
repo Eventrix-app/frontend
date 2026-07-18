@@ -1,25 +1,55 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { MOCK_USER } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { RootState } from '../../store';
+import { useGetMeQuery, useUpdateParticipantMutation } from '../../store/services/userApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [firstName, setFirstName] = useState(MOCK_USER.firstName);
-  const [lastName, setLastName] = useState(MOCK_USER.lastName);
-  const [email, setEmail] = useState(MOCK_USER.email);
-  const [phone, setPhone] = useState(MOCK_USER.phone);
-  const [city, setCity] = useState(MOCK_USER.city);
+  const userId = useSelector((state: RootState) => state.auth.user?.id);
+  const { data: me } = useGetMeQuery();
+  const [updateParticipant, { isLoading: isSaving }] = useUpdateParticipantMutation();
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+
+  // Prefill once the real profile loads — a plain effect (not defaultValue) since the
+  // query resolves after this component has already mounted with empty fields.
+  useEffect(() => {
+    if (!me) return;
+    setFirstName(me.firstName ?? '');
+    setLastName(me.lastName ?? '');
+    setPhone(me.phoneNumber ?? '');
+    setCity(me.city ?? '');
+  }, [me]);
+
+  const handleSave = async () => {
+    if (!userId) return;
+    try {
+      await updateParticipant({
+        id: userId,
+        body: { firstName, lastName, phone, city },
+      }).unwrap();
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert('Error', e?.data?.message ?? 'Failed to save changes');
+    }
+  };
+
+  const initial = (firstName || me?.email || '?').charAt(0).toUpperCase();
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -28,7 +58,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
         <TouchableOpacity style={styles.avatarSection}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarEmoji}>{MOCK_USER.avatar}</Text>
+            <Text style={styles.avatarEmoji}>{initial}</Text>
           </View>
           <Text style={styles.changePhoto}>Change photo</Text>
         </TouchableOpacity>
@@ -44,14 +74,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.label}>Email</Text>
-        <AuthInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+        {me?.email ? (
+          <>
+            <Text style={styles.label}>Email</Text>
+            <Text style={styles.readOnlyValue}>{me.email}</Text>
+          </>
+        ) : null}
 
         <Text style={styles.label}>Phone</Text>
         <AuthInput
@@ -66,8 +94,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity style={styles.saveBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.saveText}>Save Changes</Text>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+          {isSaving ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.saveText}>Save Changes</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -97,7 +129,16 @@ const styles = StyleSheet.create({
     borderColor: colors.brandPink,
   },
   avatarEmoji: {
-    fontSize: 44,
+    fontSize: 36,
+    fontWeight: '700',
+    color: colors.brandPink,
+  },
+  readOnlyValue: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    paddingVertical: 10,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
   },
   changePhoto: {
     marginTop: spacing.sm,

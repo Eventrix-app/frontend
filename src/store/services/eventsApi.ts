@@ -139,7 +139,7 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', '
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite'],
   // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
   // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
   // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
@@ -217,6 +217,7 @@ export const eventsApi = createApi({
     }),
     getEventEnrollments: builder.query<EnrollmentRecord[], string>({
       query: (eventId) => `events/${eventId}/enrollments`,
+      providesTags: (result, error, eventId) => [{ type: 'Event', id: eventId }],
     }),
     getMyEnrollments: builder.query<EnrollmentRecord[], void>({
       query: () => 'events/my-enrollments',
@@ -226,13 +227,28 @@ export const eventsApi = createApi({
       query: () => 'events/my-waitlist',
       providesTags: ['MyWaitlist'],
     }),
+    getMyFavorites: builder.query<BackendEvent[], void>({
+      query: () => 'events/my-favorites',
+      providesTags: ['Favorite'],
+    }),
+    addFavorite: builder.mutation<void, string>({
+      query: (eventId) => ({ url: `events/${eventId}/favorite`, method: 'POST' }),
+      invalidatesTags: ['Favorite'],
+    }),
+    removeFavorite: builder.mutation<void, string>({
+      query: (eventId) => ({ url: `events/${eventId}/favorite`, method: 'DELETE' }),
+      invalidatesTags: ['Favorite'],
+    }),
     checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string }>({
       query: (body) => ({
         url: 'events/check-in',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['MyEnrollments'],
+      invalidatesTags: (result) => [
+        'MyEnrollments',
+        ...(result ? [{ type: 'Event' as const, id: result.eventId }] : []),
+      ],
     }),
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
       query: (enrollmentId) => `events/enrollments/${enrollmentId}`,
@@ -279,6 +295,9 @@ export const {
   useGetEventEnrollmentsQuery,
   useGetMyEnrollmentsQuery,
   useGetMyWaitlistQuery,
+  useGetMyFavoritesQuery,
+  useAddFavoriteMutation,
+  useRemoveFavoriteMutation,
   useCheckInMutation,
   useGetEnrollmentByIdQuery,
   useGetTicketTypesQuery,

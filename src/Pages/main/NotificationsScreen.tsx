@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { MOCK_NOTIFICATIONS } from '../../data/mockEvents';
+import {
+  useGetNotificationsQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+} from '../../store/services/notificationsApi';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -13,21 +17,33 @@ import { Text } from '../../components/common/Text';
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
 const TYPE_ICONS: Record<string, string> = {
-  reminder: '⏰',
-  booking: '🎫',
-  reel: '🎬',
-  update: '📢',
+  event_changed: '📢',
+  waitlist_promoted: '🎫',
+  refund_status: '💳',
 };
+
+function formatTimeAgo(createdAt: string): string {
+  const diffMs = Date.now() - new Date(createdAt).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
+}
 
 const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState(MOCK_NOTIFICATIONS);
+  const { data: items = [], isLoading } = useGetNotificationsQuery();
+  const [markRead] = useMarkNotificationReadMutation();
+  const [markAllReadMutation] = useMarkAllNotificationsReadMutation();
 
   const markAllRead = () => {
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    markAllReadMutation();
   };
 
-  const unreadCount = items.filter((n) => !n.read).length;
+  const unreadCount = items.filter((n) => !n.readAt).length;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -54,32 +70,38 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
       ) : null}
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {items.map((item) => (
+        {isLoading ? (
+          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        ) : items.length === 0 ? (
+          <Text style={styles.emptyText}>No notifications yet.</Text>
+        ) : null}
+        {items.map((item) => {
+          const isRead = !!item.readAt;
+          return (
           <TouchableOpacity
             key={item.id}
-            style={[styles.card, !item.read && styles.cardUnread]}
+            style={[styles.card, !isRead && styles.cardUnread]}
             activeOpacity={0.8}
-            onPress={() =>
-              setItems((prev) =>
-                prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)),
-              )
-            }
+            onPress={() => {
+              if (!isRead) markRead(item.id);
+            }}
           >
-            <View style={[styles.iconWrap, !item.read && styles.iconWrapUnread]}>
+            <View style={[styles.iconWrap, !isRead && styles.iconWrapUnread]}>
               <Text style={styles.icon}>{TYPE_ICONS[item.type] ?? '🔔'}</Text>
             </View>
             <View style={styles.content}>
               <View style={styles.titleRow}>
-                <Text style={[styles.title, !item.read && styles.titleUnread]}>
+                <Text style={[styles.title, !isRead && styles.titleUnread]}>
                   {item.title}
                 </Text>
-                {!item.read ? <View style={styles.dot} /> : null}
+                {!isRead ? <View style={styles.dot} /> : null}
               </View>
               <Text style={styles.body}>{item.body}</Text>
-              <Text style={styles.time}>{item.time}</Text>
+              <Text style={styles.time}>{formatTimeAgo(item.createdAt)}</Text>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -94,6 +116,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.brandPink,
+  },
+  loader: {
+    marginTop: spacing.xxl,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    marginTop: spacing.xxl,
   },
   banner: {
     marginHorizontal: spacing.md,

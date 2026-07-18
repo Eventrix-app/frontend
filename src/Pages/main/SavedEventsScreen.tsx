@@ -1,10 +1,11 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { MOCK_EVENTS, MOCK_SAVED_EVENT_IDS } from '../../data/mockEvents';
+import { useGetMyFavoritesQuery } from '../../store/services/eventsApi';
+import { toCardEvent } from '../../utils/eventCardAdapter';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -14,14 +15,17 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SavedEvents'>;
 
 const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const savedEvents = MOCK_EVENTS.filter((e) => MOCK_SAVED_EVENT_IDS.includes(e.id));
+  const { data: favorites = [], isLoading } = useGetMyFavoritesQuery();
+  const savedEvents = favorites.map(toCardEvent);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Saved Events" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {savedEvents.length === 0 ? (
+        {isLoading ? (
+          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        ) : savedEvents.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>❤️</Text>
             <Text style={styles.emptyTitle}>No saved events yet</Text>
@@ -51,6 +55,9 @@ const styles = StyleSheet.create({
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  loader: {
+    marginTop: spacing.xxl,
   },
   empty: {
     alignItems: 'center',

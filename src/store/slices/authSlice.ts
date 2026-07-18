@@ -62,6 +62,11 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.isLoading = false;
         state.error = null;
+      })
+      .addMatcher(authApi.endpoints.refresh.matchFulfilled, (state, { payload }) => {
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
+        state.token = payload.accessToken;
+        state.isAuthenticated = true;
       });
   },
 });
