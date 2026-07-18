@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -29,6 +30,102 @@ import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
+
+const GALLERY_PAGE_SIZE = 6;
+const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
+
+
+interface GalleryItem {
+  id: string;
+  type: 'image' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+}
+
+const MOCK_GALLERY: GalleryItem[] = [
+  { id: 'g1', type: 'video', url: 'https://example.com/video.mp4', thumbnailUrl: 'https://picsum.photos/400/300?1' },
+  { id: 'g2', type: 'image', url: 'https://picsum.photos/400/300?2' },
+  { id: 'g3', type: 'image', url: 'https://picsum.photos/400/300?3' },
+  { id: 'g4', type: 'image', url: 'https://picsum.photos/400/300?4' },
+  { id: 'g5', type: 'image', url: 'https://picsum.photos/400/300?5' },
+];
+
+const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, style }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const showSkeleton = !loaded || failed;
+
+  return (
+    <View style={[styles.galleryThumbWrap, style]}>
+      {showSkeleton && (
+        <Image source={SKELETON_IMG} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      )}
+      {!failed && (
+        <Image
+          source={{ uri: item.thumbnailUrl ?? item.url }}
+          style={[StyleSheet.absoluteFill, { opacity: loaded ? 1 : 0 }]}
+          resizeMode="cover"
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      )}
+    </View>
+  );
+};
+
+const GalleryTab: React.FC<{ event: any }> = ({ event }) => {
+  const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
+
+  // TODO: add `gallery?: GalleryItem[]` to BackendEvent once the backend returns it
+  const gallery: GalleryItem[] = event.gallery ?? MOCK_GALLERY;
+  const heroVideo = gallery.find((g) => g.type === 'video');
+  const images = gallery.filter((g) => g.type === 'image');
+  const visibleImages = images.slice(0, visibleCount);
+  const hasMore = visibleCount < images.length;
+
+  if (gallery.length === 0) {
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.emptyTabText}>Gallery coming soon.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.tabContent}>
+      {heroVideo && (
+        <TouchableOpacity activeOpacity={0.9} style={styles.galleryHero}>
+          <GalleryThumb item={heroVideo} style={StyleSheet.absoluteFillObject} />
+          <View style={styles.galleryPlayBtn}>
+            <Text style={styles.galleryPlayIcon}>▶</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.galleryGrid}>
+        <View style={styles.galleryCol}>
+          {visibleImages.filter((_, i) => i % 2 === 0).map((item) => (
+            <GalleryThumb key={item.id} item={item} style={styles.galleryTallCell} />
+          ))}
+        </View>
+        <View style={styles.galleryCol}>
+          {visibleImages.filter((_, i) => i % 2 === 1).map((item) => (
+            <GalleryThumb key={item.id} item={item} style={styles.galleryShortCell} />
+          ))}
+        </View>
+      </View>
+
+      {hasMore && (
+        <TouchableOpacity
+          style={styles.viewMoreBtn}
+          onPress={() => setVisibleCount((c) => c + GALLERY_PAGE_SIZE)}
+        >
+          <Text style={styles.viewMoreText}>View More ↓</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
 
 type TierAvailability = 'available' | 'sold_out' | 'not_started' | 'ended';
 type DetailsTab = 'about' | 'schedule' | 'tickets' | 'community' | 'reviews' | 'gallery';
@@ -397,20 +494,46 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Tab content */}
         {activeTab === 'about' && (
-          <View style={styles.tabContent}>
-            {event.description ? (
-              <>
-                <Text style={styles.sectionLabel}>About This Event</Text>
-                {event.description.split('\n').filter(Boolean).map((line, i) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{line}</Text>
-                  </View>
-                ))}
-              </>
-            ) : null}
+  <View style={styles.tabContent}>
+    {event.description ? (
+      <>
+        <Text style={styles.sectionLabel}>About This Event</Text>
+        {event.description.split('\n').filter(Boolean).map((line, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <Text style={styles.bulletDot}>•</Text>
+            <Text style={styles.bulletText}>{line}</Text>
           </View>
-        )}
+        ))}
+      </>
+    ) : null}
+
+    {/* TODO: add `highlights?: string[]` to BackendEvent once the backend returns it */}
+    {(event as any).highlights?.length > 0 && (
+      <>
+        <Text style={styles.sectionLabel}>Highlights</Text>
+        {(event as any).highlights.map((h: string, i: number) => (
+          <View key={i} style={styles.bulletRow}>
+            <Text style={styles.bulletDot}>•</Text>
+            <Text style={styles.bulletText}>{h}</Text>
+          </View>
+        ))}
+      </>
+    )}
+
+    {/* TODO: add `whoShouldAttend?: string[]` to BackendEvent once the backend returns it */}
+    {(event as any).whoShouldAttend?.length > 0 && (
+      <>
+        <Text style={styles.sectionLabel}>Who Should Attend</Text>
+        {(event as any).whoShouldAttend.map((item: string, i: number) => (
+          <View key={i} style={styles.bulletRow}>
+            <Text style={styles.bulletDot}>•</Text>
+            <Text style={styles.bulletText}>{item}</Text>
+          </View>
+        ))}
+      </>
+    )}
+  </View>
+)}
 
         {activeTab === 'schedule' && (
           <View style={styles.tabContent}>
@@ -420,97 +543,140 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {activeTab === 'tickets' && (
-          <View style={styles.tabContent}>
-            {!isOwner && ticketTypes.length > 0 ? (
-              <>
-                <View style={styles.tierList}>
-                  {ticketTypes.map((tier) => {
-                    const remaining = remainingForTier(tier);
-                    const availability = tierAvailability(tier);
-                    const selectable = availability === 'available' || availability === 'sold_out';
-                    const selected = tier.id === selectedTierId;
-                    const metaText =
-                      availability === 'not_started'
-                        ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
-                        : availability === 'ended'
-                          ? 'Sales closed'
-                          : availability === 'sold_out'
-                            ? 'Sold out — join waitlist'
-                            : remaining !== null ? `${remaining} left` : 'Available';
-                    return (
-                      <TouchableOpacity
-                        key={tier.id}
-                        style={[
-                          styles.tierRow,
-                          selected && styles.tierRowSelected,
-                          !selectable && styles.tierRowDisabled,
-                        ]}
-                        onPress={() => selectable && setSelectedTierId(tier.id)}
-                        disabled={!selectable}
-                      >
-                        <View style={styles.tierInfo}>
-                          <Text style={styles.tierName}>{tier.name}</Text>
-                          <Text
-                            style={[
-                              styles.tierMeta,
-                              availability === 'sold_out' && styles.tierMetaSoldOut,
-                              (availability === 'not_started' || availability === 'ended') && styles.tierMetaClosed,
-                            ]}
-                          >
-                            {metaText}
-                          </Text>
-                        </View>
-                        <Text style={styles.tierPrice}>{tier.price > 0 ? `₹${tier.price}` : 'Free'}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+  <View style={styles.tabContent}>
+    {!isOwner && ticketTypes.length > 0 ? (
+      <>
+        <View style={styles.ticketStubList}>
+          {ticketTypes.map((tier) => {
+            const remaining = remainingForTier(tier);
+            const availability = tierAvailability(tier);
+            const selectable = availability === 'available' || availability === 'sold_out';
+            const selected = tier.id === selectedTierId;
 
-                {selectedTier && (() => {
-                  const { min, max } = quantityBoundsForTier(selectedTier);
-                  const atMin = quantity <= min;
-                  const atMax = quantity >= max;
-                  return (
-                    <View style={styles.stepperRow}>
-                      <Text style={styles.stepperLabel}>Quantity</Text>
-                      <View style={styles.stepper}>
-                        <TouchableOpacity
-                          style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
-                          onPress={() => adjustQuantity(-1)}
-                          disabled={atMin}
-                        >
-                          <Text style={styles.stepperBtnText}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.stepperValue}>{quantity}</Text>
-                        <TouchableOpacity
-                          style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
-                          onPress={() => adjustQuantity(1)}
-                          disabled={atMax}
-                        >
-                          <Text style={styles.stepperBtnText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })()}
+            // TODO: add `benefits?: string[]` to TicketTypeRecord once the backend returns it
+            const benefits: string[] = (tier as any).benefits ?? [];
 
-                {event.isPaid && event.refundPolicyType && (
-                  <>
-                    <Text style={styles.sectionLabel}>Refund Policy</Text>
-                    <GlassSurface style={styles.refundGlass} contentStyle={styles.refundCard}>
-                      <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
-                      {event.refundPolicyText ? (
-                        <Text style={styles.refundText}>{event.refundPolicyText}</Text>
-                      ) : null}
-                    </GlassSurface>
-                  </>
-                )}
-              </>
-            ) : (
-              <Text style={styles.emptyTabText}>No ticket information available.</Text>
-            )}
-          </View>
+            const nameLower = tier.name?.toLowerCase() ?? '';
+            const stubImage = nameLower.includes('vip')
+              ? require('../../../assets/tickets/vip.png')
+              : nameLower.includes('standard')
+                ? require('../../../assets/tickets/standard.png')
+                : require('../../../assets/tickets/earlybird.png');
+
+            const availabilityText =
+              availability === 'not_started'
+                ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
+                : availability === 'ended'
+                  ? 'Sales closed'
+                  : availability === 'sold_out'
+                    ? 'Sold out — join waitlist'
+                    : remaining !== null ? `${remaining} tickets left` : 'Available';
+
+            return (
+              <TouchableOpacity
+  key={tier.id}
+  activeOpacity={0.9}
+  onPress={() => selectable && setSelectedTierId(tier.id)}
+  disabled={!selectable}
+  style={[styles.ticketStubWrap, selected && styles.ticketStubSelected, !selectable && styles.ticketStubDisabled]}
+>
+  <Image
+    source={stubImage}
+    style={StyleSheet.absoluteFill}
+    resizeMode="stretch"
+  />
+
+  <View style={styles.ticketStubContent}>
+    <Text style={styles.ticketStubTitle}>{tier.name}</Text>
+
+    <View style={styles.ticketStubBody}>
+      <View style={styles.ticketStubCol}>
+        <Text style={styles.ticketStubLabel}>Price</Text>
+        <Text style={styles.ticketStubBullet}>
+          • {tier.price > 0 ? `₹${tier.price}` : 'Free'}
+        </Text>
+
+        <Text style={styles.ticketStubLabel}>Availability</Text>
+        <Text style={styles.ticketStubBullet}>• {availabilityText}</Text>
+      </View>
+
+      {benefits.length > 0 && (
+        <View style={styles.ticketStubCol}>
+          <Text style={styles.ticketStubLabel}>Benefits</Text>
+          {benefits.map((b, i) => (
+            <Text key={i} style={styles.ticketStubBullet}>• {b}</Text>
+          ))}
+        </View>
+      )}
+    </View>
+  </View>
+</TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {selectedTier && (() => {
+          const { min, max } = quantityBoundsForTier(selectedTier);
+          const atMin = quantity <= min;
+          const atMax = quantity >= max;
+          return (
+            <View style={styles.stepperRow}>
+              <Text style={styles.stepperLabel}>Quantity</Text>
+              <View style={styles.stepper}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
+                  onPress={() => adjustQuantity(-1)}
+                  disabled={atMin}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperValue}>{quantity}</Text>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
+                  onPress={() => adjustQuantity(1)}
+                  disabled={atMax}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })()}
+
+        {event.isPaid && event.refundPolicyType && (
+          <>
+            <Text style={styles.sectionLabel}>Refund Policy</Text>
+            <GlassSurface style={styles.refundGlass} contentStyle={styles.refundCard}>
+              <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
+              {event.refundPolicyText ? (
+                <Text style={styles.refundText}>{event.refundPolicyText}</Text>
+              ) : null}
+            </GlassSurface>
+          </>
         )}
+
+        {/* Payment options */}
+        <Text style={styles.sectionLabel}>Payment Options Available</Text>
+        <View style={styles.paymentMethodsList}>
+          {['UPI', 'Credit / Debit Card', 'Net Banking', 'Wallets', 'Pay at Venue (Offline)'].map((method) => (
+            <Text key={method} style={styles.paymentMethodItem}>• {method}</Text>
+          ))}
+        </View>
+
+        {/* Accepted card/wallet labels — replace with your own icon assets if you have them */}
+        <View style={styles.paymentBadgeRow}>
+          {['GPay', 'Apple Pay', 'Mastercard', 'Diners', 'Discover', 'RuPay', 'PayPal', 'Shop Pay', 'Visa', 'Amex'].map((label) => (
+            <View key={label} style={styles.paymentBadge}>
+              <Text style={styles.paymentBadgeText}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      </>
+    ) : (
+      <Text style={styles.emptyTabText}>No ticket information available.</Text>
+    )}
+  </View>
+)}
 
         {activeTab === 'community' && (
           <View style={styles.tabContent}>
@@ -527,11 +693,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {activeTab === 'gallery' && (
-          <View style={styles.tabContent}>
-            {/* TODO: wire to real event gallery/reels once the API has it */}
-            <Text style={styles.emptyTabText}>Gallery coming soon.</Text>
-          </View>
-        )}
+  <GalleryTab event={{ ...event, gallery: MOCK_GALLERY }} />
+)}
       </ScrollView>
 
       <GlassSurface style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]} contentStyle={styles.footerContent}>
@@ -813,6 +976,114 @@ const styles = StyleSheet.create({
   ownerActions: { gap: 0 },
   disabledBtn: { backgroundColor: '#9CA3AF' },
   bookText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+
+  ticketStubList: { gap: spacing.md },
+ticketStubWrap: {
+  borderRadius: borderRadius.md,
+  overflow: 'hidden',
+  position: 'relative',
+  height: 190,   // reduced from 300 now that content is top-anchored, not centered
+},
+ticketStubSelected: { opacity: 1 },
+ticketStubDisabled: { opacity: 0.5 },
+ticketStubBg: {
+  flex: 1,                  // fills the fixed-height wrap above
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.lg,
+  justifyContent: 'center',
+},
+ticketStubBgImage: { resizeMode: 'stretch' },
+ticketStubContent: {
+  flex: 1,
+  paddingHorizontal: spacing.lg,
+  paddingTop: 4,       // was spacing.lg + centered — now smaller top padding, pulled up
+  paddingBottom: spacing.lg,
+  justifyContent: 'flex-start', // was 'center' — anchors content to the top instead of middle
+},
+ticketStubTitle: {
+  color: colors.white,
+  fontSize: 17,
+  fontWeight: '700',
+  marginBottom: 8,   // was spacing.md — tighter
+},
+ticketStubBody: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  gap: spacing.lg,
+},
+ticketStubCol: { flex: 1 },
+ticketStubLabel: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.85)',
+  marginTop: 8,      // was spacing.sm — tighter
+  marginBottom: 2,
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+},
+ticketStubBullet: {
+  fontSize: 14,
+  color: colors.white,
+  lineHeight: 20,
+  fontWeight: '600',
+},
+paymentMethodsList: { gap: 4, marginBottom: spacing.md },
+paymentMethodItem: { fontSize: 14, color: colors.text },
+paymentBadgeRow: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: spacing.sm,
+  marginBottom: spacing.md,
+},
+paymentBadge: {
+  borderWidth: 1,
+  borderColor: colors.borderLight,
+  borderRadius: borderRadius.md,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+},
+
+galleryHero: {
+  height: 180,
+  borderRadius: borderRadius.md,
+  overflow: 'hidden',
+  marginBottom: spacing.md,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#E5E7EB',
+},
+galleryPlayBtn: {
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: colors.white,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+galleryPlayIcon: { fontSize: 20, color: colors.brandPink, marginLeft: 3 },
+galleryGrid: {
+  flexDirection: 'row',
+  gap: spacing.sm,
+},
+galleryCol: { flex: 1, gap: spacing.sm },
+galleryThumbWrap: {
+  borderRadius: borderRadius.md,
+  overflow: 'hidden',
+  backgroundColor: '#F3F4F6',
+},
+galleryTallCell: { height: 180 },
+galleryShortCell: { height: 130 },
+viewMoreBtn: {
+  borderWidth: 1.5,
+  borderColor: colors.brandPink,
+  borderRadius: borderRadius.lg,
+  paddingVertical: spacing.sm + 2,
+  alignItems: 'center',
+  marginTop: spacing.md,
+},
+viewMoreText: { color: colors.brandPink, fontWeight: '700', fontSize: 14 },
+
+paymentBadgeText: { fontSize: 12, fontWeight: '600', color: colors.text },
 });
 
 export default EventDetailsScreen;
