@@ -1,11 +1,10 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { CATEGORIES } from '../../data/mockEvents';
 import { RightArrow } from '../common/Icons';
 import { spacing } from '../../theme/spacing';
 import { colors } from '../../theme/colors';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type CategoryScrollerProps = {
@@ -46,10 +45,12 @@ export const CategoryScroller: React.FC<CategoryScrollerProps> = ({
       ))}
       <View style={styles.viewAllWrapper}>
         <TouchableOpacity style={styles.viewAll} activeOpacity={0.8}>
-          <GlassSurface style={styles.viewAllGlass} contentStyle={styles.viewAllContent}>
-            <RightArrow color={colors.brandPink} />
-            <Text style={styles.viewAllText}>View All</Text>
-          </GlassSurface>
+          <View style={styles.viewAllGlass}>
+            <View style={styles.viewAllContent}>
+              <RightArrow color={colors.brandPink} />
+              <Text style={styles.viewAllText}>View All</Text>
+            </View>
+          </View>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -85,7 +86,17 @@ const styles = StyleSheet.create({
   viewAllGlass: {
     borderRadius: 18,
     overflow: 'hidden',
+    backgroundColor: colors.white,
     flex: 1,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   viewAllContent: {
     alignItems: 'center',

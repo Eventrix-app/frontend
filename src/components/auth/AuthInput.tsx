@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Image,
   ImageSourcePropType,
+  Platform,
   StyleSheet,
   TextInput,
   TextInputProps,
@@ -11,7 +12,6 @@ import {
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type AuthInputProps = TextInputProps & {
@@ -44,24 +44,26 @@ export const AuthInput: React.FC<AuthInputProps> = ({
 
   return (
     <View style={styles.wrap}>
-      <GlassSurface style={[styles.fieldGlass, error && styles.fieldError]} contentStyle={styles.field}>
-        {icon
-          ? typeof icon === 'string'
-            ? <Text style={styles.icon}>{icon}</Text>
-            : <Image source={icon} style={styles.iconImage} resizeMode="contain" />
-          : null}
-        <TextInput
-          style={[styles.input, style]}
-          placeholderTextColor="rgba(26,26,46,0.45)"
-          secureTextEntry={hidden}
-          {...props}
-        />
-        {secureTextEntry ? (
-          <TouchableOpacity onPress={() => setHidden((v) => !v)} hitSlop={8}>
-            {hidden ? <EyeOffIcon size={22} /> : <EyeIcon size={22} />}
-          </TouchableOpacity>
-        ) : null}
-      </GlassSurface>
+      <View style={[styles.fieldGlass, error && styles.fieldError]}>
+        <View style={styles.field}>
+          {icon
+            ? typeof icon === 'string'
+              ? <Text style={styles.icon}>{icon}</Text>
+              : <Image source={icon} style={styles.iconImage} resizeMode="contain" />
+            : null}
+          <TextInput
+            style={[styles.input, style]}
+            placeholderTextColor="rgba(26,26,46,0.45)"
+            secureTextEntry={hidden}
+            {...props}
+          />
+          {secureTextEntry ? (
+            <TouchableOpacity onPress={() => setHidden((v) => !v)} hitSlop={8}>
+              {hidden ? <EyeOffIcon size={22} /> : <EyeIcon size={22} />}
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
@@ -73,8 +75,19 @@ const styles = StyleSheet.create({
   },
   fieldGlass: {
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.7)',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   field: {
     flexDirection: 'row',

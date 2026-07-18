@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
-import GlassSurface from '../../components/common/GlassSurface';
 import AnimatedLink from '../../components/common/AnimatedLink';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -145,36 +144,36 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           disabled={!isFormValid || isLoading}
           activeOpacity={0.9}
         >
-          <GlassSurface
-            variant="solid"
+          <View
             style={[
               styles.loginBtn,
               { height: loginBtnHeight, borderRadius: loginBtnRadius },
               (!isFormValid || isLoading) && styles.loginBtnDisabled,
             ]}
-            contentStyle={styles.loginContent}
           >
-            <Text
-              style={[
-                styles.loginBtnText,
-                { fontSize: loginBtnTextSize },
-                (!isFormValid || isLoading) && styles.loginBtnTextDisabled,
-              ]}
-            >
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Text>
-            {!isLoading && (
+            <View style={styles.loginContent}>
               <Text
                 style={[
                   styles.loginBtnText,
                   { fontSize: loginBtnTextSize },
-                  !isFormValid && styles.loginBtnTextDisabled,
+                  (!isFormValid || isLoading) && styles.loginBtnTextDisabled,
                 ]}
               >
-                →
+                {isLoading ? 'Logging in...' : 'Login'}
               </Text>
-            )}
-          </GlassSurface>
+              {!isLoading && (
+                <Text
+                  style={[
+                    styles.loginBtnText,
+                    { fontSize: loginBtnTextSize },
+                    !isFormValid && styles.loginBtnTextDisabled,
+                  ]}
+                >
+                  →
+                </Text>
+              )}
+            </View>
+          </View>
         </TouchableOpacity>
 
         <View style={styles.registerLinkWrap}>
@@ -226,10 +225,20 @@ const styles = StyleSheet.create({
   loginBtn: {
     // width: 'auto',
     backgroundColor: colors.primary,
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm + 2,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   loginWrap: {
     borderRadius: 20,

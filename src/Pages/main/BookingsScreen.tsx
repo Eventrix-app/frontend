@@ -208,13 +208,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     color: '#0D0D0D',
     marginTop: spacing.md,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
     marginBottom: spacing.md,
       fontFamily: 'ZalandoSansExpanded_700Bold'
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     fontSize: 48,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 15,
     color: colors.text,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     flex: 1,
-    fontSize: 17,
+    fontSize: 14,
     color: colors.text,
       fontFamily: 'ZalandoSansExpanded_700Bold'
 },

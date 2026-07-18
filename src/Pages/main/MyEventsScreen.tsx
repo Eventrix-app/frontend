@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import GlassSurface from '../../components/common/GlassSurface';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -93,15 +92,17 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
                 key={event.id}
                 onPress={() => navigation.navigate('EventDetails', { eventId: event.id })}
               >
-                <GlassSurface style={styles.card} contentStyle={styles.cardContent}>
-                  <View style={styles.cardText}>
-                    <Text style={styles.cardTitle}>{event.title}</Text>
-                    <Text style={styles.cardDate}>{event.eventDate}</Text>
+                <View style={styles.card}>
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>{event.title}</Text>
+                      <Text style={styles.cardDate}>{event.eventDate}</Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
+                      <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
-                    <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
-                  </View>
-                </GlassSurface>
+                </View>
               </TouchableOpacity>
             ))
           )}
@@ -168,7 +169,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   emptyCreateText: { color: colors.white, fontWeight: '600' },
-  card: { borderRadius: borderRadius.lg, marginBottom: spacing.sm },
+  card: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',

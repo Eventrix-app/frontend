@@ -1,9 +1,8 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import GlassSurface from '../../components/common/GlassSurface';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -53,7 +52,8 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       <ScreenHeader title="Ticket Details" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
-        <GlassSurface style={[styles.ticketGlass, isCancelled && styles.ticketCancelled]} contentStyle={styles.ticket}>
+        <View style={[styles.ticketGlass, isCancelled && styles.ticketCancelled]}>
+        <View style={styles.ticket}>
           <View style={styles.ticketHeader}>
             <Text style={styles.ticketLabel}>EVENTRIX TICKET</Text>
             <View style={[styles.status, { backgroundColor: statusStyle.bg }]}>
@@ -98,18 +98,21 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               {Number(enrollment.totalAmount) === 0 ? 'Free' : `₹${enrollment.totalAmount}`}
             </Text>
           </View>
-        </GlassSurface>
+        </View>
+        </View>
       </ScrollView>
 
       {!isCancelled ? (
-        <GlassSurface style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]} contentStyle={styles.footerContent}>
-          <TouchableOpacity
-            style={styles.shareBtn}
-            onPress={() => navigation.navigate('EventDetails', { eventId: enrollment.eventId })}
-          >
-            <Text style={styles.shareText}>View Event</Text>
-          </TouchableOpacity>
-        </GlassSurface>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+          <View style={styles.footerContent}>
+            <TouchableOpacity
+              style={styles.shareBtn}
+              onPress={() => navigation.navigate('EventDetails', { eventId: enrollment.eventId })}
+            >
+              <Text style={styles.shareText}>View Event</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -120,7 +123,21 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: colors.textSecondary, fontSize: 15 },
   scroll: { padding: spacing.md },
-  ticketGlass: { borderRadius: borderRadius.lg, marginBottom: spacing.md },
+  ticketGlass: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
   ticket: { padding: spacing.lg },
   ticketCancelled: { opacity: 0.85 },
   ticketHeader: {
@@ -175,6 +192,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.md,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
   shareBtn: {

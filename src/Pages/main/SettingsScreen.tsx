@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import GlassSurface from '../../components/common/GlassSurface';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -54,39 +53,45 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.groupTitle}>Preferences</Text>
-        <GlassSurface style={styles.groupGlass} contentStyle={styles.group}>
-          {SETTINGS.filter((s) => s.type === 'toggle').map((item) => (
-            <View key={item.id} style={styles.row}>
-              <View style={styles.rowText}>
-                <Text style={styles.label}>{item.label}</Text>
-                {item.subtitle ? (
-                  <Text style={styles.subtitle}>{item.subtitle}</Text>
-                ) : null}
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            {SETTINGS.filter((s) => s.type === 'toggle').map((item) => (
+              <View key={item.id} style={styles.row}>
+                <View style={styles.rowText}>
+                  <Text style={styles.label}>{item.label}</Text>
+                  {item.subtitle ? (
+                    <Text style={styles.subtitle}>{item.subtitle}</Text>
+                  ) : null}
+                </View>
+                <Switch
+                  value={toggles[item.id as keyof typeof toggles]}
+                  onValueChange={() => toggle(item.id)}
+                  trackColor={{ false: colors.border, true: colors.brandPink }}
+                  thumbColor={colors.white}
+                />
               </View>
-              <Switch
-                value={toggles[item.id as keyof typeof toggles]}
-                onValueChange={() => toggle(item.id)}
-                trackColor={{ false: colors.border, true: colors.brandPink }}
-                thumbColor={colors.white}
-              />
-            </View>
-          ))}
-        </GlassSurface>
+            ))}
+          </View>
+        </View>
 
         <Text style={styles.groupTitle}>Legal</Text>
-        <GlassSurface style={styles.groupGlass} contentStyle={styles.group}>
-          {SETTINGS.filter((s) => s.type === 'link').map((item) => (
-            <TouchableOpacity key={item.id} style={styles.row}>
-              <Text style={styles.label}>{item.label}</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </GlassSurface>
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            {SETTINGS.filter((s) => s.type === 'link').map((item) => (
+              <TouchableOpacity key={item.id} style={styles.row}>
+                <Text style={styles.label}>{item.label}</Text>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.logoutWrap} onPress={handleLogout}>
-          <GlassSurface style={styles.logoutBtn} contentStyle={styles.logoutContent}>
-            <Text style={styles.logoutText}>Log Out</Text>
-          </GlassSurface>
+          <View style={styles.logoutBtn}>
+            <View style={styles.logoutContent}>
+              <Text style={styles.logoutText}>Log Out</Text>
+            </View>
+          </View>
         </TouchableOpacity>
 
         <Text style={styles.version}>Eventrix v1.0.0</Text>
@@ -105,7 +110,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   groupTitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -116,7 +121,17 @@ const styles = StyleSheet.create({
   groupGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
     marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   group: {
     paddingVertical: 0,
@@ -135,7 +150,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   label: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
     color: colors.text,
   },
@@ -156,6 +171,17 @@ const styles = StyleSheet.create({
   },
   logoutBtn: {
     borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   logoutContent: {
     alignItems: 'center',

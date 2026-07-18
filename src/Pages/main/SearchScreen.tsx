@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -11,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import GlassSurface from '../../components/common/GlassSurface';
 import { CATEGORIES, MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -52,23 +52,25 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Search" onBack={() => navigation.goBack()} />
 
-      <GlassSurface style={styles.searchGlass} contentStyle={styles.searchWrap}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          autoFocus
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search events, venues, organizers..."
-          placeholderTextColor={colors.placeholder}
-          style={styles.searchInput}
-          returnKeyType="search"
-        />
-        {query.length > 0 ? (
-          <TouchableOpacity onPress={() => setQuery('')}>
-            <Text style={styles.clear}>✕</Text>
-          </TouchableOpacity>
-        ) : null}
-      </GlassSurface>
+      <View style={styles.searchGlass}>
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search events, venues, organizers..."
+            placeholderTextColor={colors.placeholder}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Text style={styles.clear}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
       <ScrollView
         horizontal
@@ -80,9 +82,11 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.chipWrap}
           onPress={() => setCategory(null)}
         >
-          <GlassSurface style={[styles.chipGlass, !category && styles.chipActive]} contentStyle={styles.chipContent}>
-            <Text style={[styles.chipText, !category && styles.chipTextActive]}>All</Text>
-          </GlassSurface>
+          <View style={[styles.chipGlass, !category && styles.chipActive]}>
+            <View style={styles.chipContent}>
+              <Text style={[styles.chipText, !category && styles.chipTextActive]}>All</Text>
+            </View>
+          </View>
         </TouchableOpacity>
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
@@ -92,19 +96,18 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
               setCategory((prev) => (prev === cat.name.toLowerCase() ? null : cat.name.toLowerCase()))
             }
           >
-            <GlassSurface
-              style={[styles.chipGlass, category === cat.name.toLowerCase() && styles.chipActive]}
-              contentStyle={styles.chipContent}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  category === cat.name.toLowerCase() && styles.chipTextActive,
-                ]}
-              >
-                {cat.emoji} {cat.name}
-              </Text>
-            </GlassSurface>
+            <View style={[styles.chipGlass, category === cat.name.toLowerCase() && styles.chipActive]}>
+              <View style={styles.chipContent}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    category === cat.name.toLowerCase() && styles.chipTextActive,
+                  ]}
+                >
+                  {cat.emoji} {cat.name}
+                </Text>
+              </View>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -120,9 +123,11 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
                   style={styles.recentChipWrap}
                   onPress={() => setQuery(term)}
                 >
-                  <GlassSurface style={styles.recentChip} contentStyle={styles.recentChipContent}>
-                    <Text style={styles.recentText}>🕐 {term}</Text>
-                  </GlassSurface>
+                  <View style={styles.recentChip}>
+                    <View style={styles.recentChipContent}>
+                      <Text style={styles.recentText}>🕐 {term}</Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -168,8 +173,19 @@ const styles = StyleSheet.create({
   },
   searchGlass: {
     borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   searchWrap: {
     flexDirection: 'row',
@@ -208,6 +224,16 @@ const styles = StyleSheet.create({
   chipGlass: {
     borderRadius: borderRadius.pill,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   chipContent: {
     paddingHorizontal: spacing.md,
@@ -247,6 +273,17 @@ const styles = StyleSheet.create({
   },
   recentChip: {
     borderRadius: borderRadius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   recentChipContent: {
     paddingHorizontal: spacing.md,

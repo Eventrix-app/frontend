@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -9,7 +9,6 @@ import { AuthStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from '../../components/common/GlassSurface';
 import { useResetPasswordMutation } from '../../store/services/authApi';
 import { Text } from '../../components/common/Text';
 
@@ -83,10 +82,12 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
         centerTitle
       >
         <View style={styles.successContainer}>
-          <GlassSurface variant="solid" style={styles.successIconGlass} contentStyle={styles.successIconContent}>
-            <Text style={styles.successIcon}>✓</Text>
-          </GlassSurface>
-          
+          <View style={styles.successIconGlass}>
+            <View style={styles.successIconContent}>
+              <Text style={styles.successIcon}>✓</Text>
+            </View>
+          </View>
+
           <Text style={styles.successTitle}>All Set!</Text>
           <Text style={styles.successText}>
             You can now log in to your account with your new password.
@@ -97,9 +98,11 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.9}
           >
-            <GlassSurface variant="solid" style={styles.loginBtn} contentStyle={styles.loginBtnContent}>
-              <Text style={styles.loginBtnText}>Back to Log In</Text>
-            </GlassSurface>
+            <View style={styles.loginBtn}>
+              <View style={styles.loginBtnContent}>
+                <Text style={styles.loginBtnText}>Back to Log In</Text>
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
         <LegalFooter />
@@ -265,6 +268,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   successIconContent: {
     width: 80,
@@ -299,6 +311,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandPink,
     height: 56,
     borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   loginBtnContent: {
     flexDirection: 'row',

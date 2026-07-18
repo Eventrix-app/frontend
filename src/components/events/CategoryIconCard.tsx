@@ -1,14 +1,20 @@
 import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from '../common/GlassSurface';
 import { RightArrow } from '../common/Icons';
-import MusicIcon from '../../../assets/home-screen-categories/music.svg';
-import TechIcon from '../../../assets/home-screen-categories/tech.svg';
-import SportsIcon from '../../../assets/home-screen-categories/sport.svg';
-import HealthIcon from '../../../assets/home-screen-categories/health.svg';
 import { Text } from '../common/Text';
+
+// These ship as real PNGs, not SVGs — the original .svg files in this folder are actually
+// a base64-embedded PNG wrapped in an <svg> shell (a Figma export artifact), which isn't a
+// real vector image and isn't decodable by RN's Image on Android/iOS (only a browser's
+// native <img> renders that wrapper, which is why these were invisible on-device). require()
+// rather than an ES import, matching every other image asset in this app — there's no
+// `declare module '*.png'` ambient type for the import form to type-check against.
+const MusicIcon = require('../../../assets/home-screen-categories/music.png');
+const TechIcon = require('../../../assets/home-screen-categories/tech.png');
+const SportsIcon = require('../../../assets/home-screen-categories/sport.png');
+const HealthIcon = require('../../../assets/home-screen-categories/health.png');
 
 export interface CategoryItem {
   key: string;
@@ -53,9 +59,11 @@ export const ViewAllCategoryIconCard: React.FC<ViewAllProps> = ({ onPress }) => 
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.8} onPress={onPress}>
       <View style={[styles.iconBox, styles.viewAllIconBox]}>
-        <GlassSurface style={styles.viewAllGlass} contentStyle={styles.viewAllContent}>
-          <RightArrow color={colors.brandPink} size={18} />
-        </GlassSurface>
+        <View style={styles.viewAllGlass}>
+          <View style={styles.viewAllContent}>
+            <RightArrow color={colors.brandPink} size={18} />
+          </View>
+        </View>
       </View>
       <Text style={styles.label}>View All</Text>
     </TouchableOpacity>
@@ -85,8 +93,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   viewAllContent: {
     alignItems: 'center',

@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   title: {
-    fontSize: 20,
+    fontSize: 17,
     color: colors.text,
     fontFamily: 'ZalandoSansExpanded_700Bold',
   },

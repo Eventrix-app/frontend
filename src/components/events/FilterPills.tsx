@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Platform, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text } from '../common';
 import theme from '../../theme';
-import GlassSurface from '../common/GlassSurface';
 
 interface FilterOption {
   id: string;
@@ -34,26 +33,25 @@ const FilterPills: React.FC<FilterPillsProps> = ({
             onPress={() => onSelect(option.id)}
             activeOpacity={0.7}
           >
-            <GlassSurface
-              style={[styles.pillGlass, isSelected && styles.pillSelected]}
-              contentStyle={styles.pillContent}
-            >
-              {option.icon && (
-                <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
-                  <Text style={[styles.pillIcon, isSelected && styles.pillIconSelected]}>
-                    {option.icon}
-                  </Text>
-                </View>
-              )}
-              <Text
-                variant="caption"
-                color={isSelected ? 'textInverse' : 'text'}
-                style={styles.pillText}
-              >
-                {option.label}
-              </Text>
-              <Text style={[styles.chevron, isSelected && styles.chevronSelected]}>▾</Text>
-            </GlassSurface>
+            <View style={[styles.pillGlass, isSelected && styles.pillSelected]}>
+              <View style={styles.pillContent}>
+                {option.icon && (
+                  <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
+                    <Text style={[styles.pillIcon, isSelected && styles.pillIconSelected]}>
+                      {option.icon}
+                    </Text>
+                  </View>
+                )}
+                <Text
+                  variant="caption"
+                  color={isSelected ? 'textInverse' : 'text'}
+                  style={styles.pillText}
+                >
+                  {option.label}
+                </Text>
+                <Text style={[styles.chevron, isSelected && styles.chevronSelected]}>▾</Text>
+              </View>
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -102,9 +100,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     overflow: 'hidden',
+    backgroundColor: theme.colors.white,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     minHeight: 40,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: theme.colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   pillContent: {
     flexDirection: 'row',

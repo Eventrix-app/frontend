@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ImageBackground,
+  Platform,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -11,7 +12,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import GlassSurface from '../../components/common/GlassSurface';
 import { RootStackParamList } from '../../navigation/types';
 import { RootState } from '../../store';
 import { colors } from '../../theme/colors';
@@ -666,12 +666,14 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {event.isPaid && event.refundPolicyType && (
           <>
             <Text style={styles.sectionLabel}>Refund Policy</Text>
-            <GlassSurface style={styles.refundGlass} contentStyle={styles.refundCard}>
-              <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
-              {event.refundPolicyText ? (
-                <Text style={styles.refundText}>{event.refundPolicyText}</Text>
-              ) : null}
-            </GlassSurface>
+            <View style={styles.refundGlass}>
+              <View style={styles.refundCard}>
+                <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
+                {event.refundPolicyText ? (
+                  <Text style={styles.refundText}>{event.refundPolicyText}</Text>
+                ) : null}
+              </View>
+            </View>
           </>
         )}
 
@@ -717,7 +719,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 )}
       </ScrollView>
 
-      <GlassSurface style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]} contentStyle={styles.footerContent}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+      <View style={styles.footerContent}>
         {isOwner ? (
           <View style={styles.ownerActions}>
             <TouchableOpacity
@@ -754,7 +757,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </TouchableOpacity>
         )}
-      </GlassSurface>
+      </View>
+      </View>
     </View>
   );
 };
@@ -983,11 +987,44 @@ const styles = StyleSheet.create({
   stepperBtnDisabled: { opacity: 0.4 },
   stepperBtnText: { fontSize: 18, fontWeight: '700', color: colors.text },
   stepperValue: { fontSize: 16, fontWeight: '600', color: colors.text, minWidth: 24, textAlign: 'center' },
-  refundGlass: { borderRadius: borderRadius.md, marginBottom: spacing.md, marginTop: spacing.md },
+  refundGlass: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    marginBottom: spacing.md,
+    marginTop: spacing.md,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
   refundCard: { padding: spacing.md, gap: 4 },
   refundType: { fontWeight: '600', color: colors.text, textTransform: 'capitalize' },
   refundText: { fontSize: 13, color: colors.textSecondary },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.md, borderRadius: 0 },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: spacing.md,
+    borderRadius: 0,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
   bookBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' },
   manageBtn: { backgroundColor: colors.text },

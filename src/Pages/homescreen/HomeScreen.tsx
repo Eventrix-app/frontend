@@ -34,8 +34,6 @@ const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="2
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const DEFAULT_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
-
 // TODO: pull from a real "shorts"/highlights endpoint once available
 const HIGHLIGHTS: HighlightItem[] = [
   { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
@@ -122,6 +120,7 @@ const HomeScreen: React.FC = () => {
 
   const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
   const displayAddress = accessedAddress || me?.city || 'Add your location';
+  const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
 
   // TODO: replace with real unread count from notification context/API
   const hasUnread = true;
@@ -161,10 +160,13 @@ const HomeScreen: React.FC = () => {
             </Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Image
-              source={me?.profilePictureUrl ? { uri: me.profilePictureUrl } : DEFAULT_AVATAR}
-              style={styles.avatarImg}
-            />
+            {me?.profilePictureUrl ? (
+              <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>{avatarInitial}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -331,6 +333,21 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.7)',
+  },
+  avatarFallback: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
   },
   greeting: {
     color: colors.white,

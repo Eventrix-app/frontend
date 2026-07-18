@@ -1,9 +1,8 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import GlassSurface from '../../components/common/GlassSurface';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -103,38 +102,42 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {me?.email ? <Text style={styles.username}>{me.email}</Text> : null}
         {me?.city ? <Text style={styles.location}>📍 {me.city}</Text> : null}
 
-        <GlassSurface style={styles.statsGlass} contentStyle={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{createdEventsCount}</Text>
-            <Text style={styles.statLabel}>Events</Text>
+        <View style={styles.statsGlass}>
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{createdEventsCount}</Text>
+              <Text style={styles.statLabel}>Events</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{savedCount}</Text>
+              <Text style={styles.statLabel}>Saved</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{bookingsCount}</Text>
+              <Text style={styles.statLabel}>Bookings</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{savedCount}</Text>
-            <Text style={styles.statLabel}>Saved</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{bookingsCount}</Text>
-            <Text style={styles.statLabel}>Bookings</Text>
-          </View>
-        </GlassSurface>
+        </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionTitle}>Account</Text>
         {menuItems.map((item) => (
           <TouchableOpacity key={item.label} onPress={() => item.onPress(navigation)} activeOpacity={0.7}>
-            <GlassSurface style={styles.menuGlass} contentStyle={styles.menuItem}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-              <View style={styles.menuText}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                {item.subtitle ? (
-                  <Text style={styles.menuSub}>{item.subtitle}</Text>
-                ) : null}
+            <View style={styles.menuGlass}>
+              <View style={styles.menuItem}>
+                <Text style={styles.menuIcon}>{item.icon}</Text>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  {item.subtitle ? (
+                    <Text style={styles.menuSub}>{item.subtitle}</Text>
+                  ) : null}
+                </View>
+                <Text style={styles.chevron}>›</Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </GlassSurface>
+            </View>
           </TouchableOpacity>
         ))}
 
@@ -196,7 +199,7 @@ const styles = StyleSheet.create({
     borderRadius: 44,
   },
   name: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: 'ZalandoSansExpanded_700Bold',
     color: colors.white,
   },
@@ -213,8 +216,18 @@ const styles = StyleSheet.create({
   statsGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
     width: '100%',
     marginTop: spacing.lg,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   statsRow: {
     flexDirection: 'row',
@@ -226,25 +239,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
-    color: colors.white,
+    color: colors.text,
   },
   statLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.textSecondary,
     marginTop: 2,
   },
   statDivider: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: colors.borderLight,
   },
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 13,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
@@ -253,7 +266,17 @@ const styles = StyleSheet.create({
   menuGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
     marginBottom: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   menuItem: {
     flexDirection: 'row',
@@ -271,7 +294,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuLabel: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '500',
     color: colors.text,
   },

@@ -1,10 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MockEvent } from '../../data/mockEvents';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type MainEventCardProps = {
@@ -19,7 +18,8 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
   width,
 }) => (
   <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
-    <GlassSurface style={styles.glass} contentStyle={styles.glassContent}>
+    <View style={styles.glass}>
+      <View style={styles.glassContent}>
       <View style={styles.image}>
         <View style={styles.imageTopRow}>
           <Text style={styles.categoryPill}>{event.category}</Text>
@@ -55,7 +55,8 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
         </View>
         <Text style={styles.price}>{event.price}</Text>
       </View>
-    </GlassSurface>
+      </View>
+    </View>
   </TouchableOpacity>
 );
 
@@ -68,6 +69,16 @@ const styles = StyleSheet.create({
   glass: {
     borderRadius: 24,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   glassContent: {
     padding: 2,

@@ -1,8 +1,7 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from '../common/GlassSurface';
 import { LeftArrow, RightArrow } from '../common/Icons';
 import { Text } from '../common/Text';
 
@@ -21,9 +20,11 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
 }) => (
   <View style={styles.row}>
     <TouchableOpacity style={styles.backWrap} onPress={onBack} activeOpacity={0.8}>
-      <GlassSurface style={styles.backBtn} contentStyle={styles.backContent}>
-        <LeftArrow color={colors.brandPink} />
-      </GlassSurface>
+      <View style={styles.backBtn}>
+        <View style={styles.backContent}>
+          <LeftArrow color={colors.brandPink} />
+        </View>
+      </View>
     </TouchableOpacity>
     <TouchableOpacity
       style={[styles.primaryWrap, primaryDisabled && styles.primaryDisabled]}
@@ -31,10 +32,12 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
       disabled={primaryDisabled}
       activeOpacity={0.9}
     >
-      <GlassSurface variant="solid" style={styles.primaryBtn} contentStyle={styles.primaryContent}>
-        <Text style={styles.primaryText}>{primaryLabel}</Text>
-        <RightArrow color={colors.white} />
-      </GlassSurface>
+      <View style={styles.primaryBtn}>
+        <View style={styles.primaryContent}>
+          <Text style={styles.primaryText}>{primaryLabel}</Text>
+          <RightArrow color={colors.white} />
+        </View>
+      </View>
     </TouchableOpacity>
   </View>
 );
@@ -54,14 +57,18 @@ export const OutlineButtonRow: React.FC<OutlineButtonRowProps> = ({
 }) => (
   <View style={styles.outlineRow}>
     <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
-      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
-        <Text style={styles.outlineText}>{leftLabel}</Text>
-      </GlassSurface>
+      <View style={styles.outlineBtn}>
+        <View style={styles.outlineContent}>
+          <Text style={styles.outlineText}>{leftLabel}</Text>
+        </View>
+      </View>
     </TouchableOpacity>
     <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
-      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
-        <Text style={styles.outlineText}>{rightLabel}</Text>
-      </GlassSurface>
+      <View style={styles.outlineBtn}>
+        <View style={styles.outlineContent}>
+          <Text style={styles.outlineText}>{rightLabel}</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   </View>
 );
@@ -79,8 +86,19 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1.5,
     borderColor: 'rgba(244,51,98,0.35)',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   backContent: {
     alignItems: 'center',
@@ -107,11 +125,21 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: colors.brandPink,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   primaryDisabled: {
     opacity: 0.5,
@@ -132,6 +160,8 @@ const styles = StyleSheet.create({
   outlineBtn: {
     height: 48,
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1.5,
     borderColor: 'rgba(244,51,98,0.35)',
   },

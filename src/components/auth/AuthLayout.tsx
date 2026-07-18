@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type AuthLayoutProps = {
@@ -74,14 +73,16 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </View>
       </View>
 
-      <GlassSurface style={styles.bodyCard} contentStyle={styles.bodyContent} intensity={42}>
-        <View style={[styles.headingBlock, centerTitle && styles.headingCenter]}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-        </View>
+      <View style={styles.bodyCard}>
+        <View style={styles.bodyContent}>
+          <View style={[styles.headingBlock, centerTitle && styles.headingCenter]}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          </View>
 
-        {children}
-      </GlassSurface>
+          {children}
+        </View>
+      </View>
     </>
   );
 
@@ -212,8 +213,19 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
     marginBottom: spacing.sm,
     borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.6)',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   bodyContent: {
     paddingHorizontal: spacing.md,
@@ -226,7 +238,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 32,
-    lineHeight: 24,
+    lineHeight: 40,
     letterSpacing: 0,
     textAlign: 'center',
     textAlignVertical: 'center',

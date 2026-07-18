@@ -1,8 +1,7 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from './GlassSurface';
 import { Text } from './Text';
 
 type ScreenHeaderProps = {
@@ -20,19 +19,23 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 }) => (
   <View style={styles.row}>
     {onBack ? (
-      <GlassSurface style={styles.backGlass} contentStyle={styles.backContent}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
-          <Text style={[styles.back, light && styles.backLight]}>←</Text>
-        </TouchableOpacity>
-      </GlassSurface>
+      <View style={styles.backGlass}>
+        <View style={styles.backContent}>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
+            <Text style={[styles.back, light && styles.backLight]}>←</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     ) : (
       <View style={styles.placeholder} />
     )}
-    <GlassSurface style={styles.titleGlass} contentStyle={styles.titleContent}>
-      <Text style={[styles.title, light && styles.titleLight]} numberOfLines={1}>
-        {title}
-      </Text>
-    </GlassSurface>
+    <View style={styles.titleGlass}>
+      <View style={styles.titleContent}>
+        <Text style={[styles.title, light && styles.titleLight]} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
+    </View>
     {rightAction ?? <View style={styles.placeholder} />}
   </View>
 );
@@ -48,6 +51,16 @@ const styles = StyleSheet.create({
   backGlass: {
     borderRadius: 999,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   backContent: {
     width: 40,
@@ -81,7 +94,17 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 999,
     overflow: 'hidden',
+    backgroundColor: colors.white,
     marginHorizontal: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   titleContent: {
     minHeight: 40,

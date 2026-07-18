@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
-    fontSize: 15,
+    fontSize: 13,
     color: colors.text,
     flex: 1,
       fontFamily: 'ZalandoSansExpanded_500Medium'

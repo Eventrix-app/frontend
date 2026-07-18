@@ -1,9 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, ActivityIndicator, Platform, StyleSheet, View, ViewStyle, TextStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from './GlassSurface';
 import { Text } from './Text';
 
 interface ButtonProps {
@@ -83,13 +82,15 @@ const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.7}
     >
       {variant === 'primary' || variant === 'secondary' ? (
-        <GlassSurface style={styles.glass} contentStyle={styles.glassContent}>
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text style={[getTextStyle(), textStyle]}>{title}</Text>
-          )}
-        </GlassSurface>
+        <View style={styles.glass}>
+          <View style={styles.glassContent}>
+            {loading ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+            )}
+          </View>
+        </View>
       ) : loading ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.textInverse} />
       ) : (
@@ -107,6 +108,16 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   glassContent: {
     alignItems: 'center',

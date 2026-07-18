@@ -1,8 +1,7 @@
 import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type SocialLoginRowProps = {
@@ -21,46 +20,43 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface
-          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
-          contentStyle={styles.socialGlassContent}
-        >
-          <Image
-            source={require('../../../assets/login screen/Facebookpng.png')}
-            style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
-            resizeMode="contain"
-          />
-        </GlassSurface>
+        <View style={[styles.socialGlass, compact && styles.socialGlassCompact]}>
+          <View style={styles.socialGlassContent}>
+            <Image
+              source={require('../../../assets/login screen/Facebookpng.png')}
+              style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface
-          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
-          contentStyle={styles.socialGlassContent}
-        >
-          <Image
-            source={require('../../../assets/login screen/google.png')}
-            style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
-            resizeMode="contain"
-          />
-        </GlassSurface>
+        <View style={[styles.socialGlass, compact && styles.socialGlassCompact]}>
+          <View style={styles.socialGlassContent}>
+            <Image
+              source={require('../../../assets/login screen/google.png')}
+              style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.socialBtn, compact && styles.socialBtnCompact]}
         activeOpacity={0.8}
       >
-        <GlassSurface
-          style={[styles.socialGlass, compact && styles.socialGlassCompact]}
-          contentStyle={styles.socialGlassContent}
-        >
-          <Image
-            source={require('../../../assets/login screen/apple.png')}
-            style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
-            resizeMode="contain"
-          />
-        </GlassSurface>
+        <View style={[styles.socialGlass, compact && styles.socialGlassCompact]}>
+          <View style={styles.socialGlassContent}>
+            <Image
+              source={require('../../../assets/login screen/apple.png')}
+              style={[styles.socialIconImage, compact && styles.socialIconImageCompact]}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   </View>
@@ -109,10 +105,21 @@ const styles = StyleSheet.create({
   },
   socialGlass: {
     borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.7)',
     width: '100%',
     height: '100%',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   socialGlassCompact: {
     borderRadius: 20,

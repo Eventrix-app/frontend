@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,

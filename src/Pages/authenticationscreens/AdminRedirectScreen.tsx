@@ -3,7 +3,6 @@ import { ActivityIndicator, Linking, Platform, StyleSheet, TouchableOpacity, Vie
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { AuthLayout } from '../../components/auth/AuthLayout';
-import GlassSurface from '../../components/common/GlassSurface';
 import { RootStackParamList } from '../../navigation/types';
 import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
@@ -73,9 +72,11 @@ const AdminRedirectScreen: React.FC<Props> = () => {
           </Text>
 
           <TouchableOpacity style={styles.primaryButtonWrap} onPress={handleRedirect} activeOpacity={0.9}>
-            <GlassSurface style={styles.primaryButton} contentStyle={styles.primaryButtonContent}>
-              <Text style={styles.primaryButtonText}>Open Dashboard Manually</Text>
-            </GlassSurface>
+            <View style={styles.primaryButton}>
+              <View style={styles.primaryButtonContent}>
+                <Text style={styles.primaryButtonText}>Open Dashboard Manually</Text>
+              </View>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutButtonWrap} onPress={handleLogout} activeOpacity={0.8}>
@@ -132,6 +133,17 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.brandPink,
     height: 52,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   primaryButtonContent: {
     alignItems: 'center',
