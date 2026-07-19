@@ -12,10 +12,11 @@ import { Text } from '../../components/common/Text';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 
+const bgImage = require('../../../assets/bg.png');
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 type MenuItem = {
-  icon: string;
   label: string;
   subtitle?: string;
   onPress: (nav: Props['navigation']) => void;
@@ -44,39 +45,32 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const menuItems: MenuItem[] = [
     {
-      icon: '✏️',
       label: 'Edit Profile',
       onPress: (nav) => nav.navigate('EditProfile'),
     },
     {
-      icon: '❤️',
       label: 'Saved Events',
       subtitle: `${savedCount} event${savedCount === 1 ? '' : 's'}`,
       onPress: (nav) => nav.navigate('SavedEvents'),
     },
     {
-      icon: '🎫',
       label: 'My Bookings',
       onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
     },
     {
-      icon: '➕',
       label: 'Create Event',
       onPress: (nav) => nav.navigate('CreateEvent', {}),
     },
     {
-      icon: '📅',
       label: 'My Events',
       subtitle: `${createdEventsCount} event${createdEventsCount === 1 ? '' : 's'}`,
       onPress: (nav) => nav.navigate('MyEvents'),
     },
     {
-      icon: '🔔',
       label: 'Notifications',
       onPress: (nav) => nav.navigate('Notifications'),
     },
     {
-      icon: '⚙️',
       label: 'Settings',
       onPress: (nav) => nav.navigate('Settings'),
     },
@@ -85,9 +79,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={[colors.brandPink, '#ff6b8a']}
+        colors={[colors.brandPink, '#F43362']}
         style={[styles.header, { paddingTop: insets.top + spacing.md }]}
       >
+        <View style={styles.headerBgWrap}>
+          <Image source={bgImage} style={styles.headerBg} contentFit="cover" />
+        </View>
+
         <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
@@ -100,7 +98,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         <Text style={styles.name}>{displayName || 'Your Profile'}</Text>
         {me?.email ? <Text style={styles.username}>{me.email}</Text> : null}
-        {me?.city ? <Text style={styles.location}>📍 {me.city}</Text> : null}
+        {me?.city ? <Text style={styles.location}>{me.city}</Text> : null}
 
         <View style={styles.statsGlass}>
           <View style={styles.statsRow}>
@@ -128,7 +126,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity key={item.label} onPress={() => item.onPress(navigation)} activeOpacity={0.7}>
             <View style={styles.menuGlass}>
               <View style={styles.menuItem}>
-                <Text style={styles.menuIcon}>{item.icon}</Text>
                 <View style={styles.menuText}>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   {item.subtitle ? (
@@ -162,7 +159,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: 'hidden',
   },
+  headerBgWrap: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+ headerBg: {
+  position: 'absolute',
+  top: -60,        // was: -18 — shifts the background image up further
+  left: -68,
+  width: '135%',
+  height: '135%',
+  transform: [{ scale: 0.78 }],
+  opacity: 0.15,
+},
   back: {
     alignSelf: 'flex-start',
     width: 40,
@@ -261,8 +272,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
+  },
   menuGlass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
@@ -284,11 +295,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.md,
-  },
-  menuIcon: {
-    fontSize: 22,
-    width: 32,
-    textAlign: 'center',
   },
   menuText: {
     flex: 1,

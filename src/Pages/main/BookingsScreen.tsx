@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,7 +11,10 @@ import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } fro
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 
-type TabId = 'upcoming' | 'previous' | 'cancelled' | 'waitlist';
+// TODO: source from user profile / auth state instead of hardcoding
+const CURRENT_USER_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
+
+type TabId = 'upcoming' | 'previous' | 'waitlist' | 'cancelled';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'upcoming', label: 'Upcoming' },
@@ -20,14 +23,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
-const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  confirmed: { bg: '#D1FAE5', text: '#065F46', label: 'Confirmed' },
-  pending: { bg: '#FEF3C7', text: '#92400E', label: 'Pending Payment' },
-  completed: { bg: '#E0E7FF', text: '#3730A3', label: 'Completed' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled' },
-  refunded: { bg: '#E0E7FF', text: '#3730A3', label: 'Refunded' },
-};
-
 function bucketFor(enrollment: EnrollmentRecord): TabId {
   if (enrollment.status === 'cancelled' || enrollment.status === 'refunded') return 'cancelled';
   const eventDate = enrollment.event?.eventDate ? new Date(enrollment.event.eventDate) : null;
@@ -35,12 +30,28 @@ function bucketFor(enrollment: EnrollmentRecord): TabId {
   return 'upcoming';
 }
 
-function statusKeyFor(enrollment: EnrollmentRecord): string {
-  if (enrollment.status === 'refunded') return 'refunded';
-  if (enrollment.status === 'cancelled') return 'cancelled';
-  if (enrollment.paymentStatus && enrollment.paymentStatus !== 'paid') return 'pending';
-  return bucketFor(enrollment) === 'previous' ? 'completed' : 'confirmed';
+// Paid/unpaid text color, matching the reference's inline colored status word
+// rather than a background chip.
+function statusDisplayFor(enrollment: EnrollmentRecord): { label: string; color: string } {
+  if (enrollment.status === 'refunded') return { label: 'Refunded', color: '#3730A3' };
+  if (enrollment.status === 'cancelled') return { label: 'Cancelled', color: '#991B1B' };
+  if (enrollment.paymentStatus && enrollment.paymentStatus !== 'paid') {
+    return { label: 'Unpaid', color: '#B45309' };
+  }
+  const amount = enrollment.totalAmount != null ? ` ₹${enrollment.totalAmount}` : '';
+  return { label: `Paid${amount}`, color: '#059669' };
 }
+
+// Ticket-stub shaped card, built with plain Views instead of a background image —
+// the "notches" are circles positioned at the card's left/right edges, colored to
+// match the screen background so they read as cutouts.
+const TicketCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <View style={styles.card}>
+    {children}
+    <View style={styles.notchLeft} />
+    <View style={styles.notchRight} />
+  </View>
+);
 
 const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -75,30 +86,59 @@ const BookingsScreen: React.FC = () => {
     [waitlistEntries],
   );
 
+  // Decorative "new" dot per tab, purely visual to match the reference —
+  // shows on a non-active tab if it currently has at least one item.
+  const dotForTab = (tabId: TabId): boolean => {
+    if (tabId === activeTab) return false;
+    if (tabId === 'waitlist') return waitingEntries.length > 0;
+    return enrollments.some((e) => bucketFor(e) === tabId);
+  };
+
+  const resultsCount = isWaitlistTab ? waitingEntries.length : bookings.length;
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <Text style={styles.title}>My Bookings</Text>
-      <Text style={styles.subtitle}>Your tickets and wallet</Text>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.iconBtnText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>My Bookings</Text>
+        <View style={styles.topBarRight}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+            <Text style={styles.iconBtnText}>⌕</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={styles.iconBtnText}>◔</Text>
+            <View style={styles.bellDot} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Image source={CURRENT_USER_AVATAR} style={styles.avatar} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={styles.tabs}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {TABS.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tab, active && styles.tabActive]}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              <View style={styles.tabLabelRow}>
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                {dotForTab(tab.id) && <View style={styles.tabDot} />}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.brandPink} />
       ) : isError ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
           <Text style={styles.emptyTitle}>
             {isWaitlistTab ? "Couldn't load your waitlist" : "Couldn't load your bookings"}
           </Text>
@@ -107,95 +147,114 @@ const BookingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : isWaitlistTab ? (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          {waitingEntries.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>⏳</Text>
-              <Text style={styles.emptyTitle}>No waitlist entries</Text>
-              <Text style={styles.emptySub}>You'll see it here when you join a sold-out ticket's waitlist</Text>
-            </View>
-          ) : (
-            waitingEntries.map((entry) => {
-              const event = entry.event;
-              return (
-                <View key={entry.id} style={styles.card}>
-                  <View style={styles.cardHeader}>
+        <>
+          <ScrollView contentContainerStyle={styles.scroll}>
+            {waitingEntries.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No waitlist entries</Text>
+                <Text style={styles.emptySub}>You'll see it here when you join a sold-out ticket's waitlist</Text>
+              </View>
+            ) : (
+              waitingEntries.map((entry) => {
+                const event = entry.event;
+                return (
+                  <TicketCard key={entry.id}>
                     <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
-                    <View style={[styles.status, { backgroundColor: '#FEF3C7' }]}>
-                      <Text style={[styles.statusText, { color: '#92400E' }]}>#{entry.position} in line</Text>
+
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Date</Text>
+                        <Text style={styles.infoValue}>
+                          {event ? formatEventDate(event.eventDate) : '—'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Ticket Type</Text>
+                        <Text style={styles.infoValue}>
+                          {entry.ticketType?.name ?? 'General Admission'} × {entry.quantity}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {event ? (
-                    <>
-                      <Text style={styles.meta}>📅 {formatEventDate(event.eventDate)} · {formatEventTime(event.startTime)}</Text>
-                      <Text style={styles.meta}>📍 {event.venueName}</Text>
-                    </>
-                  ) : null}
-                  <Text style={styles.ticketType}>
-                    {entry.ticketType?.name ?? 'General Admission'} · Qty {entry.quantity}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          {bookings.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🎫</Text>
-              <Text style={styles.emptyTitle}>No {activeTab} bookings</Text>
-              <Text style={styles.emptySub}>
-                {activeTab === 'upcoming'
-                  ? 'Book an event to see your tickets here'
-                  : 'Nothing to show in this tab yet'}
-              </Text>
-            </View>
-          ) : (
-            bookings.map((booking) => {
-              const statusKey = statusKeyFor(booking);
-              const status = STATUS_STYLE[statusKey];
-              const event = booking.event;
-              return (
-                <TouchableOpacity
-                  key={booking.id}
-                  style={styles.card}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
-                    <View style={[styles.status, { backgroundColor: status.bg }]}>
-                      <Text style={[styles.statusText, { color: status.text }]}>
-                        {status.label}
+
+                    <View style={styles.stubDivider} />
+
+                    <View style={styles.footerRow}>
+                      <Text style={styles.footerLabel}>
+                        Status: <Text style={{ color: '#B45309', fontWeight: '700' }}>#{entry.position} in line</Text>
                       </Text>
                     </View>
-                  </View>
-                  {event ? (
-                    <>
-                      <Text style={styles.meta}>📅 {formatEventDate(event.eventDate)} · {formatEventTime(event.startTime)}</Text>
-                      <Text style={styles.meta}>📍 {event.venueName}</Text>
-                    </>
-                  ) : null}
-                  <Text style={styles.ticketType}>{booking.ticketType?.name ?? 'General Admission'}</Text>
+                  </TicketCard>
+                );
+              })
+            )}
+          </ScrollView>
+          {waitingEntries.length > 0 && (
+            <Text style={styles.resultsText}>
+              {resultsCount} result{resultsCount === 1 ? '' : 's'} found
+            </Text>
+          )}
+        </>
+      ) : (
+        <>
+          <ScrollView contentContainerStyle={styles.scroll}>
+            {bookings.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No {activeTab} bookings</Text>
+                <Text style={styles.emptySub}>
+                  {activeTab === 'upcoming'
+                    ? 'Book an event to see your tickets here'
+                    : 'Nothing to show in this tab yet'}
+                </Text>
+              </View>
+            ) : (
+              bookings.map((booking) => {
+                const status = statusDisplayFor(booking);
+                const event = booking.event;
+                return (
+                  <TicketCard key={booking.id}>
+                    <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
 
-                  {booking.status !== 'cancelled' && booking.ticketCode ? (
-                    <View style={styles.qrSection}>
-                      <View style={styles.qrBox}>
-                        <Text style={styles.qrPlaceholder}>▦▦▦</Text>
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Date</Text>
+                        <Text style={styles.infoValue}>
+                          {event ? formatEventDate(event.eventDate) : '—'}
+                        </Text>
                       </View>
-                      <View style={styles.qrInfo}>
-                        <Text style={styles.qrLabel}>Booking Ref</Text>
-                        <Text style={styles.qrCode}>{booking.bookingReference}</Text>
-                        <Text style={styles.viewTicket}>Tap to view full ticket →</Text>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Ticket Type</Text>
+                        <Text style={styles.infoValue}>
+                          {booking.ticketType?.name ?? 'General Admission'}
+                          {booking.quantity != null ? ` × ${booking.quantity}` : ''}
+                        </Text>
                       </View>
                     </View>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })
+
+                    <View style={styles.stubDivider} />
+
+                    <View style={styles.footerRow}>
+                      <Text style={styles.footerLabel}>
+                        Status: <Text style={{ color: status.color, fontWeight: '700' }}>{status.label}</Text>
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.viewTicketBtn}
+                        onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
+                      >
+                        <Text style={styles.viewTicketText}>View Ticket</Text>
+                        <Text style={styles.viewTicketArrow}>→</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TicketCard>
+                );
+              })
+            )}
+          </ScrollView>
+          {bookings.length > 0 && (
+            <Text style={styles.resultsText}>
+              {resultsCount} result{resultsCount === 1 ? '' : 's'} found
+            </Text>
           )}
-        </ScrollView>
+        </>
       )}
     </View>
   );
@@ -207,18 +266,50 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     paddingHorizontal: spacing.md,
   },
-  title: {
-    fontSize: 20,
-    color: '#0D0D0D',
-    marginTop: spacing.md,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
-  subtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
     marginBottom: spacing.md,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
+  },
+  title: {
+    fontSize: 18,
+    color: colors.text,
+    fontFamily: 'ZalandoSansExpanded_700Bold',
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnText: {
+    fontSize: 20,
+    color: colors.text,
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   tabs: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundSecondary,
@@ -240,8 +331,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  tabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
   },
@@ -249,25 +345,28 @@ const styles = StyleSheet.create({
     color: colors.brandPink,
     fontWeight: '600',
   },
+  tabDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF3B30',
+  },
   loader: {
     marginTop: spacing.xxl,
   },
   scroll: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.md,
   },
   empty: {
     alignItems: 'center',
     paddingVertical: spacing.xxl * 2,
     gap: spacing.sm,
   },
-  emptyIcon: {
-    fontSize: 48,
-  },
   emptyTitle: {
     fontSize: 15,
     color: colors.text,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
+  },
   emptySub: {
     fontSize: 14,
     color: colors.textSecondary,
@@ -284,86 +383,103 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
   },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    backgroundColor: colors.white,
-    marginBottom: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+card: {
+  borderWidth: 1,
+  borderColor: '#D1D5DB',   // was colors.borderLight — darker, more visible border
+  borderRadius: borderRadius.lg,
+  padding: spacing.md,
+  backgroundColor: colors.white,
+  marginBottom: spacing.md,
+  position: 'relative',
+  overflow: 'visible',
+},
+notchLeft: {
+  position: 'absolute',
+  left: -10,
+  top: '58%',
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  backgroundColor: colors.white,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',   // match the new card border color
+},
+ notchRight: {
+  position: 'absolute',
+  right: -10,
+  top: '58%',
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  backgroundColor: colors.white,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',   // match the new card border color
+},
+  eventTitle: {
+    fontSize: 15,
+    color: colors.text,
+    fontFamily: 'ZalandoSansExpanded_700Bold',
     marginBottom: spacing.sm,
+  },
+  infoRow: {
+    flexDirection: 'row',
     gap: spacing.sm,
   },
-  eventTitle: {
+  infoBox: {
     flex: 1,
-    fontSize: 14,
-    color: colors.text,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
-  status: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  meta: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  ticketType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.brandPink,
-    marginVertical: spacing.sm,
-  },
-  qrSection: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  qrBox: {
-    width: 80,
-    height: 80,
+    backgroundColor: '#F3F4F6',
     borderRadius: borderRadius.md,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: spacing.sm,
   },
-  qrPlaceholder: {
-    fontSize: 28,
+  infoLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
+    marginBottom: 2,
   },
-  qrInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  qrLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  qrCode: {
-    fontSize: 16,
-    fontWeight: '700',
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.text,
   },
-  viewTicket: {
+  // Approximates a ticket-stub perforation. borderStyle: 'dashed' renders correctly on iOS
+  // and web, but Android's dashed border support is inconsistent — if it renders solid on
+  // Android, swap this for a row of small dot Views instead.
+ stubDivider: {
+  borderTopWidth: 1.5,        // was 1 — slightly thicker
+  borderStyle: 'dashed',
+  borderTopColor: '#9CA3AF',  // was colors.borderLight — noticeably darker grey
+  marginVertical: spacing.sm,
+},
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  footerLabel: {
     fontSize: 13,
+    color: colors.textSecondary,
+  },
+  viewTicketBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewTicketText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.brandPink,
-    fontWeight: '500',
-    marginTop: spacing.xs,
+  },
+  viewTicketArrow: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.brandPink,
+  },
+  resultsText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: spacing.md,
   },
 });
 

@@ -37,7 +37,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 const GALLERY_PAGE_SIZE = 6;
 const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
 
-
 interface GalleryItem {
   id: string;
   type: 'image' | 'video';
@@ -130,6 +129,151 @@ const GalleryTab: React.FC<{ event: any }> = ({ event }) => {
   );
 };
 
+// --- Schedule tab ---
+interface ScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  completed: boolean;
+}
+
+// TODO: replace with real schedule data from the backend once that endpoint exists
+const MOCK_SCHEDULE: ScheduleItem[] = [
+  { id: 's1', time: '9:00 PM', title: 'Participant Check-in Opens', completed: true },
+  { id: 's2', time: '10:00 PM', title: 'Warm-up & Briefing', completed: true },
+  { id: 's3', time: '10:30 PM', title: 'Marathon Flag-off', completed: true },
+  { id: 's4', time: '12:30 AM', title: 'Finish Line Closes', completed: false },
+  { id: 's5', time: '1:00 AM', title: 'Awards & Closing Ceremony', completed: false },
+  { id: 's6', time: '1:30 AM', title: 'Send-off and departure', completed: false },
+];
+
+const ScheduleTab: React.FC = () => {
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.scheduleList}>
+        {MOCK_SCHEDULE.map((item, index) => {
+          const isLast = index === MOCK_SCHEDULE.length - 1;
+          return (
+            <View key={item.id} style={styles.scheduleRow}>
+              <View style={styles.scheduleMarkerCol}>
+                <View style={[styles.scheduleMarker, item.completed && styles.scheduleMarkerDone]}>
+                  {item.completed && <Text style={styles.scheduleMarkerCheck}>✓</Text>}
+                </View>
+                {!isLast && (
+                  <View style={[styles.scheduleLine, item.completed && styles.scheduleLineDone]} />
+                )}
+              </View>
+
+              <View style={styles.scheduleCard}>
+                <Text style={styles.scheduleTime}>{item.time}</Text>
+                <Text style={styles.scheduleTitle}>{item.title}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.scheduleFooterNote}>
+        <Text style={styles.scheduleFooterIcon}>ⓘ</Text>
+        <Text style={styles.scheduleFooterText}>
+          Timings may vary slightly. Please arrive early. Need{' '}
+          <Text style={styles.scheduleFooterLink}>help?</Text>
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// --- Reviews tab ---
+interface ReviewItem {
+  id: string;
+  name: string;
+  username: string;
+  rating: number; // 1-5
+  text: string;
+}
+
+// TODO: replace with real reviews data from the backend once that endpoint exists
+const MOCK_REVIEWS: ReviewItem[] = [
+  {
+    id: 'r1',
+    name: 'Robert D. Jr.',
+    username: '@random_username',
+    rating: 4,
+    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
+  },
+  {
+    id: 'r2',
+    name: 'Henry F.',
+    username: '@random_username',
+    rating: 3,
+    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
+  },
+  {
+    id: 'r3',
+    name: 'Natasha W.',
+    username: '@random_username',
+    rating: 5,
+    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
+  },
+  {
+    id: 'r4',
+    name: 'James Cameron',
+    username: '@random_username',
+    rating: 1,
+    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
+  },
+  {
+    id: 'r5',
+    name: 'Aman F.',
+    username: '@random_username',
+    rating: 3,
+    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
+  },
+];
+
+const StarRow: React.FC<{ rating: number }> = ({ rating }) => (
+  <View style={styles.reviewStarRow}>
+    {[1, 2, 3, 4, 5].map((n) => (
+      <Text
+        key={n}
+        style={[styles.reviewStar, n <= rating ? styles.reviewStarFilled : styles.reviewStarEmpty]}
+      >
+        ★
+      </Text>
+    ))}
+  </View>
+);
+
+const ReviewsTab: React.FC = () => {
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.reviewList}>
+        {MOCK_REVIEWS.map((review) => (
+          <View key={review.id} style={styles.reviewCard}>
+            <View style={styles.reviewTopRow}>
+              <View style={styles.reviewAvatar}>
+                <Text style={styles.reviewAvatarIcon}>🖼️</Text>
+              </View>
+              <View style={styles.reviewNameCol}>
+                <Text style={styles.reviewName}>{review.name}</Text>
+                <Text style={styles.reviewUsername}>{review.username}</Text>
+              </View>
+              <StarRow rating={review.rating} />
+            </View>
+
+            <Text style={styles.reviewText}>{review.text}</Text>
+
+            <TouchableOpacity>
+              <Text style={styles.reviewReadMore}>Read More ›</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 type TierAvailability = 'available' | 'sold_out' | 'not_started' | 'ended';
 type DetailsTab = 'about' | 'schedule' | 'tickets' | 'community' | 'reviews' | 'gallery';
 
@@ -151,8 +295,6 @@ function isTierSoldOut(tier: TicketTypeRecord): boolean {
   return remaining !== null && remaining <= 0;
 }
 
-// Mirrors EventsService.enroll()'s sales-window check server-side — a tier outside its
-// configured window can't actually be booked, so the UI shouldn't offer it as if it can.
 function tierAvailability(tier: TicketTypeRecord): TierAvailability {
   const now = new Date();
   if (tier.salesStartAt && now < new Date(tier.salesStartAt)) return 'not_started';
@@ -164,15 +306,12 @@ function tierAvailability(tier: TicketTypeRecord): TierAvailability {
 function quantityBoundsForTier(tier: TicketTypeRecord): { min: number; max: number } {
   const min = tier.minPerOrder ?? 1;
   const remaining = remainingForTier(tier);
-  // Once a tier is sold out, remaining no longer bounds the quantity — the request is
-  // for the waitlist, not live stock — so only maxPerOrder (or a sane default) applies.
   const max = isTierSoldOut(tier)
     ? tier.maxPerOrder ?? 20
     : Math.min(tier.maxPerOrder ?? Infinity, remaining ?? Infinity);
   return { min, max: Math.max(max, min) };
 }
 
-// Days-to-go badge — gracefully returns null (badge hidden) if eventDate isn't parseable.
 function daysToGoLabel(eventDate: string): string | null {
   const target = new Date(eventDate);
   if (isNaN(target.getTime())) return null;
@@ -214,17 +353,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       showAlert('Error', extractErrorMessage(e, 'Failed to update saved events'));
     }
   };
-  // isEnrolling only flips true on the next render after dispatch — a fast double-tap on
-  // "Book Now" can fire two enroll requests before that happens, each of which would
-  // atomically claim a ticket. This ref closes that gap synchronously.
+
   const isEnrollingRef = useRef(false);
 
-  // Owner check: event.organizer.userId matches the logged-in user's id
   const isOwner = !!(event && authUser && event.organizer?.userId === authUser.id);
 
-  // Default to the first bookable tier; fall back to the first sold-out one (still
-  // joinable via waitlist), and only as a last resort a not-yet-open/closed tier (there's
-  // nothing else to preselect, but the footer will correctly show it as unavailable).
   useEffect(() => {
     if (selectedTierId || ticketTypes.length === 0) return;
     const bookable = ticketTypes.find((t) => tierAvailability(t) === 'available');
@@ -234,7 +367,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const selectedTier = ticketTypes.find((t) => t.id === selectedTierId) ?? null;
 
-  // Reset quantity to the new tier's minimum whenever the selected tier changes.
   useEffect(() => {
     if (selectedTier) setQuantity(selectedTier.minPerOrder ?? 1);
   }, [selectedTierId]);
@@ -316,7 +448,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     selectedAvailability === 'not_started' ||
     selectedAvailability === 'ended';
 
-  // --- Badge pills: only include ones we actually have real data for ---
   const badges: string[] = [];
   const daysToGo = daysToGoLabel(event.eventDate);
   if (daysToGo) badges.push(daysToGo);
@@ -351,7 +482,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       </ImageBackground>
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        {/* Owner-only: rejection banner */}
         {isOwner && event.approvalStatus === 'rejected' && (
           <View style={styles.rejectionBanner}>
             <Text style={styles.rejectionTitle}>❌ Event Rejected</Text>
@@ -367,7 +497,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Owner-only: draft actions */}
         {isOwner && event.approvalStatus === 'draft' && (
           <View style={styles.draftBanner}>
             <Text style={styles.draftTitle}>📝 Draft</Text>
@@ -380,7 +509,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Owner-only: ticket sales count for pending/approved */}
         {isOwner && (event.approvalStatus === 'pending_approval' || event.approvalStatus === 'approved') && (
           <View style={styles.salesBanner}>
             <Text style={styles.salesText}>
@@ -394,10 +522,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Title */}
         <Text style={styles.title}>{event.title}</Text>
 
-        {/* Badge pills */}
         {badges.length > 0 && (
           <ScrollView
             horizontal
@@ -412,7 +538,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </ScrollView>
         )}
 
-        {/* Organizer row */}
         <View style={styles.organizerRow}>
           <View style={styles.organizerAvatar}>
             <Text style={styles.organizerAvatarText}>👤</Text>
@@ -428,7 +553,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.organizerActions}>
-            {/* TODO: wire these to your messaging/call flow once built */}
             <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
               <Text style={styles.organizerActionIcon}>💬</Text>
             </TouchableOpacity>
@@ -438,7 +562,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Description card */}
         {event.description ? (
           <>
             <Text style={styles.sectionLabel}>Description</Text>
@@ -453,7 +576,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </>
         ) : null}
 
-        {/* When-n-where */}
         <Text style={styles.sectionLabel}>When-n-where?</Text>
         <View style={styles.whenWhereBlock}>
           <View style={styles.infoLine}>
@@ -470,7 +592,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Quick info */}
         <Text style={styles.sectionLabel}>Quick info</Text>
         <View style={styles.quickInfoRow}>
           {event.totalCapacity != null && (
@@ -491,7 +612,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Tab bar */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -512,252 +632,235 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           })}
         </ScrollView>
 
-        {/* Tab content */}
         {activeTab === 'about' && (
-  <View style={styles.tabContent}>
-    {event.description ? (
-      <>
-        <Text style={styles.sectionLabel}>About This Event</Text>
-        {event.description.split('\n').filter(Boolean).map((line, i) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={styles.bulletDot}>•</Text>
-            <Text style={styles.bulletText}>{line}</Text>
-          </View>
-        ))}
-      </>
-    ) : null}
-
-    {/* TODO: add `highlights?: string[]` to BackendEvent once the backend returns it */}
-    {(event as any).highlights?.length > 0 && (
-      <>
-        <Text style={styles.sectionLabel}>Highlights</Text>
-        {(event as any).highlights.map((h: string, i: number) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={styles.bulletDot}>•</Text>
-            <Text style={styles.bulletText}>{h}</Text>
-          </View>
-        ))}
-      </>
-    )}
-
-    {/* TODO: add `whoShouldAttend?: string[]` to BackendEvent once the backend returns it */}
-    {(event as any).whoShouldAttend?.length > 0 && (
-      <>
-        <Text style={styles.sectionLabel}>Who Should Attend</Text>
-        {(event as any).whoShouldAttend.map((item: string, i: number) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={styles.bulletDot}>•</Text>
-            <Text style={styles.bulletText}>{item}</Text>
-          </View>
-        ))}
-      </>
-    )}
-  </View>
-)}
-
-        {activeTab === 'schedule' && (
           <View style={styles.tabContent}>
-            {/* TODO: wire to real schedule data once the API has it */}
-            <Text style={styles.emptyTabText}>Schedule details coming soon.</Text>
+            {event.description ? (
+              <>
+                <Text style={styles.sectionLabel}>About This Event</Text>
+                {event.description.split('\n').filter(Boolean).map((line, i) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>{line}</Text>
+                  </View>
+                ))}
+              </>
+            ) : null}
+
+            {(event as any).highlights?.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Highlights</Text>
+                {(event as any).highlights.map((h: string, i: number) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>{h}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {(event as any).whoShouldAttend?.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Who Should Attend</Text>
+                {(event as any).whoShouldAttend.map((item: string, i: number) => (
+                  <View key={i} style={styles.bulletRow}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>{item}</Text>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
         )}
+
+        {activeTab === 'schedule' && <ScheduleTab />}
 
         {activeTab === 'tickets' && (
-  <View style={styles.tabContent}>
-    {!isOwner && ticketTypes.length > 0 ? (
-      <>
-        <View style={styles.ticketStubList}>
-          {ticketTypes.map((tier) => {
-            const remaining = remainingForTier(tier);
-            const availability = tierAvailability(tier);
-            const selectable = availability === 'available' || availability === 'sold_out';
-            const selected = tier.id === selectedTierId;
+          <View style={styles.tabContent}>
+            {!isOwner && ticketTypes.length > 0 ? (
+              <>
+                <View style={styles.ticketStubList}>
+                  {ticketTypes.map((tier) => {
+                    const remaining = remainingForTier(tier);
+                    const availability = tierAvailability(tier);
+                    const selectable = availability === 'available' || availability === 'sold_out';
+                    const selected = tier.id === selectedTierId;
 
-            // TODO: add `benefits?: string[]` to TicketTypeRecord once the backend returns it
-            const benefits: string[] = (tier as any).benefits ?? [];
+                    const benefits: string[] = (tier as any).benefits ?? [];
 
-            const nameLower = tier.name?.toLowerCase() ?? '';
-            const stubImage = nameLower.includes('vip')
-              ? require('../../../assets/tickets/vip.png')
-              : nameLower.includes('standard')
-                ? require('../../../assets/tickets/standard.png')
-                : require('../../../assets/tickets/earlybird.png');
+                    const nameLower = tier.name?.toLowerCase() ?? '';
+                    const stubImage = nameLower.includes('vip')
+                      ? require('../../../assets/tickets/vip.png')
+                      : nameLower.includes('standard')
+                        ? require('../../../assets/tickets/standard.png')
+                        : require('../../../assets/tickets/earlybird.png');
 
-            const availabilityText =
-              availability === 'not_started'
-                ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
-                : availability === 'ended'
-                  ? 'Sales closed'
-                  : availability === 'sold_out'
-                    ? 'Sold out — join waitlist'
-                    : remaining !== null ? `${remaining} tickets left` : 'Available';
+                    const availabilityText =
+                      availability === 'not_started'
+                        ? `On sale from ${DATE_DISPLAY_FORMATTER.format(new Date(tier.salesStartAt!))}`
+                        : availability === 'ended'
+                          ? 'Sales closed'
+                          : availability === 'sold_out'
+                            ? 'Sold out — join waitlist'
+                            : remaining !== null ? `${remaining} tickets left` : 'Available';
 
-            return (
-              <TouchableOpacity
-  key={tier.id}
-  activeOpacity={0.9}
-  onPress={() => selectable && setSelectedTierId(tier.id)}
-  disabled={!selectable}
-  style={[styles.ticketStubWrap, selected && styles.ticketStubSelected, !selectable && styles.ticketStubDisabled]}
->
-  <Image
-    source={stubImage}
-    style={StyleSheet.absoluteFill}
-    resizeMode="stretch"
-  />
+                    return (
+                      <TouchableOpacity
+                        key={tier.id}
+                        activeOpacity={0.9}
+                        onPress={() => selectable && setSelectedTierId(tier.id)}
+                        disabled={!selectable}
+                        style={[styles.ticketStubWrap, selected && styles.ticketStubSelected, !selectable && styles.ticketStubDisabled]}
+                      >
+                        <Image
+                          source={stubImage}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode="stretch"
+                        />
 
-  <View style={styles.ticketStubContent}>
-    <Text style={styles.ticketStubTitle}>{tier.name}</Text>
+                        <View style={styles.ticketStubContent}>
+                          <Text style={styles.ticketStubTitle}>{tier.name}</Text>
 
-    <View style={styles.ticketStubBody}>
-      <View style={styles.ticketStubCol}>
-        <Text style={styles.ticketStubLabel}>Price</Text>
-        <Text style={styles.ticketStubBullet}>
-          • {tier.price > 0 ? `₹${tier.price}` : 'Free'}
-        </Text>
+                          <View style={styles.ticketStubBody}>
+                            <View style={styles.ticketStubCol}>
+                              <Text style={styles.ticketStubLabel}>Price</Text>
+                              <Text style={styles.ticketStubBullet}>
+                                • {tier.price > 0 ? `₹${tier.price}` : 'Free'}
+                              </Text>
 
-        <Text style={styles.ticketStubLabel}>Availability</Text>
-        <Text style={styles.ticketStubBullet}>• {availabilityText}</Text>
-      </View>
+                              <Text style={styles.ticketStubLabel}>Availability</Text>
+                              <Text style={styles.ticketStubBullet}>• {availabilityText}</Text>
+                            </View>
 
-      {benefits.length > 0 && (
-        <View style={styles.ticketStubCol}>
-          <Text style={styles.ticketStubLabel}>Benefits</Text>
-          {benefits.map((b, i) => (
-            <Text key={i} style={styles.ticketStubBullet}>• {b}</Text>
-          ))}
-        </View>
-      )}
-    </View>
-  </View>
-</TouchableOpacity>
-            );
-          })}
-        </View>
+                            {benefits.length > 0 && (
+                              <View style={styles.ticketStubCol}>
+                                <Text style={styles.ticketStubLabel}>Benefits</Text>
+                                {benefits.map((b, i) => (
+                                  <Text key={i} style={styles.ticketStubBullet}>• {b}</Text>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-        {selectedTier && (() => {
-          const { min, max } = quantityBoundsForTier(selectedTier);
-          const atMin = quantity <= min;
-          const atMax = quantity >= max;
-          return (
-            <View style={styles.stepperRow}>
-              <Text style={styles.stepperLabel}>Quantity</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
-                  onPress={() => adjustQuantity(-1)}
-                  disabled={atMin}
-                >
-                  <Text style={styles.stepperBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{quantity}</Text>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
-                  onPress={() => adjustQuantity(1)}
-                  disabled={atMax}
-                >
-                  <Text style={styles.stepperBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })()}
+                {selectedTier && (() => {
+                  const { min, max } = quantityBoundsForTier(selectedTier);
+                  const atMin = quantity <= min;
+                  const atMax = quantity >= max;
+                  return (
+                    <View style={styles.stepperRow}>
+                      <Text style={styles.stepperLabel}>Quantity</Text>
+                      <View style={styles.stepper}>
+                        <TouchableOpacity
+                          style={[styles.stepperBtn, atMin && styles.stepperBtnDisabled]}
+                          onPress={() => adjustQuantity(-1)}
+                          disabled={atMin}
+                        >
+                          <Text style={styles.stepperBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.stepperValue}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={[styles.stepperBtn, atMax && styles.stepperBtnDisabled]}
+                          onPress={() => adjustQuantity(1)}
+                          disabled={atMax}
+                        >
+                          <Text style={styles.stepperBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
 
-        {event.isPaid && event.refundPolicyType && (
-          <>
-            <Text style={styles.sectionLabel}>Refund Policy</Text>
-            <View style={styles.refundGlass}>
-              <View style={styles.refundCard}>
-                <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
-                {event.refundPolicyText ? (
-                  <Text style={styles.refundText}>{event.refundPolicyText}</Text>
-                ) : null}
-              </View>
-            </View>
-          </>
+                {event.isPaid && event.refundPolicyType && (
+                  <>
+                    <Text style={styles.sectionLabel}>Refund Policy</Text>
+                    <View style={styles.refundGlass}>
+                      <View style={styles.refundCard}>
+                        <Text style={styles.refundType}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
+                        {event.refundPolicyText ? (
+                          <Text style={styles.refundText}>{event.refundPolicyText}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                <Text style={styles.sectionLabel}>Payment Options Available</Text>
+                <View style={styles.paymentMethodsList}>
+                  {['UPI', 'Credit / Debit Card', 'Net Banking', 'Wallets', 'Pay at Venue (Offline)'].map((method) => (
+                    <Text key={method} style={styles.paymentMethodItem}>• {method}</Text>
+                  ))}
+                </View>
+
+                <View style={styles.paymentBadgeRow}>
+                  {['GPay', 'Apple Pay', 'Mastercard', 'Diners', 'Discover', 'RuPay', 'PayPal', 'Shop Pay', 'Visa', 'Amex'].map((label) => (
+                    <View key={label} style={styles.paymentBadge}>
+                      <Text style={styles.paymentBadgeText}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.emptyTabText}>No ticket information available.</Text>
+            )}
+          </View>
         )}
-
-        {/* Payment options */}
-        <Text style={styles.sectionLabel}>Payment Options Available</Text>
-        <View style={styles.paymentMethodsList}>
-          {['UPI', 'Credit / Debit Card', 'Net Banking', 'Wallets', 'Pay at Venue (Offline)'].map((method) => (
-            <Text key={method} style={styles.paymentMethodItem}>• {method}</Text>
-          ))}
-        </View>
-
-        {/* Accepted card/wallet labels — replace with your own icon assets if you have them */}
-        <View style={styles.paymentBadgeRow}>
-          {['GPay', 'Apple Pay', 'Mastercard', 'Diners', 'Discover', 'RuPay', 'PayPal', 'Shop Pay', 'Visa', 'Amex'].map((label) => (
-            <View key={label} style={styles.paymentBadge}>
-              <Text style={styles.paymentBadgeText}>{label}</Text>
-            </View>
-          ))}
-        </View>
-      </>
-    ) : (
-      <Text style={styles.emptyTabText}>No ticket information available.</Text>
-    )}
-  </View>
-)}
 
         {activeTab === 'community' && (
           <View style={styles.tabContent}>
-            {/* TODO: wire to real community/discussion data once the API has it */}
             <Text style={styles.emptyTabText}>Community discussion coming soon.</Text>
           </View>
         )}
 
-        {activeTab === 'reviews' && (
-          <View style={styles.tabContent}>
-            {/* TODO: wire to real reviews data once the API has it */}
-            <Text style={styles.emptyTabText}>Reviews coming soon.</Text>
-          </View>
-        )}
+        {activeTab === 'reviews' && <ReviewsTab />}
 
         {activeTab === 'gallery' && (
-  <GalleryTab event={{ ...event, gallery: MOCK_GALLERY }} />
-)}
+          <GalleryTab event={{ ...event, gallery: MOCK_GALLERY }} />
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-      <View style={styles.footerContent}>
-        {isOwner ? (
-          <View style={styles.ownerActions}>
-            <TouchableOpacity
-              style={[styles.bookBtn, styles.manageBtn]}
-              onPress={() => navigation.navigate('MyEvents')}
-            >
-              <Text style={styles.bookText}>Manage Event</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.bookBtn, styles.manageTicketsBtn]}
-              onPress={() => navigation.navigate('ManageTicketTypes', { eventId: event.id })}
-            >
-              <Text style={styles.bookText}>Manage Ticket Types</Text>
-            </TouchableOpacity>
-            {event.approvalStatus === 'approved' && (
+        <View style={styles.footerContent}>
+          {isOwner ? (
+            <View style={styles.ownerActions}>
               <TouchableOpacity
-                style={[styles.bookBtn, styles.checkInBtn]}
-                onPress={() => navigation.navigate('CheckIn', { eventId: event.id })}
+                style={[styles.bookBtn, styles.manageBtn]}
+                onPress={() => navigation.navigate('MyEvents')}
               >
-                <Text style={styles.bookText}>Check In Attendees</Text>
+                <Text style={styles.bookText}>Manage Event</Text>
               </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.bookBtn, footerDisabled ? styles.disabledBtn : {}]}
-            onPress={handleEnroll}
-            disabled={isEnrolling || footerDisabled}
-          >
-            {isEnrolling ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.bookText}>{footerLabel}</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
+              <TouchableOpacity
+                style={[styles.bookBtn, styles.manageTicketsBtn]}
+                onPress={() => navigation.navigate('ManageTicketTypes', { eventId: event.id })}
+              >
+                <Text style={styles.bookText}>Manage Ticket Types</Text>
+              </TouchableOpacity>
+              {event.approvalStatus === 'approved' && (
+                <TouchableOpacity
+                  style={[styles.bookBtn, styles.checkInBtn]}
+                  onPress={() => navigation.navigate('CheckIn', { eventId: event.id })}
+                >
+                  <Text style={styles.bookText}>Check In Attendees</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.bookBtn, footerDisabled ? styles.disabledBtn : {}]}
+              onPress={handleEnroll}
+              disabled={isEnrolling || footerDisabled}
+            >
+              {isEnrolling ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.bookText}>{footerLabel}</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -1035,112 +1138,190 @@ const styles = StyleSheet.create({
   bookText: { color: colors.white, fontSize: 16, fontWeight: '600' },
 
   ticketStubList: { gap: spacing.md },
-ticketStubWrap: {
-  borderRadius: borderRadius.md,
-  overflow: 'hidden',
-  position: 'relative',
-  height: 190,   // reduced from 300 now that content is top-anchored, not centered
-},
-ticketStubSelected: { opacity: 1 },
-ticketStubDisabled: { opacity: 0.5 },
-ticketStubBg: {
-  flex: 1,                  // fills the fixed-height wrap above
-  paddingHorizontal: spacing.lg,
-  paddingVertical: spacing.lg,
-  justifyContent: 'center',
-},
-ticketStubBgImage: { resizeMode: 'stretch' },
-ticketStubContent: {
-  flex: 1,
-  paddingHorizontal: spacing.lg,
-  paddingTop: 4,       // was spacing.lg + centered — now smaller top padding, pulled up
-  paddingBottom: spacing.lg,
-  justifyContent: 'flex-start', // was 'center' — anchors content to the top instead of middle
-},
-ticketStubTitle: {
-  color: colors.white,
-  fontSize: 17,
-  fontWeight: '700',
-  marginBottom: 8,   // was spacing.md — tighter
-},
-ticketStubBody: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  gap: spacing.lg,
-},
-ticketStubCol: { flex: 1 },
-ticketStubLabel: {
-  fontSize: 12,
-  fontWeight: '700',
-  color: 'rgba(255,255,255,0.85)',
-  marginTop: 8,      // was spacing.sm — tighter
-  marginBottom: 2,
-  textTransform: 'uppercase',
-  letterSpacing: 0.4,
-},
-ticketStubBullet: {
-  fontSize: 14,
-  color: colors.white,
-  lineHeight: 20,
-  fontWeight: '600',
-},
-paymentMethodsList: { gap: 4, marginBottom: spacing.md },
-paymentMethodItem: { fontSize: 14, color: colors.text },
-paymentBadgeRow: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  gap: spacing.sm,
-  marginBottom: spacing.md,
-},
-paymentBadge: {
-  borderWidth: 1,
-  borderColor: colors.borderLight,
-  borderRadius: borderRadius.md,
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-},
+  ticketStubWrap: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    height: 190,
+  },
+  ticketStubSelected: { opacity: 1 },
+  ticketStubDisabled: { opacity: 0.5 },
+  ticketStubBg: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    justifyContent: 'center',
+  },
+  ticketStubBgImage: { resizeMode: 'stretch' },
+  ticketStubContent: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 4,
+    paddingBottom: spacing.lg,
+    justifyContent: 'flex-start',
+  },
+  ticketStubTitle: {
+    color: colors.white,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  ticketStubBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+  },
+  ticketStubCol: { flex: 1 },
+  ticketStubLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 8,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  ticketStubBullet: {
+    fontSize: 14,
+    color: colors.white,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  paymentMethodsList: { gap: 4, marginBottom: spacing.md },
+  paymentMethodItem: { fontSize: 14, color: colors.text },
+  paymentBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  paymentBadge: {
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
 
-galleryHero: {
-  height: 180,
-  borderRadius: borderRadius.md,
-  overflow: 'hidden',
-  marginBottom: spacing.md,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#E5E7EB',
-},
-galleryPlayBtn: {
-  width: 56,
-  height: 56,
-  borderRadius: 28,
-  backgroundColor: colors.white,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-galleryPlayIcon: { fontSize: 20, color: colors.brandPink, marginLeft: 3 },
-galleryGrid: {
-  flexDirection: 'row',
-  gap: spacing.sm,
-},
-galleryCol: { flex: 1, gap: spacing.sm },
-galleryThumbWrap: {
-  borderRadius: borderRadius.md,
-  overflow: 'hidden',
-  backgroundColor: '#F3F4F6',
-},
-galleryTallCell: { height: 180 },
-galleryShortCell: { height: 130 },
-viewMoreBtn: {
-  borderWidth: 1.5,
-  borderColor: colors.brandPink,
-  borderRadius: borderRadius.lg,
-  paddingVertical: spacing.sm + 2,
-  alignItems: 'center',
-  marginTop: spacing.md,
-},
-viewMoreText: { color: colors.brandPink, fontWeight: '700', fontSize: 14 },
+  galleryHero: {
+    height: 180,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5E7EB',
+  },
+  galleryPlayBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryPlayIcon: { fontSize: 20, color: colors.brandPink, marginLeft: 3 },
+  galleryGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  galleryCol: { flex: 1, gap: spacing.sm },
+  galleryThumbWrap: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  galleryTallCell: { height: 180 },
+  galleryShortCell: { height: 130 },
+  viewMoreBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.brandPink,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  viewMoreText: { color: colors.brandPink, fontWeight: '700', fontSize: 14 },
 
-paymentBadgeText: { fontSize: 12, fontWeight: '600', color: colors.text },
+  paymentBadgeText: { fontSize: 12, fontWeight: '600', color: colors.text },
+
+  // --- Schedule tab ---
+  scheduleList: { paddingTop: spacing.sm },
+  scheduleRow: { flexDirection: 'row' },
+  scheduleMarkerCol: { alignItems: 'center', width: 28, marginRight: spacing.sm },
+  scheduleMarker: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleMarkerDone: { backgroundColor: '#10B981' },
+  scheduleMarkerCheck: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  scheduleLine: { width: 2, flex: 1, minHeight: 40, backgroundColor: '#D1D5DB', marginTop: 2 },
+  scheduleLineDone: { backgroundColor: '#10B981' },
+  scheduleCard: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  scheduleTime: { fontSize: 13, fontWeight: '700', color: colors.brandPink, marginBottom: 4 },
+  scheduleTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  scheduleFooterNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  scheduleFooterIcon: { fontSize: 14, color: colors.textSecondary },
+  scheduleFooterText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  scheduleFooterLink: { color: colors.brandPink, fontWeight: '600', textDecorationLine: 'underline' },
+
+  // --- Reviews tab ---
+  reviewList: { gap: spacing.md, paddingTop: spacing.sm },
+  reviewCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+  },
+  reviewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  reviewAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  reviewAvatarIcon: { fontSize: 18 },
+  reviewNameCol: { flex: 1 },
+  reviewName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  reviewUsername: { fontSize: 12, color: colors.brandPink, marginTop: 1 },
+  reviewStarRow: { flexDirection: 'row', gap: 1 },
+  reviewStar: { fontSize: 15 },
+  reviewStarFilled: { color: colors.brandPink },
+  reviewStarEmpty: { color: 'rgba(225,29,72,0.25)' },
+  reviewText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  reviewReadMore: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    alignSelf: 'flex-end',
+  },
 });
 
 export default EventDetailsScreen;

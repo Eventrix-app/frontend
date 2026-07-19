@@ -189,7 +189,7 @@ const LocationAccessScreen: React.FC = () => {
               label={isLocating ? '  Locating…  ' : 'Allow Location Access'}
               variant="solid"
               onPress={handleAllowLocation}
-              style={[styles.primaryBtn, (isLocating || isGeocoding) && styles.btnDisabled]}
+              style={StyleSheet.flatten([styles.primaryBtn, (isLocating || isGeocoding) ? styles.btnDisabled : undefined])}
             />
           </View>
 

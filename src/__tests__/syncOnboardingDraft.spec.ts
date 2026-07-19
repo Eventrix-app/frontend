@@ -13,6 +13,7 @@
  */
 
 import { configureStore } from '@reduxjs/toolkit';
+import type { RootState } from '../store';
 import onboardingDraftReducer, {
   setInterests,
   setLocation,
@@ -33,11 +34,12 @@ function defaultDraft() {
     manualCity: null as string | null,
     notificationPrefs: null as any,
     isSynced: false,
+    hasCompletedOnboarding: false,
   };
 }
 
 function makeStore(preloaded?: Partial<ReturnType<typeof defaultDraft>>) {
-  return configureStore({
+  const s = configureStore({
     reducer: {
       onboardingDraft: onboardingDraftReducer,
       userApi: () => ({}),
@@ -46,6 +48,7 @@ function makeStore(preloaded?: Partial<ReturnType<typeof defaultDraft>>) {
       onboardingDraft: { ...defaultDraft(), ...preloaded },
     },
   });
+  return s as typeof s & { getState: () => RootState };
 }
 
 const CAT_IDS = [
