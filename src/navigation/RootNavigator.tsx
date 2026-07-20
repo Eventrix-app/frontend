@@ -89,9 +89,14 @@ const RootNavigator = () => {
   // using the push's own data payload rather than round-tripping through GET /notifications.
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response && navigationRef.current) {
+      if (!response) return;
+      if (navigationRef.current) {
         navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
       }
+      // Without this, Expo keeps returning the same "last tapped" response on every
+      // subsequent cold start (not just the one that followed the actual tap), which
+      // would otherwise re-trigger this navigation on every future app launch.
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
     });
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
