@@ -37,10 +37,31 @@ import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
 
-// Keep the native splash screen up until both the Redux persist rehydration (handled by
-// PersistGate below) and these font files are ready, so no screen ever flashes with the
-// system fallback font before Zalando Sans Expanded / Poppins are available.
+// Keep the native splash screen up until Redux persist rehydration (handled by
+// PersistGate below), these font files, and — for the logged-out flow — the intro video
+// are all ready. See SplashGate and SplashScreen.tsx (the video screen) for the two
+// places that actually call hideAsync().
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Only the logged-out flow (AuthNavigator) mounts the video Splash screen, which hides
+// the native splash itself once the video reports readyToPlay (see SplashScreen.tsx) —
+// that hand-off is deliberately deferred so there's no blank flash between the native
+// splash and the video's first frame. Authenticated/admin users skip straight to
+// Main/AdminRedirect and never mount that screen, so hide the native splash here
+// instead, mirroring RootNavigator's own isAdmin/isAuthenticated routing decision.
+function SplashGate() {
+  const { isAuthenticated, user } = useSelector((s: RootState) => s.auth);
+  const isAdmin = isAuthenticated && (user?.roles ?? []).includes('admin');
+
+  useEffect(() => {
+    if (isAdmin || isAuthenticated) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
 
 function AppStateSync() {
   const dispatch = useDispatch<AppDispatch>();
@@ -102,14 +123,6 @@ export default function App() {
     Poppins_900Black,
   });
 
-  useEffect(() => {
-    // Don't block forever on a font-load failure (e.g. offline first install) — fall back
-    // to the system font rather than leaving the app stuck behind the splash screen.
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [fontsLoaded, fontError]);
-
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -120,6 +133,7 @@ export default function App() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <BottomSheetModalProvider>
             <SafeAreaProvider>
+              <SplashGate />
               <AppStateSync />
               <NetworkGate>
                  <ServerGate>

@@ -11,6 +11,7 @@ import {
   REGISTER,
 } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import secureStorage from './secureStorage';
 
 import authSlice from './slices/authSlice';
 import eventsSlice from './slices/eventsSlice';
@@ -24,6 +25,7 @@ import { userApi } from './services/userApi';
 import { paymentsApi } from './services/paymentsApi';
 import { notificationsApi } from './services/notificationsApi';
 import { authErrorMiddleware } from './middleware/authErrorMiddleware';
+import { clearApiCacheOnLogout } from './middleware/clearApiCacheOnLogout';
 
 // Persisted so a logged-in session survives an app restart — the 2-day inactivity logout
 // (POST /auth/refresh, called on every app foreground/launch — see AppStateSync in App.tsx)
@@ -32,7 +34,7 @@ import { authErrorMiddleware } from './middleware/authErrorMiddleware';
 // isLoading/error are transient UI state, not session state, so they're excluded.
 const authPersistConfig = {
   key: 'auth',
-  storage: AsyncStorage,
+  storage: secureStorage,
   blacklist: ['isLoading', 'error'],
 };
 
@@ -77,6 +79,7 @@ export const store = configureStore({
       paymentsApi.middleware,
       notificationsApi.middleware,
       authErrorMiddleware,
+      clearApiCacheOnLogout,
     ),
 });
 

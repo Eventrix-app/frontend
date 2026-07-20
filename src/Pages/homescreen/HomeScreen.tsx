@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,7 +19,7 @@ import { spacing } from '../../theme/spacing';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
-import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
@@ -76,11 +76,21 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { data: events = [] } = useGetEventsQuery({ limit: 100 });
+  const { events, loadMore, isFetchingMore } = usePaginatedEvents();
   const { data: me } = useGetMeQuery();
-  const cardEvents = events.map(toCardEvent);
+  const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   const featured = cardEvents.filter((event) => event.featured);
   const recommended = cardEvents;
+
+  // "Lazy loading": the feed starts with just the first page instead of fetching
+  // everything up front, and quietly fetches the next page once the user scrolls
+  // near the bottom of this (single, whole-page) ScrollView.
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 400) {
+      loadMore();
+    }
+  };
 
   // Turns the coordinates captured during onboarding's location-access step (persisted on
   // the user's account, GET /users/me) into a real, human-readable address — replaces the
@@ -221,7 +231,12 @@ const HomeScreen: React.FC = () => {
         </View>
       </LinearGradient>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        onScroll={handleScroll}
+        scrollEventThrottle={200}
+      >
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
         {featured.length > 0 && (
@@ -282,6 +297,8 @@ const HomeScreen: React.FC = () => {
         {recommended.map((event) => (
           <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
         ))}
+
+        {isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null}
 
         <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
           <Text style={styles.viewAllText}>View All Events</Text>
@@ -472,6 +489,9 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  loadMoreLoader: {
+    marginVertical: spacing.md,
   },
   viewAllBtn: {
     flexDirection: 'row',

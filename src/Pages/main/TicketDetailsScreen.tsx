@@ -1,5 +1,5 @@
-import React from 'react';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -8,6 +8,8 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEnrollmentByIdQuery } from '../../store/services/eventsApi';
+import { useRequestRefundMutation } from '../../store/services/paymentsApi';
+import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TicketDetails'>;
@@ -24,6 +26,23 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   // route.params.bookingId maps to enrollmentId on the backend (Section 5 naming fix)
   const enrollmentId = route.params.bookingId;
   const { data: enrollment, isLoading, isError } = useGetEnrollmentByIdQuery(enrollmentId);
+  const [requestRefund, { isLoading: isRequestingRefund }] = useRequestRefundMutation();
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundRequested, setRefundRequested] = useState(false);
+
+  const handleSubmitRefund = async () => {
+    try {
+      await requestRefund({ enrollmentId, reason: refundReason.trim() || undefined }).unwrap();
+      setShowRefundForm(false);
+      setRefundRequested(true);
+      showAlert('Refund Requested', "We've sent your request to the organizer for review.");
+    } catch (e: any) {
+      // Surface the backend's own message directly (e.g. the 48h-cutoff rejection, or "a
+      // refund request is already open for this booking") rather than re-deriving it here.
+      showAlert('Refund Request Failed', e?.data?.message ?? 'Something went wrong. Please try again.');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -105,12 +124,61 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       {!isCancelled ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <View style={styles.footerContent}>
-            <TouchableOpacity
-              style={styles.shareBtn}
-              onPress={() => navigation.navigate('EventDetails', { eventId: enrollment.eventId })}
-            >
-              <Text style={styles.shareText}>View Event</Text>
-            </TouchableOpacity>
+            {showRefundForm ? (
+              <View style={styles.refundForm}>
+                <TextInput
+                  style={styles.refundInput}
+                  placeholder="Reason for refund (optional)"
+                  placeholderTextColor={colors.textSecondary}
+                  value={refundReason}
+                  onChangeText={setRefundReason}
+                  multiline
+                />
+                <View style={styles.refundFormActions}>
+                  <TouchableOpacity
+                    style={styles.refundCancelBtn}
+                    onPress={() => setShowRefundForm(false)}
+                    disabled={isRequestingRefund}
+                  >
+                    <Text style={styles.refundCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.refundSubmitBtn, isRequestingRefund && styles.btnDisabled]}
+                    onPress={handleSubmitRefund}
+                    disabled={isRequestingRefund}
+                  >
+                    {isRequestingRefund ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <Text style={styles.refundSubmitText}>Submit Request</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.footerRow}>
+                <TouchableOpacity
+                  style={[styles.shareBtn, styles.footerBtnFlex]}
+                  onPress={() => navigation.navigate('EventDetails', { eventId: enrollment.eventId })}
+                >
+                  <Text style={styles.shareText}>View Event</Text>
+                </TouchableOpacity>
+                {enrollment.status === 'confirmed' ? (
+                  refundRequested ? (
+                    <View style={[styles.footerBtnFlex, styles.refundPendingBadge]}>
+                      <Text style={styles.refundPendingText}>Refund Requested</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.refundBtn, styles.footerBtnFlex]}
+                      onPress={() => setShowRefundForm(true)}
+                    >
+                      <Text style={styles.refundText}>Request Refund</Text>
+                    </TouchableOpacity>
+                  )
+                ) : null}
+              </View>
+            )}
           </View>
         </View>
       ) : null}
@@ -206,6 +274,8 @@ const styles = StyleSheet.create({
     }),
   },
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
+  footerRow: { flexDirection: 'row', gap: spacing.sm },
+  footerBtnFlex: { flex: 1 },
   shareBtn: {
     borderRadius: borderRadius.md,
     paddingVertical: 14,
@@ -214,6 +284,50 @@ const styles = StyleSheet.create({
     borderColor: colors.brandPink,
   },
   shareText: { color: colors.brandPink, fontWeight: '600', fontSize: 15 },
+  refundBtn: {
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+  },
+  refundText: { color: '#991B1B', fontWeight: '600', fontSize: 15 },
+  refundPendingBadge: {
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: colors.muted,
+  },
+  refundPendingText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
+  refundForm: { gap: spacing.sm },
+  refundInput: {
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: 14,
+    color: colors.text,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  refundFormActions: { flexDirection: 'row', gap: spacing.sm },
+  refundCancelBtn: {
+    flex: 1,
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
+  },
+  refundCancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
+  refundSubmitBtn: {
+    flex: 1,
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: colors.brandPink,
+  },
+  refundSubmitText: { color: colors.white, fontWeight: '600', fontSize: 15 },
+  btnDisabled: { opacity: 0.6 },
 });
 
 export default TicketDetailsScreen;

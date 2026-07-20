@@ -27,7 +27,6 @@ import { syncOnboardingDraft } from '../utils/syncOnboardingDraft';
 
 function defaultDraft() {
   return {
-    role: null as 'participant' | 'organizer' | null,
     categoryIds: [] as string[],
     latitude: null as number | null,
     longitude: null as number | null,

@@ -45,12 +45,20 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.title}>My Events</Text>
-        <TouchableOpacity
-          style={styles.createBtn}
-          onPress={() => navigation.navigate('CreateEvent', {})}
-        >
-          <Text style={styles.createBtnText}>+ Create</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.refundsBtn}
+            onPress={() => navigation.navigate('RefundApproval')}
+          >
+            <Text style={styles.refundsBtnText}>Refunds</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.createBtn}
+            onPress={() => navigation.navigate('CreateEvent', {})}
+          >
+            <Text style={styles.createBtnText}>+ Create</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -133,6 +141,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, color: colors.text, flex: 1,
       fontFamily: 'ZalandoSansExpanded_700Bold'
 },
+  headerActions: { flexDirection: 'row', gap: spacing.sm },
   createBtn: {
     backgroundColor: colors.brandPink,
     borderRadius: borderRadius.md,
@@ -140,6 +149,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   createBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  refundsBtn: {
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  refundsBtnText: { color: colors.text, fontWeight: '600', fontSize: 14 },
   filterRow: { maxHeight: 48 },
   filterContent: { paddingHorizontal: spacing.md, gap: spacing.sm, alignItems: 'center' },
   pill: {

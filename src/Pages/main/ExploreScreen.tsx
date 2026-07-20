@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import FeaturedCarousel from '../../components/events/FeaturedCarousel';
 import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
@@ -12,7 +11,9 @@ import InterestSelectionScreen from '../interestselection/InterestSelectionScree
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { borderRadius } from '../../theme/borderRadius';
+import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useGetMeQuery } from '../../store/services/userApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import NoEvents from '../../components/common/Noevents';
@@ -31,19 +32,10 @@ const hasUnread = true; // TODO: replace with real unread count from notificatio
 const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { data: events = [] } = useGetEventsQuery({ limit: 100 });
-  const cardEvents = events.map(toCardEvent);
+  const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents();
+  const { data: me } = useGetMeQuery();
+  const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   const [showInterestSheet, setShowInterestSheet] = useState(false);
-
-  const featuredCards = cardEvents.slice(0, 5).map((event) => ({
-    id: event.id,
-    title: event.title,
-    date: (event as any).date,
-    location: (event as any).venue,
-    price: (event as any).price,
-    image: (event as any).image,
-    featured: true,
-  }));
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -101,30 +93,52 @@ const ExploreScreen: React.FC = () => {
         ))}
       </ScrollView>
 
-      {cardEvents.length === 0 ? (
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+      ) : isError ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>Couldn't load events</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={refetch}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : cardEvents.length === 0 ? (
         <NoEvents
           onBack={() => navigation.goBack()}
           onGoHome={() => navigation.navigate('Home' as never)}
         />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <SectionHeader title="Browse by Category" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-            {CATEGORIES.map((category) => (
-              <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
-            ))}
-            <ViewAllCategoryIconCard onPress={openInterestSheet} />
-          </ScrollView>
-
-          <SectionHeader title="You Might Also Like" />
-          {cardEvents.map((event) => (
-            <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
-          ))}
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
-          </View>
-        </ScrollView>
+        <FlatList
+          data={cardEvents}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <EventInterestCard event={item as any} onPress={() => openEvent(item.id)} />
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListHeaderComponent={
+            <>
+              <SectionHeader title="Browse by Category" />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+                {CATEGORIES.map((category) => (
+                  <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+                ))}
+                <ViewAllCategoryIconCard onPress={openInterestSheet} />
+              </ScrollView>
+              <SectionHeader title="You Might Also Like" />
+            </>
+          }
+          ListFooterComponent={
+            <>
+              {isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
+              </View>
+            </>
+          }
+        />
       )}
 
      <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
@@ -247,6 +261,33 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  loader: {
+    marginTop: spacing.xxl,
+  },
+  loadMoreLoader: {
+    marginVertical: spacing.md,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl * 2,
+    gap: spacing.sm,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    color: colors.text,
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
+  },
+  retryBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryText: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

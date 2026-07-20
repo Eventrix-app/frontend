@@ -9,6 +9,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { getEventStartDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 
 // TODO: source from user profile / auth state instead of hardcoding
@@ -25,8 +26,9 @@ const TABS: { id: TabId; label: string }[] = [
 
 function bucketFor(enrollment: EnrollmentRecord): TabId {
   if (enrollment.status === 'cancelled' || enrollment.status === 'refunded') return 'cancelled';
-  const eventDate = enrollment.event?.eventDate ? new Date(enrollment.event.eventDate) : null;
-  if (eventDate && eventDate.getTime() < Date.now()) return 'previous';
+  const event = enrollment.event;
+  const eventStart = event?.eventDate && event?.startTime ? getEventStartDateTime(event) : null;
+  if (eventStart && eventStart.getTime() < Date.now()) return 'previous';
   return 'upcoming';
 }
 

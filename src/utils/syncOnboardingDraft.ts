@@ -1,6 +1,6 @@
-import { AppDispatch, RootState } from '../store';
+import { AppDispatch } from '../store';
 import { userApi } from '../store/services/userApi';
-import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
+import { markSynced, resetDraft, OnboardingDraftState } from '../store/slices/onboardingDraftSlice';
 
 /**
  * Syncs the locally-cached onboarding draft (interests/location/notification prefs) to
@@ -12,7 +12,7 @@ import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
  */
 export async function syncOnboardingDraft(
   dispatch: AppDispatch,
-  getState: () => RootState,
+  getState: () => { onboardingDraft: OnboardingDraftState },
 ): Promise<void> {
   const draft = getState().onboardingDraft;
 

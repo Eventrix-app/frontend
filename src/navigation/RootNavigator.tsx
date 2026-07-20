@@ -22,6 +22,7 @@ import MyEventsScreen from '../Pages/main/MyEventsScreen';
 import CreateEventScreen from '../Pages/main/CreateEventScreen';
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
+import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 
@@ -87,6 +88,7 @@ const RootNavigator = () => {
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
+        <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />
       </Stack.Navigator>

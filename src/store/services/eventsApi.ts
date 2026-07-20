@@ -35,7 +35,7 @@ export interface BackendEvent {
   updatedAt: string;
   // Eager-loaded by the backend on both GET /events and GET /events/:id
   // (events.service.ts findAllFiltered/findOne relations: ['organizer', 'organizer.user', 'category']).
-  category?: { id: string; name: string; emoji?: string; colorHex?: string };
+  category?: { id: string; name: string };
   organizer?: { id: string; userId: string; companyName: string; companyLogoUrl?: string; user?: { id: string; fullName: string } };
 }
 
@@ -133,13 +133,27 @@ export interface UploadUrlResponse {
 }
 
 export type UploadPurpose = 'profile-picture' | 'event-image' | 'event-cover' | 'company-logo';
-export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp';
-export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp'];
+export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
+export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
+
+export interface EventMediaRecord {
+  id: string;
+  eventId: string;
+  type: 'image' | 'video';
+  url: string;
+  position: number;
+}
+
+export interface CreateEventMediaPayload {
+  type: 'image' | 'video';
+  url: string;
+  position?: number;
+}
 
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite', 'EventMedia', 'Enrollment'],
   // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
   // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
   // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
@@ -150,13 +164,14 @@ export const eventsApi = createApi({
   refetchOnMountOrArgChange: 10,
   refetchOnFocus: true,
   endpoints: (builder) => ({
-    getEvents: builder.query<BackendEvent[], { categoryId?: string; isOnline?: boolean; page?: number; limit?: number }>({
+    getEvents: builder.query<BackendEvent[], { categoryId?: string; isOnline?: boolean; page?: number; limit?: number; search?: string }>({
       query: (filters) => {
         const params = new URLSearchParams();
         if (filters.categoryId) params.append('categoryId', filters.categoryId);
         if (filters.isOnline !== undefined) params.append('isOnline', String(filters.isOnline));
         if (filters.page) params.append('page', String(filters.page));
         if (filters.limit) params.append('limit', String(filters.limit));
+        if (filters.search) params.append('search', filters.search);
         return `events?${params.toString()}`;
       },
       // GET /events returns a paginated wrapper ({events, total, page, totalPages}), not a bare array.
@@ -252,6 +267,7 @@ export const eventsApi = createApi({
     }),
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
       query: (enrollmentId) => `events/enrollments/${enrollmentId}`,
+      providesTags: (result, error, enrollmentId) => [{ type: 'Enrollment', id: enrollmentId }],
     }),
     getTicketTypes: builder.query<TicketTypeRecord[], string>({
       query: (eventId) => `events/${eventId}/ticket-types`,
@@ -280,6 +296,25 @@ export const eventsApi = createApi({
       }),
       invalidatesTags: (result, error, { eventId }) => [{ type: 'TicketType', id: eventId }],
     }),
+    getEventMedia: builder.query<EventMediaRecord[], string>({
+      query: (eventId) => `events/${eventId}/media`,
+      providesTags: (result, error, eventId) => [{ type: 'EventMedia', id: eventId }],
+    }),
+    createEventMedia: builder.mutation<EventMediaRecord, { eventId: string; body: CreateEventMediaPayload }>({
+      query: ({ eventId, body }) => ({
+        url: `events/${eventId}/media`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'EventMedia', id: eventId }],
+    }),
+    deleteEventMedia: builder.mutation<void, { eventId: string; mediaId: string }>({
+      query: ({ eventId, mediaId }) => ({
+        url: `events/${eventId}/media/${mediaId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'EventMedia', id: eventId }],
+    }),
   }),
 });
 
@@ -305,4 +340,7 @@ export const {
   useCreateTicketTypeMutation,
   useUpdateTicketTypeMutation,
   useDeleteTicketTypeMutation,
+  useGetEventMediaQuery,
+  useCreateEventMediaMutation,
+  useDeleteEventMediaMutation,
 } = eventsApi;

@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import {
   Animated,
   Pressable,
+  StyleProp,
   StyleSheet,
   View,
   ViewStyle,
@@ -15,7 +16,7 @@ type Props = {
   label: string;
   onPress: () => void;
   variant?: Variant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 export const PrimaryButton: React.FC<Props> = ({

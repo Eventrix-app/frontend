@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -12,6 +12,7 @@ import { useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
 
 export type AuthStackParamList = {
@@ -65,7 +66,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         err.data?.message?.toLowerCase()?.includes('invalid email or password') ||
         err.message?.toLowerCase()?.includes('invalid email or password')
       ) {
-        Alert.alert('Error', 'invalid email or password');
+        showAlert('Error', 'invalid email or password');
       } else {
         if (err.data && err.data.message) {
           if (Array.isArray(err.data.message)) {

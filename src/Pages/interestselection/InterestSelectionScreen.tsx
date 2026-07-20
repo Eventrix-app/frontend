@@ -96,9 +96,6 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
                   style={[styles.chip, selected && styles.chipSelected]}
                   onPress={() => toggle(cat.id)}
                 >
-                  {cat.emoji ? (
-                    <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-                  ) : null}
                   <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                     {cat.name}
                   </Text>
@@ -229,7 +226,6 @@ const styles = StyleSheet.create({
     borderColor: '#FF3366',
     backgroundColor: 'rgba(255,51,102,0.07)',
   },
-  chipEmoji: { fontSize: 16 },
   chipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
   chipTextSelected: { color: '#FF3366', fontWeight: '600' },
   hintText: {

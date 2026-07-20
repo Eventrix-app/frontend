@@ -22,10 +22,14 @@ import {
   useUpdateEventMutation,
   useGetUploadUrlMutation,
   useGetEventByIdQuery,
+  useGetEventMediaQuery,
+  useCreateEventMediaMutation,
+  useDeleteEventMediaMutation,
   ALLOWED_UPLOAD_CONTENT_TYPES,
   UploadContentType,
 } from '../../store/services/eventsApi';
 import { useGetCategoriesQuery } from '../../store/services/userApi';
+import { useRefreshMutation } from '../../store/services/authApi';
 import * as ImagePicker from 'expo-image-picker';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
@@ -75,6 +79,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   // brand-new user has no way to pass the role check before their first event is saved).
   const [pendingImage, setPendingImage] = useState<{ uri: string; contentType: UploadContentType } | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  // Additional gallery images/videos (EventDetailsScreen's carousel) — same deferred-
+  // upload approach as the cover image, uploaded once the event exists.
+  const [pendingGalleryItems, setPendingGalleryItems] = useState<
+    { uri: string; contentType: UploadContentType; type: 'image' | 'video' }[]
+  >([]);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   // Tracks which footer button triggered the save, so only that one shows a spinner —
@@ -89,8 +99,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [createEvent, { isLoading: isCreating }] = useCreateEventMutation();
   const [updateEvent, { isLoading: isUpdating }] = useUpdateEventMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
+  const [refresh] = useRefreshMutation();
   const { data: existingEvent } = useGetEventByIdQuery(eventId!, { skip: !isEdit });
   const { data: categories = [] } = useGetCategoriesQuery();
+  const { data: existingGallery = [] } = useGetEventMediaQuery(eventId!, { skip: !isEdit });
+  const [createEventMedia] = useCreateEventMediaMutation();
+  const [deleteEventMedia] = useDeleteEventMediaMutation();
 
   useEffect(() => {
     if (!isEdit || !existingEvent || prefilledRef.current) {
@@ -222,6 +236,62 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     return uploadResponse.publicUrl;
   };
 
+  // Picks one or more gallery images/videos locally only — uploaded in handleSave, same
+  // deferred approach as the cover image.
+  const handlePickGalleryMedia = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showAlert('Permission needed', 'Allow photo library access to add gallery images or videos.');
+      return;
+    }
+
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      quality: 0.85,
+    });
+    if (pickerResult.canceled || !pickerResult.assets.length) return;
+
+    const picked = pickerResult.assets
+      .filter((asset) => !!asset.uri)
+      .map((asset) => {
+        const isVideo = asset.type === 'video';
+        const contentType = (ALLOWED_UPLOAD_CONTENT_TYPES.includes(asset.mimeType as UploadContentType)
+          ? asset.mimeType
+          : isVideo ? 'video/mp4' : 'image/jpeg') as UploadContentType;
+        return { uri: asset.uri, contentType, type: (isVideo ? 'video' : 'image') as 'image' | 'video' };
+      });
+    setPendingGalleryItems((prev) => [...prev, ...picked]);
+  };
+
+  const removePendingGalleryItem = (index: number) => {
+    setPendingGalleryItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadPendingGalleryItems = async (targetEventId: string): Promise<boolean> => {
+    let allSucceeded = true;
+    for (let i = 0; i < pendingGalleryItems.length; i++) {
+      const item = pendingGalleryItems[i];
+      try {
+        const { uploadUrl, publicUrl } = await getUploadUrl({ purpose: 'event-image', contentType: item.contentType }).unwrap();
+        const fileBlob = await (await fetch(item.uri)).blob();
+        const putResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: fileBlob,
+          headers: { 'Content-Type': item.contentType },
+        });
+        if (!putResponse.ok) throw new Error('Gallery upload to storage failed.');
+        await createEventMedia({
+          eventId: targetEventId,
+          body: { type: item.type, url: publicUrl, position: existingGallery.length + i },
+        }).unwrap();
+      } catch {
+        allSucceeded = false;
+      }
+    }
+    return allSucceeded;
+  };
+
   const handleSave = async (asDraft: boolean) => {
     if (isSubmittingRef.current) return;
     const err = validate();
@@ -238,6 +308,14 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         ? await updateEvent({ id: eventId!, body: payload }).unwrap()
         : await createEvent(payload).unwrap();
 
+      // A first-ever event grants the 'organizer' role server-side (EventsService.
+      // createForUser), but the access token already in memory was minted before that and
+      // still lacks it — the upload-url requests below would 403 on a stale role.
+      // Refreshing re-signs the token from current DB state so they carry the new role.
+      if (!isEdit && (pendingImage || pendingGalleryItems.length > 0)) {
+        await refresh().unwrap().catch(() => {});
+      }
+
       if (pendingImage) {
         setIsUploadingCover(true);
         try {
@@ -249,6 +327,22 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
           imageWarning = 'The cover image failed to upload — you can add it again from Edit.';
         } finally {
           setIsUploadingCover(false);
+        }
+      }
+
+      if (pendingGalleryItems.length > 0) {
+        setIsUploadingGallery(true);
+        try {
+          const allSucceeded = await uploadPendingGalleryItems(savedEvent.id);
+          if (allSucceeded) {
+            setPendingGalleryItems([]);
+          } else {
+            imageWarning = imageWarning
+              ? `${imageWarning}\n\nSome gallery items failed to upload — you can add them again from Edit.`
+              : 'Some gallery items failed to upload — you can add them again from Edit.';
+          }
+        } finally {
+          setIsUploadingGallery(false);
         }
       }
 
@@ -303,7 +397,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => setCategoryId(cat.id)}
             >
               <Text style={[styles.refundPillText, categoryId === cat.id && styles.refundPillTextActive]}>
-                {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
+                {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
@@ -441,6 +535,58 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
             <Image source={{ uri: pendingImage?.uri ?? coverImageUrl }} style={styles.previewImage} />
           </View>
         ) : null}
+
+        <Text style={styles.label}>Gallery (photos &amp; videos)</Text>
+        <TouchableOpacity
+          style={[styles.uploadBtn, savingMode !== null && styles.uploadBtnDisabled]}
+          onPress={handlePickGalleryMedia}
+          disabled={savingMode !== null}
+        >
+          <Text style={styles.uploadBtnText}>+ Add Gallery Media</Text>
+        </TouchableOpacity>
+        {pendingGalleryItems.length > 0 ? (
+          <Text style={styles.previewHint}>Uploaded when you save this event.</Text>
+        ) : null}
+
+        {(existingGallery.length > 0 || pendingGalleryItems.length > 0) && (
+          <View style={styles.galleryGrid}>
+            {existingGallery.map((item) => (
+              <View key={item.id} style={styles.galleryThumbWrap}>
+                {item.type === 'video' ? (
+                  <View style={[styles.galleryThumb, styles.galleryVideoPlaceholder]}>
+                    <Text style={styles.galleryVideoIcon}>▶</Text>
+                  </View>
+                ) : (
+                  <Image source={{ uri: item.url }} style={styles.galleryThumb} />
+                )}
+                <TouchableOpacity
+                  style={styles.galleryRemoveBtn}
+                  onPress={() => deleteEventMedia({ eventId: eventId!, mediaId: item.id })}
+                >
+                  <Text style={styles.galleryRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {pendingGalleryItems.map((item, index) => (
+              <View key={`pending-${index}`} style={styles.galleryThumbWrap}>
+                {item.type === 'video' ? (
+                  <View style={[styles.galleryThumb, styles.galleryVideoPlaceholder]}>
+                    <Text style={styles.galleryVideoIcon}>▶</Text>
+                  </View>
+                ) : (
+                  <Image source={{ uri: item.uri }} style={styles.galleryThumb} />
+                )}
+                <TouchableOpacity
+                  style={styles.galleryRemoveBtn}
+                  onPress={() => removePendingGalleryItem(index)}
+                  disabled={savingMode !== null}
+                >
+                  <Text style={styles.galleryRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -580,6 +726,46 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: borderRadius.lg,
     backgroundColor: '#E5E7EB',
+  },
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  galleryThumbWrap: {
+    width: 84,
+    height: 84,
+  },
+  galleryThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: borderRadius.md,
+    backgroundColor: '#E5E7EB',
+  },
+  galleryVideoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryVideoIcon: {
+    fontSize: 24,
+    color: colors.textSecondary,
+  },
+  galleryRemoveBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryRemoveText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   footer: {
     position: 'absolute',

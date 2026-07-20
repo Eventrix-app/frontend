@@ -10,15 +10,17 @@ export type MockEvent = {
   image: string;
   featured?: boolean;
   description?: string;
+  attendeesAvailable?: number;
+  distanceKm?: string;
 };
 
 export const CATEGORIES = [
-  { id: 'music', name: 'Music', emoji: '🎵', color: '#FF3366' },
-  { id: 'tech', name: 'Tech', emoji: '💻', color: '#3B82F6' },
-  { id: 'sports', name: 'Sports', emoji: '⚽', color: '#10B981' },
-  { id: 'health', name: 'Health', emoji: '🧘', color: '#8B5CF6' },
-  { id: 'business', name: 'Business', emoji: '💼', color: '#F59E0B' },
-  { id: 'education', name: 'Education', emoji: '📚', color: '#EC4899' },
+  { id: 'music', name: 'Music' },
+  { id: 'tech', name: 'Tech' },
+  { id: 'sports', name: 'Sports' },
+  { id: 'health', name: 'Health' },
+  { id: 'business', name: 'Business' },
+  { id: 'education', name: 'Education' },
 ];
 
 export const MOCK_EVENTS: MockEvent[] = [

@@ -4,8 +4,6 @@ import { createFallbackBaseQuery } from './baseQuery';
 export interface Category {
   id: string;
   name: string;
-  emoji?: string;
-  colorHex?: string;
   description?: string;
 }
 

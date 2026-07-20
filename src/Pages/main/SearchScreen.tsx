@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,7 +18,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import Noevents from '../../components/common/Noevents';
@@ -28,21 +30,20 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
-  const { data: events = [], isLoading, isError, refetch } = useGetEventsQuery({});
-  const cardEvents = useMemo(() => events.map(toCardEvent), [events]);
+  // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
+  // sent to the backend so search runs over the full catalog, not just already-loaded pages.
+  const debouncedQuery = useDebouncedValue(query.trim(), 400);
+  const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents({
+    search: debouncedQuery || undefined,
+  });
+  const cardEvents = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
 
+  // Text matching now happens server-side (title/venue); category remains a client-side
+  // filter over the already-fetched page since it's an exact chip selection, not free text.
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return cardEvents.filter((event) => {
-      const matchesQuery =
-        !q ||
-        event.title.toLowerCase().includes(q) ||
-        event.venue.toLowerCase().includes(q) ||
-        event.category.toLowerCase().includes(q);
-      const matchesCategory = !category || event.category.toLowerCase() === category;
-      return matchesQuery && matchesCategory;
-    });
-  }, [cardEvents, query, category]);
+    if (!category) return cardEvents;
+    return cardEvents.filter((event) => event.category.toLowerCase() === category);
+  }, [cardEvents, category]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -104,7 +105,7 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
                     category === cat.name.toLowerCase() && styles.chipTextActive,
                   ]}
                 >
-                  {cat.emoji} {cat.name}
+                  {cat.name}
                 </Text>
               </View>
             </View>
@@ -112,56 +113,64 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {!query && !category ? (
-          <>
-            <Text style={styles.sectionTitle}>Recent searches</Text>
-            <View style={styles.recentRow}>
-              {MOCK_RECENT_SEARCHES.map((term) => (
-                <TouchableOpacity
-                  key={term}
-                  style={styles.recentChipWrap}
-                  onPress={() => setQuery(term)}
-                >
-                  <View style={styles.recentChip}>
-                    <View style={styles.recentChipContent}>
-                      <Text style={styles.recentText}>🕐 {term}</Text>
-                    </View>
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+      ) : isError ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Couldn't load events</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <MainEventCard event={item} onPress={() => openEvent(item.id)} />
+          )}
+          contentContainerStyle={styles.scroll}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListHeaderComponent={
+            <>
+              {!query && !category ? (
+                <>
+                  <Text style={styles.sectionTitle}>Recent searches</Text>
+                  <View style={styles.recentRow}>
+                    {MOCK_RECENT_SEARCHES.map((term) => (
+                      <TouchableOpacity
+                        key={term}
+                        style={styles.recentChipWrap}
+                        onPress={() => setQuery(term)}
+                      >
+                        <View style={styles.recentChip}>
+                          <View style={styles.recentChipContent}>
+                            <Text style={styles.recentText}>🕐 {term}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
-        ) : isError ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>⚠️</Text>
-            <Text style={styles.emptyTitle}>Couldn't load events</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.sectionTitle}>
-              {results.length} result{results.length === 1 ? '' : 's'}
-            </Text>
-            {results.length === 0 ? (
-            <Noevents 
-                inline
+                </>
+              ) : null}
+              <Text style={styles.sectionTitle}>
+                {results.length} result{results.length === 1 ? '' : 's'}
+              </Text>
+            </>
+          }
+          ListEmptyComponent={
+            <Noevents
+              inline
               subtitle={query ? `No events matching "${query}"` : 'Try a different keyword or category'}
-  />
-) : (
-              results.map((event) => (
-                <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
-              ))
-            )}
-          </>
-        )}
-      </ScrollView>
+            />
+          }
+          ListFooterComponent={
+            isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null
+          }
+        />
+      )}
     </View>
   );
 };
@@ -312,6 +321,9 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: spacing.xxl,
+  },
+  loadMoreLoader: {
+    marginVertical: spacing.md,
   },
   retryBtn: {
     marginTop: spacing.sm,

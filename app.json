@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "Eventrix",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -50,7 +50,9 @@
         {
           "cameraPermission": "Allow Eventrix to use the camera to scan attendee ticket QR codes."
         }
-      ]
+      ],
+      "expo-video",
+      "expo-secure-store"
     ]
   }
 }

@@ -16,7 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SavedEvents'>;
 const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { data: favorites = [], isLoading } = useGetMyFavoritesQuery();
-  const savedEvents = favorites.map(toCardEvent);
+  const savedEvents = favorites.map((event) => toCardEvent(event));
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

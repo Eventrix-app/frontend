@@ -20,6 +20,7 @@ import { borderRadius } from '../../theme/borderRadius';
 import {
   useGetEventByIdQuery,
   useGetTicketTypesQuery,
+  useGetEventMediaQuery,
   useEnrollEventMutation,
   useGetMyFavoritesQuery,
   useAddFavoriteMutation,
@@ -30,6 +31,8 @@ import {
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
+import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { daysUntilEventDate } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
@@ -51,6 +54,28 @@ const MOCK_GALLERY: GalleryItem[] = [
   { id: 'g4', type: 'image', url: 'https://picsum.photos/400/300?4' },
   { id: 'g5', type: 'image', url: 'https://picsum.photos/400/300?5' },
 ];
+
+// Generic, non-factual filler content — used only when an organizer hasn't filled in the
+// real field yet, so the screen never looks bare. Never used for anything a buyer could
+// treat as a fact affecting their purchase (price, capacity, seats left, dates) — those
+// stay hidden rather than faked when the real value is missing.
+const MOCK_DESCRIPTION =
+  "Join us for an unforgettable experience filled with great energy, good company, and memories to last a lifetime. Whether you're a first-timer or a regular, there's something here for everyone.";
+
+const MOCK_HIGHLIGHTS = [
+  'Live performances and interactive experiences',
+  'Networking opportunities with fellow attendees',
+  'On-site food and beverage stalls',
+  'Professional photography and exclusive event merch',
+];
+
+const MOCK_WHO_SHOULD_ATTEND = [
+  'Anyone who loves a great time out',
+  'Fans of the category who want to connect with like-minded people',
+  'Groups, friends, and first-time explorers alike',
+];
+
+const MOCK_TICKET_BENEFITS = ['Entry to the event', 'Access to all general areas', 'Complimentary welcome drink'];
 
 const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, style }) => {
   const [loaded, setLoaded] = useState(false);
@@ -75,11 +100,13 @@ const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, styl
   );
 };
 
-const GalleryTab: React.FC<{ event: any }> = ({ event }) => {
+const GalleryTab: React.FC<{ gallery: GalleryItem[] }> = ({ gallery: realGallery }) => {
   const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
 
-  // TODO: add `gallery?: GalleryItem[]` to BackendEvent once the backend returns it
-  const gallery: GalleryItem[] = event.gallery ?? MOCK_GALLERY;
+  // Falls back to generic stock imagery when the organizer hasn't uploaded any media yet,
+  // so the tab isn't just an empty "coming soon" state for every event that lacks photos.
+  const gallery = realGallery.length > 0 ? realGallery : MOCK_GALLERY;
+
   const heroVideo = gallery.find((g) => g.type === 'video');
   const images = gallery.filter((g) => g.type === 'image');
   const visibleImages = images.slice(0, visibleCount);
@@ -313,12 +340,8 @@ function quantityBoundsForTier(tier: TicketTypeRecord): { min: number; max: numb
 }
 
 function daysToGoLabel(eventDate: string): string | null {
-  const target = new Date(eventDate);
-  if (isNaN(target.getTime())) return null;
-  const now = new Date();
-  const diffMs = target.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return null;
+  const diffDays = daysUntilEventDate(eventDate);
+  if (diffDays === null || diffDays < 0) return null;
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return '1 Day to go';
   return `${diffDays} Days to go`;
@@ -334,6 +357,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const { data: ticketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
+  const { data: mediaItems = [] } = useGetEventMediaQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
   const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
@@ -464,6 +488,13 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (earlyBirdTier) badges.push('Early Bird');
 
   const organizerName = event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer';
+  const description = event.description || MOCK_DESCRIPTION;
+  // TODO: add `highlights?: string[]` / `whoShouldAttend?: string[]` to BackendEvent once
+  // the backend returns them — mocked here so the About tab isn't bare for every event.
+  const highlights: string[] = (event as any).highlights?.length ? (event as any).highlights : MOCK_HIGHLIGHTS;
+  const whoShouldAttend: string[] = (event as any).whoShouldAttend?.length
+    ? (event as any).whoShouldAttend
+    : MOCK_WHO_SHOULD_ATTEND;
 
   return (
     <View style={styles.root}>
@@ -580,11 +611,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.whenWhereBlock}>
           <View style={styles.infoLine}>
             <Text style={styles.infoIcon}>🗓️</Text>
-            <Text style={styles.infoLineText}>{event.eventDate}</Text>
+            <Text style={styles.infoLineText}>{formatEventDate(event.eventDate)}</Text>
           </View>
           <View style={styles.infoLine}>
             <Text style={styles.infoIcon}>🕐</Text>
-            <Text style={styles.infoLineText}>{event.startTime}</Text>
+            <Text style={styles.infoLineText}>{formatEventTime(event.startTime)}</Text>
           </View>
           <View style={styles.infoLine}>
             <Text style={styles.infoIcon}>📍</Text>
@@ -817,9 +848,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'reviews' && <ReviewsTab />}
 
-        {activeTab === 'gallery' && (
-          <GalleryTab event={{ ...event, gallery: MOCK_GALLERY }} />
-        )}
+        {activeTab === 'gallery' && <GalleryTab gallery={mediaItems} />}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>

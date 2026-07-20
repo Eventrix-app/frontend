@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useDispatch } from 'react-redux';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
+import { logout } from '../../store/slices/authSlice';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -30,6 +32,7 @@ const SETTINGS: SettingRow[] = [
 
 const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const dispatch = useDispatch();
   const [toggles, setToggles] = useState({
     push: true,
     email: true,
@@ -41,10 +44,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Auth' }],
-    });
+    // Clears (and persists) isAuthenticated/token/user — RootNavigator watches
+    // isAuthenticated and resets the root stack to 'Auth' itself once this lands (same
+    // pattern as AdminRedirectScreen's logout), so no manual navigation call here. Without
+    // actually clearing this state, a browser refresh would rehydrate the stale
+    // isAuthenticated: true and silently sign the user back in.
+    dispatch(logout());
   };
 
   return (
