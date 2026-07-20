@@ -44,3 +44,5 @@ yarn-error.*
 /ios
 /android
 /lovable-screens
+eventrix-ff79a-firebase-adminsdk-fbsvc-d06a1db5ed.json
+*firebase-adminsdk*.json

@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationState, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from './types';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
 import { setCurrentScreen } from '../store/slices/uiSlice';
+import { notificationsApi } from '../store/services/notificationsApi';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import EventDetailsScreen from '../Pages/main/EventDetailsScreen';
@@ -38,6 +40,28 @@ function getActiveRouteName(state: NavigationState | undefined): string | undefi
   return route.name;
 }
 
+// Mirrors the payload shapes NotificationService actually enqueues (see
+// notification.service.ts's notify* methods): event_changed carries {eventId},
+// waitlist_promoted and refund_status both carry {enrollmentId} — TicketDetailsScreen
+// needs a bookingId (= enrollmentId), not a refundId, so refund_status routes there too
+// rather than only to the general Bookings list.
+function navigateForPushData(
+  navRef: NavigationContainerRef<RootStackParamList>,
+  data: Record<string, unknown> | undefined,
+): void {
+  const type = data?.type;
+  if (type === 'event_changed' && typeof data?.eventId === 'string') {
+    navRef.navigate('EventDetails', { eventId: data.eventId });
+  } else if (
+    (type === 'waitlist_promoted' || type === 'refund_status') &&
+    typeof data?.enrollmentId === 'string'
+  ) {
+    navRef.navigate('TicketDetails', { bookingId: data.enrollmentId });
+  } else {
+    navRef.navigate('Notifications');
+  }
+}
+
 const RootNavigator = () => {
   useForegroundSyncRetry();
   useCheckInSyncRetry();
@@ -58,6 +82,35 @@ const RootNavigator = () => {
     }
     wasAuthenticated.current = isAuthenticated;
   }, [isAuthenticated]);
+
+  // Cold start: the app was launched by tapping a notification (not already running) —
+  // checked once, here, at the true app root. Warm: the app was already running
+  // (foreground or backgrounded) when the notification was tapped. Either way, deep-link
+  // using the push's own data payload rather than round-tripping through GET /notifications.
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response && navigationRef.current) {
+        navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
+      }
+    });
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (navigationRef.current) {
+        navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
+      }
+    });
+
+    // A push arrived while the app is in the foreground — refresh the in-app notifications
+    // list so it shows up without the user needing to reopen the screen.
+    const receivedSub = Notifications.addNotificationReceivedListener(() => {
+      dispatch(notificationsApi.util.invalidateTags(['Notifications']));
+    });
+
+    return () => {
+      responseSub.remove();
+      receivedSub.remove();
+    };
+  }, [dispatch]);
 
   return (
     <NavigationContainer
@@ -89,6 +142,7 @@ const RootNavigator = () => {
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />
+        <Stack.Screen name="OrganizerProfile" component={ProfileScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />
       </Stack.Navigator>

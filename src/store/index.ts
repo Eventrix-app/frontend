@@ -24,6 +24,7 @@ import { authApi } from './services/authApi';
 import { userApi } from './services/userApi';
 import { paymentsApi } from './services/paymentsApi';
 import { notificationsApi } from './services/notificationsApi';
+import { organizerApi } from './services/organizerApi';
 import { authErrorMiddleware } from './middleware/authErrorMiddleware';
 import { clearApiCacheOnLogout } from './middleware/clearApiCacheOnLogout';
 
@@ -62,6 +63,7 @@ const rootReducer = combineReducers({
   [userApi.reducerPath]: userApi.reducer,
   [paymentsApi.reducerPath]: paymentsApi.reducer,
   [notificationsApi.reducerPath]: notificationsApi.reducer,
+  [organizerApi.reducerPath]: organizerApi.reducer,
 });
 
 export const store = configureStore({
@@ -78,6 +80,7 @@ export const store = configureStore({
       userApi.middleware,
       paymentsApi.middleware,
       notificationsApi.middleware,
+      organizerApi.middleware,
       authErrorMiddleware,
       clearApiCacheOnLogout,
     ),

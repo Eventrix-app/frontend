@@ -274,7 +274,7 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="Based on Interest" />
         {recommended.slice(0, 1).map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
+          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
         ))}
 
         <SectionHeader title="Event Highlights" />
@@ -295,7 +295,7 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="You Might Also Like" />
         {recommended.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
+          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
         ))}
 
         {isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null}

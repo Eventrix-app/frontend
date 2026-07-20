@@ -56,6 +56,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params ?? {};
   const isEdit = !!eventId;
   const prefilledRef = useRef(false);
+  const originalApprovalStatusRef = useRef<string | undefined>(undefined);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -67,6 +68,10 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [endTime, setEndTime] = useState('');
   const [isFree, setIsFree] = useState(true);
   const [tiers, setTiers] = useState<TierDraft[]>(() => [createBlankTier()]);
+  // Optional event-wide seat cap — left blank, the backend derives capacity from the sum
+  // of ticket-tier quantities instead (see events.service.ts withComputedSeats). Kept as a
+  // string for the TextInput; converted to a number (or omitted) in buildPayload().
+  const [capacity, setCapacity] = useState('');
   const [isOnline, setIsOnline] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
   const [refundPolicyType, setRefundPolicyType] = useState('no_refunds');
@@ -105,6 +110,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: existingGallery = [] } = useGetEventMediaQuery(eventId!, { skip: !isEdit });
   const [createEventMedia] = useCreateEventMediaMutation();
   const [deleteEventMedia] = useDeleteEventMediaMutation();
+  const isApprovedEdit = isEdit && existingEvent?.approvalStatus === 'approved';
 
   useEffect(() => {
     if (!isEdit || !existingEvent || prefilledRef.current) {
@@ -125,7 +131,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     setRefundPolicyType(existingEvent.refundPolicyType ?? 'no_refunds');
     setRefundPolicyText(existingEvent.refundPolicyText ?? '');
     setCoverImageUrl(existingEvent.coverImageUrl ?? existingEvent.imageUrl ?? '');
+    setCapacity(existingEvent.capacity != null ? String(existingEvent.capacity) : '');
 
+    originalApprovalStatusRef.current = existingEvent.approvalStatus;
     prefilledRef.current = true;
   }, [existingEvent, isEdit]);
 
@@ -152,10 +160,22 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       // paid event's isPaid to false on every unrelated edit.
       pricePerTicket: isEdit ? undefined : representativePrice,
       isPaid: !isFree,
+      // Optional — omitted entirely (not sent as 0/undefined-but-present) when blank, so
+      // the backend keeps deriving it from ticket-tier quantities instead of overwriting
+      // an existing explicit cap with nothing on an unrelated edit.
+      capacity: capacity.trim() ? Number(capacity.trim()) : undefined,
       isOnline,
       meetingLink: isOnline ? meetingLink : undefined,
       coverImageUrl: coverImageUrl || undefined,
-      approvalStatus: asDraft ? ('draft' as const) : ('pending_approval' as const),
+      // Draft/rejected events explicitly move to draft/pending_approval on save — that's
+      // a real state transition the organizer is choosing. An already-approved event
+      // shouldn't be force-demoted on every unrelated edit; the backend decides whether
+      // this save needs re-review, based on which fields actually changed (see
+      // EventsService.update()'s content-field check).
+      approvalStatus:
+        isEdit && originalApprovalStatusRef.current === 'approved'
+          ? undefined
+          : asDraft ? ('draft' as const) : ('pending_approval' as const),
       refundPolicyType: !isFree ? refundPolicyType : undefined,
       refundPolicyText: !isFree && refundPolicyText ? refundPolicyText : undefined,
       // PATCH /events/:id (edit) rejects ticketTypes — nested ticket-type endpoints
@@ -178,6 +198,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       return 'End time must be after start time';
     }
     if (isOnline && !meetingLink) return 'Meeting link is required for online events';
+    if (capacity.trim() && (!/^\d+$/.test(capacity.trim()) || Number(capacity.trim()) < 1)) {
+      return 'Total event capacity must be a whole number of at least 1';
+    }
     if (!isEdit) {
       const tierError = validateTiers(tiers, isFree);
       if (tierError) return tierError;
@@ -346,12 +369,18 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
 
-      const successTitle = asDraft ? 'Draft Saved' : 'Event Published';
-      const successMessage = asDraft
-        ? 'Your event has been saved as a draft.'
-        : isFree
-          ? 'Your event is now live.'
-          : 'Your event has been submitted for approval.';
+      const successTitle = isApprovedEdit
+        ? 'Changes Saved'
+        : asDraft ? 'Draft Saved' : 'Event Published';
+      const successMessage = isApprovedEdit
+        ? savedEvent.approvalStatus === 'pending_approval'
+          ? 'Your changes were saved. Since you edited the title, description, category or cover image, this event has been resubmitted for admin review.'
+          : 'Your changes are live.'
+        : asDraft
+          ? 'Your event has been saved as a draft.'
+          : isFree
+            ? 'Your event is now live.'
+            : 'Your event has been submitted for approval.';
 
       // Navigating only happens once the user dismisses this dialog — that ordering is
       // deliberate: it's the confirmation that the save actually succeeded, and it stops
@@ -382,6 +411,16 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}>
+        {isApprovedEdit && (
+          <View style={styles.reviewNotice}>
+            <Text style={styles.reviewNoticeText}>
+              This event is live. Changes to date, time, venue, capacity, pricing or online-meeting details apply
+              immediately. Changing the title, description, category or cover image sends this event back for
+              admin review before it's visible to others again.
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.label}>Title *</Text>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Event title" placeholderTextColor={colors.textSecondary} />
 
@@ -480,6 +519,20 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         ) : (
           <TicketTypeEditor tiers={tiers} onChange={setTiers} isFree={isFree} />
         )}
+
+        <Text style={styles.label}>Total Event Capacity</Text>
+        <TextInput
+          style={styles.input}
+          value={capacity}
+          onChangeText={(v) => setCapacity(v.replace(/[^0-9]/g, ''))}
+          placeholder="Optional — defaults to your ticket quantities combined"
+          placeholderTextColor={colors.textSecondary}
+          keyboardType="number-pad"
+        />
+        <Text style={styles.fieldHint}>
+          Leave blank to cap attendance at the total of your ticket tiers. Set a number here to cap
+          the whole event instead — this is what "seats available" on event cards is based on.
+        </Text>
 
         {!isFree && (
           <>
@@ -590,17 +643,19 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity
-          style={[styles.btn, styles.draftBtn]}
-          onPress={() => handleSave(true)}
-          disabled={savingMode !== null}
-        >
-          {savingMode === 'draft' ? (
-            <ActivityIndicator color={colors.text} />
-          ) : (
-            <Text style={styles.draftBtnText}>Save as Draft</Text>
-          )}
-        </TouchableOpacity>
+        {!isApprovedEdit && (
+          <TouchableOpacity
+            style={[styles.btn, styles.draftBtn]}
+            onPress={() => handleSave(true)}
+            disabled={savingMode !== null}
+          >
+            {savingMode === 'draft' ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.draftBtnText}>Save as Draft</Text>
+            )}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.btn, styles.publishBtn]}
           onPress={() => handleSave(false)}
@@ -610,7 +665,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
             <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.publishBtnText}>
-              {isFree ? 'Publish Event' : 'Submit for Approval'}
+              {isApprovedEdit ? 'Save Changes' : isFree ? 'Publish Event' : 'Submit for Approval'}
             </Text>
           )}
         </TouchableOpacity>
@@ -653,6 +708,14 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
+  reviewNotice: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  reviewNoticeText: { fontSize: 12, color: '#92400E', lineHeight: 17 },
+  fieldHint: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 16 },
   pickerValue: { fontSize: 15, color: colors.text },
   pickerPlaceholder: { fontSize: 15, color: colors.textSecondary },
   pickerWrap: {

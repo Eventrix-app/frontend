@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
 import {
   ZalandoSansExpanded_200ExtraLight,
@@ -33,6 +34,7 @@ import { AppDispatch, RootState } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import NetworkGate from './src/components/common/NetworkGate';
 import { syncOnboardingDraft } from './src/utils/syncOnboardingDraft';
+import { registerForPushNotifications } from './src/utils/registerForPushNotifications';
 import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
@@ -42,6 +44,21 @@ import ServerGate from './src/components/common/ServerGate';
 // are all ready. See SplashGate and SplashScreen.tsx (the video screen) for the two
 // places that actually call hideAsync().
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Governs how a push is presented while the app is in the foreground — without this,
+// Expo's default is to suppress the OS alert/sound entirely while the app is open. The
+// actual "show a banner / update the list" behavior for a foreground push lives in
+// RootNavigator's notification listeners, which is where navigation + the notifications
+// cache are both reachable.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 // Only the logged-out flow (AuthNavigator) mounts the video Splash screen, which hides
 // the native splash itself once the video reports readyToPlay (see SplashScreen.tsx) —
@@ -73,10 +90,13 @@ function AppStateSync() {
   // Extends the session on launch (covers: app was killed while logged in and reopened
   // later) — if the persisted token already expired (2+ days unused), this 401s and
   // authErrorMiddleware turns that into an automatic logout; no manual error handling
-  // needed here.
+  // needed here. Also re-registers for push here — LoginScreen/RegisterScreen cover the
+  // fresh-login case, this covers "already logged in, app relaunched" (Expo push tokens
+  // can change across app reinstalls/updates, so this isn't a one-time-ever registration).
   useEffect(() => {
     if (isAuthenticated) {
       refresh();
+      registerForPushNotifications(dispatch);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

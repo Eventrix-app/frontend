@@ -10,12 +10,16 @@ type MainEventCardProps = {
   event: MockEvent;
   onPress?: () => void;
   width?: number;
+  // Only rendered when provided — callers that don't need a per-card menu (e.g.
+  // SearchScreen) see no visual change.
+  onMenuPress?: () => void;
 };
 
 export const MainEventCard: React.FC<MainEventCardProps> = ({
   event,
   onPress,
   width,
+  onMenuPress,
 }) => (
   <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
     <View style={styles.glass}>
@@ -23,8 +27,15 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
       <View style={styles.image}>
         <View style={styles.imageTopRow}>
           <Text style={styles.categoryPill}>{event.category}</Text>
-          <View style={styles.pricePill}>
-            <Text style={styles.pricePillText}>{event.price}</Text>
+          <View style={styles.imageTopRightGroup}>
+            <View style={styles.pricePill}>
+              <Text style={styles.pricePillText}>{event.price}</Text>
+            </View>
+            {onMenuPress && (
+              <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
+                <Text style={styles.menuBtnText}>⋮</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         {typeof event.image === 'string' && event.image.startsWith('http') ? (
@@ -128,6 +139,11 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
     overflow: 'hidden',
   },
+  imageTopRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   pricePill: {
     backgroundColor: 'rgba(20,39,102,0.92)',
     paddingHorizontal: spacing.sm,
@@ -138,6 +154,20 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: '700',
+  },
+  menuBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBtnText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   badgeText: {
     color: colors.white,

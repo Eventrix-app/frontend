@@ -1,8 +1,9 @@
-import React from 'react';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useRef } from 'react';
+import { ActivityIndicator, FlatList, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -11,19 +12,71 @@ import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
+import {
+  useFollowOrganizerMutation,
+  useGetOrganizerEventsQuery,
+  useGetOrganizerProfileQuery,
+  useUnfollowOrganizerMutation,
+} from '../../store/services/organizerApi';
+import { EventInterestCard } from '../../components/events/EventInterestCard';
+import { toCardEvent } from '../../utils/eventCardAdapter';
+import { showAlert } from '../../utils/crossPlatformAlert';
+import { extractErrorMessage } from '../../utils/apiError';
 
 const bgImage = require('../../../assets/bg.png');
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Profile' | 'OrganizerProfile'>;
 
 type MenuItem = {
+  icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   subtitle?: string;
   onPress: (nav: Props['navigation']) => void;
 };
 
-const ProfileScreen: React.FC<Props> = ({ navigation }) => {
+const EVENT_CARD_WIDTH = 165;
+const MEMBER_SINCE_FORMATTER = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' });
+
+function websiteHostname(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
+// Soft, colored (not flat-android-gray) shadow — the one directional-shadow treatment used
+// on every card surface across both branches, so they read as one system.
+const cardShadow = Platform.select({
+  android: { elevation: 6 },
+  default: {
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+});
+
+const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+
+  // Profile (no params) vs OrganizerProfile ({ organizerId }) — the only two routes this
+  // component is registered against (see navigation/types.ts + RootNavigator.tsx).
+  const routeParams = route.params as { organizerId?: string } | undefined;
+  const organizerId = routeParams?.organizerId;
+  const isOwnProfile = !organizerId;
+
+  return isOwnProfile ? (
+    <SelfProfile navigation={navigation} insets={insets} />
+  ) : (
+    <OrganizerProfile navigation={navigation} insets={insets} organizerId={organizerId} />
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Self branch — private membership-card view of the logged-in user's own account.
+// ---------------------------------------------------------------------------
+
+const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: number; bottom: number } }> = ({
+  navigation,
+  insets,
+}) => {
   const { data: me } = useGetMeQuery();
   const { data: enrollments = [] } = useGetMyEnrollmentsQuery();
   const { data: favorites = [] } = useGetMyFavoritesQuery();
@@ -39,120 +92,289 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const displayName = (me?.fullName ?? '').trim() || me?.email || '';
   const initial = displayName.charAt(0).toUpperCase() || '?';
-  const memberSince = me?.createdAt
-    ? new Date(me.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
-    : '';
+  const memberSince = me?.createdAt ? MEMBER_SINCE_FORMATTER.format(new Date(me.createdAt)) : '';
 
   const menuItems: MenuItem[] = [
+    { icon: 'edit-2', label: 'Edit Profile', onPress: (nav) => nav.navigate('EditProfile') },
     {
-      label: 'Edit Profile',
-      onPress: (nav) => nav.navigate('EditProfile'),
-    },
-    {
+      icon: 'bookmark',
       label: 'Saved Events',
       subtitle: `${savedCount} event${savedCount === 1 ? '' : 's'}`,
       onPress: (nav) => nav.navigate('SavedEvents'),
     },
+    { icon: 'calendar', label: 'My Bookings', onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }) },
+    { icon: 'plus-circle', label: 'Create Event', onPress: (nav) => nav.navigate('CreateEvent', {}) },
     {
-      label: 'My Bookings',
-      onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
-    },
-    {
-      label: 'Create Event',
-      onPress: (nav) => nav.navigate('CreateEvent', {}),
-    },
-    {
+      icon: 'grid',
       label: 'My Events',
       subtitle: `${createdEventsCount} event${createdEventsCount === 1 ? '' : 's'}`,
       onPress: (nav) => nav.navigate('MyEvents'),
     },
-    {
-      label: 'Notifications',
-      onPress: (nav) => nav.navigate('Notifications'),
-    },
-    {
-      label: 'Settings',
-      onPress: (nav) => nav.navigate('Settings'),
-    },
+    { icon: 'bell', label: 'Notifications', onPress: (nav) => nav.navigate('Notifications') },
+    { icon: 'settings', label: 'Settings', onPress: (nav) => nav.navigate('Settings') },
   ];
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={[colors.brandPink, '#F43362']}
-        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
-      >
+      <LinearGradient colors={[colors.brandPink, '#F43362']} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerBgWrap}>
           <Image source={bgImage} style={styles.headerBg} contentFit="cover" />
         </View>
 
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
+        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="arrow-left" size={20} color={colors.white} />
         </TouchableOpacity>
-        <View style={styles.avatarWrap}>
+
+        <View style={styles.avatarRing}>
           {me?.profilePictureUrl ? (
             <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImage} />
           ) : (
-            <Text style={styles.avatar}>{initial}</Text>
+            <Text variant="h2" style={styles.avatarInitial}>{initial}</Text>
           )}
         </View>
-        <Text style={styles.name}>{displayName || 'Your Profile'}</Text>
-        {me?.email ? <Text style={styles.username}>{me.email}</Text> : null}
-        {me?.city ? <Text style={styles.location}>{me.city}</Text> : null}
 
-        <View style={styles.statsGlass}>
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{createdEventsCount}</Text>
-              <Text style={styles.statLabel}>Events</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{savedCount}</Text>
-              <Text style={styles.statLabel}>Saved</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{bookingsCount}</Text>
-              <Text style={styles.statLabel}>Bookings</Text>
-            </View>
+        <Text variant="h3" color="white" style={styles.name}>{displayName || 'Your Profile'}</Text>
+        {me?.email ? (
+          <Text variant="caption" style={styles.headerSubtext}>{me.email}</Text>
+        ) : null}
+        {me?.city ? (
+          <View style={styles.locationRow}>
+            <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
+            <Text variant="caption" style={styles.headerSubtext}>{me.city}</Text>
           </View>
+        ) : null}
+
+        <View style={[styles.statsCard, cardShadow]}>
+          <StatBlock value={createdEventsCount} label="Events" />
+          <View style={styles.statDivider} />
+          <StatBlock value={savedCount} label="Saved" />
+          <View style={styles.statDivider} />
+          <StatBlock value={bookingsCount} label="Bookings" />
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        {menuItems.map((item) => (
-          <TouchableOpacity key={item.label} onPress={() => item.onPress(navigation)} activeOpacity={0.7}>
-            <View style={styles.menuGlass}>
-              <View style={styles.menuItem}>
-                <View style={styles.menuText}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  {item.subtitle ? (
-                    <Text style={styles.menuSub}>{item.subtitle}</Text>
-                  ) : null}
-                </View>
-                <Text style={styles.chevron}>›</Text>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xxl }]}>
+        <Text variant="label" style={styles.eyebrow}>Account</Text>
+
+        <View style={[styles.menuCard, cardShadow]}>
+          {menuItems.map((item, i) => (
+            <TouchableOpacity
+              key={item.label}
+              onPress={() => item.onPress(navigation)}
+              activeOpacity={0.6}
+              style={[styles.menuRow, i > 0 && styles.menuRowDivider]}
+            >
+              <Feather name={item.icon} size={18} color={colors.textSecondary} style={styles.menuIcon} />
+              <View style={styles.menuText}>
+                <Text variant="label" color="text">{item.label}</Text>
+                {item.subtitle ? (
+                  <Text variant="caption" color="textSecondary" style={styles.menuSub}>{item.subtitle}</Text>
+                ) : null}
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <Feather name="chevron-right" size={18} color={colors.placeholder} />
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {memberSince ? (
-          <View style={styles.memberSince}>
-            <Text style={styles.memberText}>Member since {memberSince}</Text>
-          </View>
+          <Text variant="caption" color="textSecondary" style={styles.memberSince}>
+            Member since {memberSince}
+          </Text>
         ) : null}
       </ScrollView>
     </View>
   );
 };
 
+const StatBlock: React.FC<{ value: number; label: string }> = ({ value, label }) => (
+  <View style={styles.stat}>
+    <Text variant="h4" color="brandPink" style={styles.statValue}>{value}</Text>
+    <Text variant="caption" color="textSecondary">{label}</Text>
+  </View>
+);
+
+// ---------------------------------------------------------------------------
+// Organizer branch — public pass view of someone else's organizer account.
+// ---------------------------------------------------------------------------
+
+const OrganizerProfile: React.FC<{
+  navigation: Props['navigation'];
+  insets: { top: number; bottom: number };
+  organizerId: string;
+}> = ({ navigation, insets, organizerId }) => {
+  const { data: profile, isLoading, isError, refetch } = useGetOrganizerProfileQuery(organizerId);
+  const { data: events = [] } = useGetOrganizerEventsQuery(organizerId);
+  const [followOrganizer, { isLoading: isFollowLoading }] = useFollowOrganizerMutation();
+  const [unfollowOrganizer, { isLoading: isUnfollowLoading }] = useUnfollowOrganizerMutation();
+
+  // Mutation isLoading only flips true on the next render — same double-tap gap as
+  // EventDetailsScreen's isEnrollingRef, closed the same way.
+  const isTogglingRef = useRef(false);
+
+  const handleToggleFollow = async () => {
+    if (!profile || isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    try {
+      if (profile.isFollowing) {
+        await unfollowOrganizer(organizerId).unwrap();
+      } else {
+        await followOrganizer(organizerId).unwrap();
+      }
+    } catch (e: any) {
+      showAlert('Something went wrong', extractErrorMessage(e, 'Please try again.'));
+    } finally {
+      isTogglingRef.current = false;
+    }
+  };
+
+  const cardEvents = events.map((event) => toCardEvent(event));
+
+  if (isLoading) {
+    return (
+      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
+        <ActivityIndicator color={colors.brandPink} />
+      </View>
+    );
+  }
+
+  if (isError || !profile) {
+    return (
+      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
+        <Text variant="body" color="textSecondary" style={styles.centerText}>Couldn't load this organizer.</Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text variant="button" color="white">Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backLinkBtn} onPress={() => navigation.goBack()}>
+            <Text variant="button" color="textSecondary">Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const isToggling = isFollowLoading || isUnfollowLoading;
+  const memberSince = MEMBER_SINCE_FORMATTER.format(new Date(profile.memberSince));
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.topBarBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="arrow-left" size={20} color={colors.text} />
+        </TouchableOpacity>
+        <Text variant="label" color="text" numberOfLines={1} style={styles.topBarTitle}>{profile.companyName}</Text>
+        <View style={styles.topBarBtn} />
+      </View>
+
+      <FlatList
+        data={cardEvents}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={cardEvents.length > 0 ? styles.eventsRow : undefined}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+        ListHeaderComponent={
+          <View style={[styles.organizerCard, cardShadow]}>
+            <View style={styles.topRow}>
+              <View style={styles.orgAvatarRing}>
+                <View style={styles.orgAvatar}>
+                  {profile.companyLogoUrl ? (
+                    <Image source={{ uri: profile.companyLogoUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <Feather name="briefcase" size={30} color={colors.textSecondary} />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.statsRow}>
+                <StatBlock value={profile.eventCount} label="Events" />
+                <View style={styles.statDivider} />
+                <StatBlock value={profile.followerCount} label="Followers" />
+              </View>
+            </View>
+
+            <View style={styles.identityBlock}>
+              <View style={styles.nameRow}>
+                <Text variant="h4" color="text">{profile.companyName}</Text>
+                {profile.verified && (
+                  <View style={styles.verifiedPill}>
+                    <Feather name="check-circle" size={12} color={colors.success} />
+                    <Text variant="caption" style={styles.verifiedText}>Verified</Text>
+                  </View>
+                )}
+              </View>
+
+              {profile.companyDescription ? (
+                <Text variant="body" color="text" style={styles.description}>{profile.companyDescription}</Text>
+              ) : null}
+
+              {profile.companyWebsite ? (
+                <TouchableOpacity style={styles.websiteRow} onPress={() => Linking.openURL(profile.companyWebsite!)}>
+                  <Feather name="external-link" size={13} color={colors.brandPink} />
+                  <Text variant="caption" color="brandPink" style={styles.websiteText}>
+                    {websiteHostname(profile.companyWebsite)}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <Text variant="caption" color="textSecondary" style={styles.memberSinceInline}>
+                Organizing events since {memberSince}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.followBtn, profile.isFollowing && styles.followingBtn]}
+              onPress={handleToggleFollow}
+              disabled={isToggling}
+            >
+              {isToggling ? (
+                <ActivityIndicator color={profile.isFollowing ? colors.brandPink : colors.white} size="small" />
+              ) : (
+                <>
+                  <Feather
+                    name={profile.isFollowing ? 'user-check' : 'user-plus'}
+                    size={15}
+                    color={profile.isFollowing ? colors.brandPink : colors.white}
+                  />
+                  <Text variant="button" style={[styles.followBtnText, profile.isFollowing && styles.followingBtnText]}>
+                    {profile.isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <EventInterestCard
+            event={item as any}
+            width={EVENT_CARD_WIDTH}
+            onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
+            onRequireAuth={() => navigation.navigate('Auth' as never)}
+          />
+        )}
+        ListHeaderComponentStyle={styles.eventsHeader}
+        ListEmptyComponent={
+          <View style={styles.emptyEvents}>
+            <Feather name="calendar" size={28} color={colors.placeholder} />
+            <Text variant="caption" color="textSecondary" style={styles.emptyText}>
+              No upcoming events from this organizer right now.
+            </Text>
+          </View>
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.neutralBg,
-  },
+  root: { flex: 1, backgroundColor: colors.neutralBg },
+  center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
+  centerText: { textAlign: 'center' },
+  errorActions: { flexDirection: 'row', gap: spacing.sm },
+  retryBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  backLinkBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+
+  // --- Self header ---
   header: {
     alignItems: 'center',
     paddingBottom: spacing.xl,
@@ -161,19 +383,16 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     overflow: 'hidden',
   },
-  headerBgWrap: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
+  headerBgWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  headerBg: {
+    position: 'absolute',
+    top: -60,
+    left: -68,
+    width: '135%',
+    height: '135%',
+    transform: [{ scale: 0.78 }],
+    opacity: 0.15,
   },
- headerBg: {
-  position: 'absolute',
-  top: -60,        // was: -18 — shifts the background image up further
-  left: -68,
-  width: '135%',
-  height: '135%',
-  transform: [{ scale: 0.78 }],
-  opacity: 0.15,
-},
   back: {
     alignSelf: 'flex-start',
     width: 40,
@@ -184,11 +403,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  backText: {
-    color: colors.white,
-    fontSize: 22,
-  },
-  avatarWrap: {
+  avatarRing: {
     width: 88,
     height: 88,
     borderRadius: 44,
@@ -198,129 +413,128 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 3,
     borderColor: colors.white,
-  },
-  avatar: {
-    fontSize: 40,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 44,
-  },
-  name: {
-    fontSize: 18,
-    fontFamily: 'ZalandoSansExpanded_700Bold',
-    color: colors.white,
-  },
-  username: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-  },
-  location: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: spacing.xs,
-  },
-  statsGlass: {
-    borderRadius: borderRadius.lg,
     overflow: 'hidden',
+  },
+  avatarInitial: { fontSize: 36, lineHeight: 40, color: colors.white },
+  avatarImage: { width: '100%', height: '100%' },
+  name: { textAlign: 'center' },
+  headerSubtext: { color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
+
+  statsCard: {
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.white,
     width: '100%',
     marginTop: spacing.lg,
-    ...Platform.select({
-      android: { elevation: 6 },
-      default: {
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
-  statsRow: {
     flexDirection: 'row',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     justifyContent: 'space-around',
   },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  statLabel: {
-    fontSize: 12,
+  stat: { alignItems: 'center' },
+  statValue: { marginBottom: 2 },
+  statDivider: { width: 1, alignSelf: 'stretch', backgroundColor: colors.borderLight },
+
+  // --- Self account list ---
+  scroll: { padding: spacing.md },
+  eyebrow: {
     color: colors.textSecondary,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.borderLight,
-  },
-  scroll: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
-    fontFamily: 'ZalandoSansExpanded_600SemiBold',
   },
-  menuGlass: {
+  menuCard: {
     borderRadius: borderRadius.lg,
-    overflow: 'hidden',
     backgroundColor: colors.white,
-    marginBottom: spacing.sm,
-    ...Platform.select({
-      android: { elevation: 6 },
-      default: {
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
+    overflow: 'hidden',
   },
-  menuItem: {
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.md,
   },
-  menuText: {
-    flex: 1,
-  },
-  menuLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  menuSub: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  chevron: {
-    fontSize: 22,
-    color: colors.textSecondary,
-  },
-  memberSince: {
+  menuRowDivider: { borderTopWidth: 1, borderTopColor: colors.borderLight },
+  menuIcon: { width: 18 },
+  menuText: { flex: 1 },
+  menuSub: { marginTop: 2 },
+  memberSince: { textAlign: 'center', marginTop: spacing.xl },
+
+  // --- Organizer branch ---
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xl,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  memberText: {
-    fontSize: 13,
-    color: colors.textSecondary,
+  topBarBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  topBarTitle: { flex: 1, textAlign: 'center', marginHorizontal: spacing.sm },
+
+  organizerCard: {
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  orgAvatarRing: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.lg,
+  },
+  orgAvatar: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  statsRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' },
+
+  identityBlock: { marginBottom: spacing.md, gap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
+  verifiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  verifiedText: { color: colors.success, fontWeight: '700' },
+  description: { marginTop: 2 },
+  websiteRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
+  websiteText: { fontWeight: '600' },
+  memberSinceInline: { marginTop: spacing.xs },
+
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  followingBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.borderLight },
+  followBtnText: { color: colors.white },
+  followingBtnText: { color: colors.text },
+
+  eventsHeader: { marginBottom: 0 },
+  eventsRow: { justifyContent: 'space-between' },
+  emptyEvents: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  emptyText: { textAlign: 'center', paddingHorizontal: spacing.xl },
 });
 
 export default ProfileScreen;

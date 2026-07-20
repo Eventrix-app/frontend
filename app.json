@@ -22,26 +22,23 @@
     },
     "android": {
       "package": "com.eventrix.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/logo.jpg",
+        "foregroundImage": "./assets/logo/adaptive-icon-foreground.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.jpg"
     },
-    "extra": {
-      "eas": {
-        "projectId": "8652e400-bcb5-4a21-877f-18cbdbb501e8"
-      }
-    },
-    "owner": "aarish33",
     "plugins": [
       "@react-native-community/datetimepicker",
       "expo-font",
@@ -51,8 +48,27 @@
           "cameraPermission": "Allow Eventrix to use the camera to scan attendee ticket QR codes."
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Eventrix to access your calendar to add events you're attending."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo/logo.jpg",
+          "color": "#F43362"
+        }
+      ],
       "expo-video",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "edfe8b87-7c19-4917-b0f0-ccca04f33197"
+      }
+    },
+    "owner": "aarish45"
   }
 }

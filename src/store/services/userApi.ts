@@ -69,6 +69,11 @@ export const userApi = createApi({
       query: ({ id, body }) => ({ url: `participants/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Me'],
     }),
+    // Re-registered on every login/app start (see utils/registerForPushNotifications.ts) —
+    // the backend just overwrites whatever token was stored before.
+    updatePushToken: builder.mutation<void, string>({
+      query: (pushToken) => ({ url: 'users/me/push-token', method: 'PATCH', body: { pushToken } }),
+    }),
   }),
 });
 
@@ -79,4 +84,5 @@ export const {
   useUpdateLocationMutation,
   useUpdateNotificationPreferencesMutation,
   useUpdateParticipantMutation,
+  useUpdatePushTokenMutation,
 } = userApi;

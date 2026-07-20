@@ -15,6 +15,7 @@ export type RootStackParamList = {
   ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };
   RefundApproval: undefined;
+  OrganizerProfile: { organizerId: string };
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
 };

@@ -14,9 +14,13 @@ export interface BackendEvent {
   eventDate: string;
   startTime: string;
   endTime?: string;
-  durationMinutes?: number;
   pricePerTicket?: number;
   currency?: string;
+  // Organizer-entered event-wide cap (Event.capacity) — set once at creation/edit and
+  // distinct from totalCapacity/availableTickets below, which are the *computed* numbers
+  // the backend derives from it (falling back to summing ticket-tier quantities when this
+  // is unset). Only meaningful to read back for pre-filling the edit form.
+  capacity?: number;
   totalCapacity?: number;
   availableTickets?: number;
   featured: boolean;
@@ -69,6 +73,10 @@ export interface CreateEventPayload {
   endTime?: string;
   pricePerTicket?: number;
   totalCapacity?: number;
+  // Event-wide seat cap the organizer sets directly; when omitted, the backend derives it
+  // from the sum of ticket-tier quantities instead (see events.service.ts withComputedSeats).
+  // Accepted on both create and edit (PATCH keeps it — only ticketTypes is create-only).
+  capacity?: number;
   isOnline?: boolean;
   meetingLink?: string;
   coverImageUrl?: string;

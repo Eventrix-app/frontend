@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Platform, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -30,6 +30,18 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundRequested, setRefundRequested] = useState(false);
+
+  const handleShare = async () => {
+    if (!enrollment) return;
+    const title = enrollment.event?.title ?? 'my event';
+    try {
+      await Share.share({
+        message: `I'm going to "${title}" on Eventrix — booking ref ${enrollment.bookingReference}.`,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to surface
+    }
+  };
 
   const handleSubmitRefund = async () => {
     try {
@@ -68,7 +80,15 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Ticket Details" onBack={() => navigation.goBack()} />
+      <ScreenHeader
+        title="Ticket Details"
+        onBack={() => navigation.goBack()}
+        rightAction={
+          <TouchableOpacity style={styles.shareIconBtn} onPress={handleShare} hitSlop={8}>
+            <Text style={styles.shareIconText}>⤴</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
         <View style={[styles.ticketGlass, isCancelled && styles.ticketCancelled]}>
@@ -190,6 +210,24 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: colors.textSecondary, fontSize: 15 },
+  shareIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
+  shareIconText: { fontSize: 18, color: colors.brandPink },
   scroll: { padding: spacing.md },
   ticketGlass: {
     borderRadius: borderRadius.lg,

@@ -12,6 +12,7 @@ import { useRegisterMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -40,8 +41,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setErrorMessage(null);
       await register({ email, password, firstName, lastName }).unwrap();
-      // Fire-and-forget: sync onboarding draft in background, navigate immediately
+      // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
+      registerForPushNotifications(dispatch);
       navigation.getParent()?.navigate('Main' as never);
     } catch (err: any) {
       console.error('Registration error details:', err);

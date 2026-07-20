@@ -12,6 +12,7 @@ import { useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
 
@@ -50,8 +51,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setErrorMessage(null);
       const result = await login({ email, password }).unwrap();
-      // Fire-and-forget: sync onboarding draft in background, navigate immediately
+      // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
+      registerForPushNotifications(dispatch);
       if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
       } else {

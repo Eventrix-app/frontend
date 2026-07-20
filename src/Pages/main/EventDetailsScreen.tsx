@@ -3,6 +3,7 @@ import {
   ImageBackground,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -12,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Calendar from 'expo-calendar';
 import { RootStackParamList } from '../../navigation/types';
 import { RootState } from '../../store';
 import { colors } from '../../theme/colors';
@@ -32,7 +34,7 @@ import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
-import { daysUntilEventDate } from '../../utils/eventDateTime';
+import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
@@ -378,6 +380,57 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
+
+  const handleAddToCalendar = async () => {
+    if (!event || isAddingToCalendar) return;
+    setIsAddingToCalendar(true);
+    try {
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert('Permission needed', 'Allow calendar access in your device settings to add this event.');
+        return;
+      }
+      const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const targetCalendar = calendars.find((c) => c.allowsModifications) ?? calendars[0];
+      if (!targetCalendar) {
+        showAlert("Couldn't add to calendar", 'No calendar is available on this device.');
+        return;
+      }
+      // A missing endTime falls back to a flat +2h block here rather than reusing
+      // getEventEndDateTime's start==end fallback, since a zero-length calendar entry
+      // renders oddly in most calendar apps.
+      const startDate = getEventStartDateTime(event);
+      const endDate = event.endTime
+        ? getEventEndDateTime(event)
+        : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+      await Calendar.createEventAsync(targetCalendar.id, {
+        title: event.title,
+        startDate,
+        endDate,
+        location: event.venueName,
+        notes: event.description || undefined,
+        timeZone: 'Asia/Kolkata',
+      });
+      showAlert('Added to Calendar', `"${event.title}" has been added to your calendar.`);
+    } catch (e: any) {
+      showAlert("Couldn't add to calendar", extractErrorMessage(e, 'Something went wrong. Please try again.'));
+    } finally {
+      setIsAddingToCalendar(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!event) return;
+    try {
+      await Share.share({
+        message: `Check out "${event.title}" on Eventrix — ${formatEventDate(event.eventDate)} at ${event.venueName}.`,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to surface
+    }
+  };
+
   const isEnrollingRef = useRef(false);
 
   const isOwner = !!(event && authUser && event.organizer?.userId === authUser.id);
@@ -507,9 +560,21 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         {!coverImage ? <Text style={styles.heroEmoji}>🎪</Text> : null}
-        <TouchableOpacity style={styles.save} onPress={handleToggleSave}>
-          <Text>{saved ? '❤️' : '🤍'}</Text>
-        </TouchableOpacity>
+        <View style={styles.heroActions}>
+          <TouchableOpacity style={styles.heroActionBtn} onPress={handleShare}>
+            <Text style={styles.heroActionIcon}>⤴</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.heroActionBtn} onPress={handleAddToCalendar} disabled={isAddingToCalendar}>
+            {isAddingToCalendar ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.heroActionIcon}>📅</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.heroActionBtn} onPress={handleToggleSave}>
+            <Text>{saved ? '❤️' : '🤍'}</Text>
+          </TouchableOpacity>
+        </View>
       </ImageBackground>
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
@@ -542,9 +607,19 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {isOwner && (event.approvalStatus === 'pending_approval' || event.approvalStatus === 'approved') && (
           <View style={styles.salesBanner}>
-            <Text style={styles.salesText}>
-              {event.approvalStatus === 'pending_approval' ? '⏳ Pending Review' : '✅ Approved'}
-            </Text>
+            <View style={styles.salesBannerHeader}>
+              <Text style={styles.salesText}>
+                {event.approvalStatus === 'pending_approval' ? '⏳ Pending Review' : '✅ Approved'}
+              </Text>
+              {event.approvalStatus === 'approved' && (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => navigation.navigate('CreateEvent', { eventId: event.id })}
+                >
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             {event.totalCapacity != null && event.availableTickets != null && (
               <Text style={styles.salesCount}>
                 🎫 {event.totalCapacity - event.availableTickets} / {event.totalCapacity} tickets sold
@@ -577,7 +652,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.organizerName}>{organizerName}</Text>
             <TouchableOpacity
               onPress={() => {
-                // TODO: navigate once an OrganizerProfile screen/route exists
+                if (event.organizer?.id) {
+                  navigation.navigate('OrganizerProfile', { organizerId: event.organizer.id });
+                }
               }}
             >
               <Text style={styles.viewProfileText}>View Profile ›</Text>
@@ -922,10 +999,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { color: colors.white, fontSize: 22 },
-  save: {
+  heroActions: {
     position: 'absolute',
     right: spacing.md,
     top: spacing.md + 44,
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  heroActionBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -933,6 +1014,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  heroActionIcon: { fontSize: 17, color: colors.white },
   heroEmoji: { fontSize: 80 },
   body: {
     flex: 1,
@@ -982,6 +1064,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
     gap: 4,
+  },
+  salesBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   salesText: { fontWeight: '600', color: '#065F46' },
   salesCount: { fontSize: 13, color: '#047857' },

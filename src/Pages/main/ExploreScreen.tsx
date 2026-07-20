@@ -14,6 +14,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import NoEvents from '../../components/common/Noevents';
@@ -32,9 +33,22 @@ const hasUnread = true; // TODO: replace with real unread count from notificatio
 const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents();
+  const [followingOnly, setFollowingOnly] = useState(false);
+  const { events, loadMore, isLoading: isLoadingAll, isFetchingMore, isError: isErrorAll, refetch: refetchAll } = usePaginatedEvents();
+  const {
+    data: followedEvents = [],
+    isLoading: isLoadingFollowed,
+    isError: isErrorFollowed,
+    refetch: refetchFollowed,
+  } = useGetFollowedEventsQuery(undefined, { skip: !followingOnly });
   const { data: me } = useGetMeQuery();
-  const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
+
+  const isLoading = followingOnly ? isLoadingFollowed : isLoadingAll;
+  const isError = followingOnly ? isErrorFollowed : isErrorAll;
+  const refetch = followingOnly ? refetchFollowed : refetchAll;
+  const cardEvents = (followingOnly ? followedEvents : events).map((event) =>
+    toCardEvent(event, me?.latitude, me?.longitude),
+  );
   const [showInterestSheet, setShowInterestSheet] = useState(false);
 
   const openEvent = (eventId: string) => {
@@ -85,6 +99,13 @@ const ExploreScreen: React.FC = () => {
           <Text style={styles.slidersIcon}>☰</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.chip, followingOnly && styles.chipActive]}
+          onPress={() => setFollowingOnly((v) => !v)}
+        >
+          <Text style={[styles.chipLabel, followingOnly && styles.chipLabelActive]}>Following</Text>
+        </TouchableOpacity>
+
         {FILTER_CHIPS.map((chip) => (
           <TouchableOpacity key={chip.id} style={styles.chip}>
             <Text style={styles.chipLabel}>{chip.label}</Text>
@@ -112,11 +133,15 @@ const ExploreScreen: React.FC = () => {
           data={cardEvents}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <EventInterestCard event={item as any} onPress={() => openEvent(item.id)} />
+            <EventInterestCard
+              event={item as any}
+              onPress={() => openEvent(item.id)}
+              onRequireAuth={() => navigation.navigate('Auth' as never)}
+            />
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
-          onEndReached={loadMore}
+          onEndReached={followingOnly ? undefined : loadMore}
           onEndReachedThreshold={0.4}
           ListHeaderComponent={
             <>
@@ -236,10 +261,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     marginRight: spacing.sm,
   },
+  chipActive: {
+    backgroundColor: colors.brandPink,
+    borderColor: colors.brandPink,
+  },
   chipLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.text,
+  },
+  chipLabelActive: {
+    color: colors.white,
   },
   chipChevron: {
     fontSize: 12,
