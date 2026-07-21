@@ -1,6 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
 import type { BackendEvent } from './eventsApi';
+import { userApi } from './userApi';
 
 export interface OrganizerPublicProfile {
   id: string;
@@ -59,6 +60,10 @@ export const organizerApi = createApi({
         );
         try {
           await queryFulfilled;
+          // followingCount lives on userApi's getMe, a separate RTK Query slice whose tags
+          // this api's invalidatesTags can't reach — invalidate it directly so the profile
+          // stat updates without waiting out getMe's cache TTL.
+          dispatch(userApi.util.invalidateTags(['Me']));
         } catch {
           patch.undo();
         }
@@ -80,6 +85,7 @@ export const organizerApi = createApi({
         );
         try {
           await queryFulfilled;
+          dispatch(userApi.util.invalidateTags(['Me']));
         } catch {
           patch.undo();
         }

@@ -37,6 +37,8 @@ export interface CurrentUser {
   pushEnabled: boolean;
   emailEnabled: boolean;
   roles: string[];
+  // Count of organizers this user follows — the reverse of Organizer.followerCount.
+  followingCount: number;
   createdAt: string;
 }
 

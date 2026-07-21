@@ -38,6 +38,7 @@ import { registerForPushNotifications } from './src/utils/registerForPushNotific
 import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
+import { ThemeProvider } from './src/theme/ThemeContext';
 
 // Keep the native splash screen up until Redux persist rehydration (handled by
 // PersistGate below), these font files, and — for the logged-out flow — the intro video
@@ -151,20 +152,22 @@ export default function App() {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <BottomSheetModalProvider>
-            <SafeAreaProvider>
-              <SplashGate />
-              <AppStateSync />
-              <NetworkGate>
-                 <ServerGate>
-                  <ErrorBoundary>
-                    <RootNavigator />
-                  </ErrorBoundary>
-                 </ServerGate>
-              </NetworkGate>
-              <StatusBar style="auto" />
-            </SafeAreaProvider>
-          </BottomSheetModalProvider>
+          <ThemeProvider>
+            <BottomSheetModalProvider>
+              <SafeAreaProvider>
+                <SplashGate />
+                <AppStateSync />
+                <NetworkGate>
+                   <ServerGate>
+                    <ErrorBoundary>
+                      <RootNavigator />
+                    </ErrorBoundary>
+                   </ServerGate>
+                </NetworkGate>
+                <StatusBar style="auto" />
+              </SafeAreaProvider>
+            </BottomSheetModalProvider>
+          </ThemeProvider>
         </GestureHandlerRootView>
       </PersistGate>
     </Provider>

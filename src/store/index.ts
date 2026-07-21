@@ -25,6 +25,8 @@ import { userApi } from './services/userApi';
 import { paymentsApi } from './services/paymentsApi';
 import { notificationsApi } from './services/notificationsApi';
 import { organizerApi } from './services/organizerApi';
+import { chatApi } from './services/chatApi';
+import { geocodeApi } from './services/geocodeApi';
 import { authErrorMiddleware } from './middleware/authErrorMiddleware';
 import { clearApiCacheOnLogout } from './middleware/clearApiCacheOnLogout';
 
@@ -64,6 +66,8 @@ const rootReducer = combineReducers({
   [paymentsApi.reducerPath]: paymentsApi.reducer,
   [notificationsApi.reducerPath]: notificationsApi.reducer,
   [organizerApi.reducerPath]: organizerApi.reducer,
+  [chatApi.reducerPath]: chatApi.reducer,
+  [geocodeApi.reducerPath]: geocodeApi.reducer,
 });
 
 export const store = configureStore({
@@ -81,6 +85,8 @@ export const store = configureStore({
       paymentsApi.middleware,
       notificationsApi.middleware,
       organizerApi.middleware,
+      chatApi.middleware,
+      geocodeApi.middleware,
       authErrorMiddleware,
       clearApiCacheOnLogout,
     ),

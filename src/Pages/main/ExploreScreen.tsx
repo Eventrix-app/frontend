@@ -15,14 +15,16 @@ import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
-import { toCardEvent } from '../../utils/eventCardAdapter';
+import { calculateDistanceKm, toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import NoEvents from '../../components/common/Noevents';
+import EventListSkeleton from '../../components/common/EventListSkeleton';
+import { EventFilters, FilterSheet } from '../../components/events/FilterSheet';
 
-const FILTER_CHIPS = [
-  { id: 'date', label: 'Date' },
-  { id: 'price', label: 'Price' },
-  { id: 'distance', label: 'Distance' },
+const FILTER_CHIPS: { id: keyof EventFilters | 'category'; label: string }[] = [
+  { id: 'dateFrom', label: 'Date' },
+  { id: 'priceMin', label: 'Price' },
+  { id: 'radiusKm', label: 'Distance' },
   { id: 'category', label: 'Category' },
 ];
 
@@ -34,7 +36,21 @@ const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [followingOnly, setFollowingOnly] = useState(false);
-  const { events, loadMore, isLoading: isLoadingAll, isFetchingMore, isError: isErrorAll, refetch: refetchAll } = usePaginatedEvents();
+  const [filters, setFilters] = useState<EventFilters>({});
+  const {
+    events,
+    loadMore,
+    isLoading: isLoadingAll,
+    isFetchingMore,
+    isError: isErrorAll,
+    refetch: refetchAll,
+  } = usePaginatedEvents({
+    categoryId: filters.categoryId,
+    priceMin: filters.priceMin,
+    priceMax: filters.priceMax,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  });
   const {
     data: followedEvents = [],
     isLoading: isLoadingFollowed,
@@ -46,10 +62,29 @@ const ExploreScreen: React.FC = () => {
   const isLoading = followingOnly ? isLoadingFollowed : isLoadingAll;
   const isError = followingOnly ? isErrorFollowed : isErrorAll;
   const refetch = followingOnly ? refetchFollowed : refetchAll;
-  const cardEvents = (followingOnly ? followedEvents : events).map((event) =>
+  let cardEvents = (followingOnly ? followedEvents : events).map((event) =>
     toCardEvent(event, me?.latitude, me?.longitude),
   );
+  // Distance has no backend param yet (event lat/lng is barely populated until the map
+  // picker from #3 ships) — filtered client-side over whatever's already been fetched, so it
+  // organically starts covering the full catalog as more events get real coordinates.
+  if (filters.radiusKm !== undefined && me?.latitude != null && me?.longitude != null) {
+    const radiusKm = filters.radiusKm;
+    cardEvents = cardEvents.filter((event) => {
+      const backendEvent = (followingOnly ? followedEvents : events).find((e) => e.id === event.id);
+      if (!backendEvent?.latitude || !backendEvent?.longitude) return false;
+      return calculateDistanceKm(me.latitude!, me.longitude!, backendEvent.latitude, backendEvent.longitude) <= radiusKm;
+    });
+  }
   const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const hasActiveFilter = (id: (typeof FILTER_CHIPS)[number]['id']): boolean => {
+    if (id === 'category') return !!filters.categoryId;
+    if (id === 'dateFrom') return !!filters.dateFrom;
+    if (id === 'priceMin') return filters.priceMin !== undefined || filters.priceMax !== undefined;
+    if (id === 'radiusKm') return filters.radiusKm !== undefined;
+    return false;
+  };
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -95,7 +130,7 @@ const ExploreScreen: React.FC = () => {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsRow}
       >
-        <TouchableOpacity style={styles.slidersBtn}>
+        <TouchableOpacity style={styles.slidersBtn} onPress={() => setShowFilterSheet(true)}>
           <Text style={styles.slidersIcon}>☰</Text>
         </TouchableOpacity>
 
@@ -106,16 +141,23 @@ const ExploreScreen: React.FC = () => {
           <Text style={[styles.chipLabel, followingOnly && styles.chipLabelActive]}>Following</Text>
         </TouchableOpacity>
 
-        {FILTER_CHIPS.map((chip) => (
-          <TouchableOpacity key={chip.id} style={styles.chip}>
-            <Text style={styles.chipLabel}>{chip.label}</Text>
-            <Text style={styles.chipChevron}>⌄</Text>
-          </TouchableOpacity>
-        ))}
+        {FILTER_CHIPS.map((chip) => {
+          const active = hasActiveFilter(chip.id);
+          return (
+            <TouchableOpacity
+              key={chip.id}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setShowFilterSheet(true)}
+            >
+              <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{chip.label}</Text>
+              <Text style={[styles.chipChevron, active && styles.chipLabelActive]}>⌄</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <EventListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Couldn't load events</Text>
@@ -173,6 +215,10 @@ const ExploreScreen: React.FC = () => {
     onDismiss={closeInterestSheet}
   />
 </HalfScreenModal>
+
+      <HalfScreenModal visible={showFilterSheet} onClose={() => setShowFilterSheet(false)} heightPercent={0.75}>
+        <FilterSheet value={filters} onApply={setFilters} onClose={() => setShowFilterSheet(false)} />
+      </HalfScreenModal>
     </View>
   );
 };

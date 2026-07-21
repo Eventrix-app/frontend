@@ -6,7 +6,17 @@ const PAGE_SIZE = 20;
 // Loads events one page at a time (server-side pagination via GET /events?page=&limit=)
 // and accumulates them locally as the caller scrolls, instead of fetching everything
 // (or a large fixed limit) up front. Filters resetting (category/online) restarts from page 1.
-export function usePaginatedEvents(filters: { categoryId?: string; isOnline?: boolean; search?: string } = {}) {
+export interface PaginatedEventFilters {
+  categoryId?: string;
+  isOnline?: boolean;
+  search?: string;
+  priceMin?: number;
+  priceMax?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
   const [page, setPage] = useState(1);
   // Pages are stored keyed by page number rather than appended to a flat array. `getEvents`
   // invalidates under a single shared 'Event' tag (see eventsApi.ts), so creating, editing,
@@ -22,6 +32,10 @@ export function usePaginatedEvents(filters: { categoryId?: string; isOnline?: bo
     categoryId: filters.categoryId,
     isOnline: filters.isOnline,
     search: filters.search,
+    priceMin: filters.priceMin,
+    priceMax: filters.priceMax,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
     page,
     limit: PAGE_SIZE,
   });
@@ -31,7 +45,7 @@ export function usePaginatedEvents(filters: { categoryId?: string; isOnline?: bo
     setPage(1);
     setPagesById(new Map());
     setHasMore(true);
-  }, [filters.categoryId, filters.isOnline, filters.search]);
+  }, [filters.categoryId, filters.isOnline, filters.search, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo]);
 
   useEffect(() => {
     if (!data) return;

@@ -50,13 +50,15 @@ function navigateForPushData(
   data: Record<string, unknown> | undefined,
 ): void {
   const type = data?.type;
-  if (type === 'event_changed' && typeof data?.eventId === 'string') {
+  if ((type === 'event_changed' || type === 'announcement') && typeof data?.eventId === 'string') {
     navRef.navigate('EventDetails', { eventId: data.eventId });
   } else if (
     (type === 'waitlist_promoted' || type === 'refund_status') &&
     typeof data?.enrollmentId === 'string'
   ) {
     navRef.navigate('TicketDetails', { bookingId: data.enrollmentId });
+  } else if (type === 'organizer_followed') {
+    navRef.navigate('Profile');
   } else {
     navRef.navigate('Notifications');
   }

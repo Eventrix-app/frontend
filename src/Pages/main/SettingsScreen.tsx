@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,7 +6,8 @@ import { useDispatch } from 'react-redux';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
 import { logout } from '../../store/slices/authSlice';
-import { colors } from '../../theme/colors';
+import { ColorPalette } from '../../theme/colors.light';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
@@ -42,6 +43,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: me } = useGetMeQuery();
   const [updateNotificationChannels] = useUpdateNotificationChannelsMutation();
   const [clearPushToken] = useClearPushTokenMutation();
+  const { theme, colors, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // push/email default true (matching the backend's default for a newly created account)
   // until `me` loads, so the switches don't flash off-then-on; location has no backend
   // field at all and stays purely local/decorative.
@@ -115,6 +118,24 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
+        <Text style={styles.groupTitle}>Appearance</Text>
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            <View style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.label}>Dark Mode</Text>
+                <Text style={styles.subtitle}>{theme === 'dark' ? 'On' : 'Off'}</Text>
+              </View>
+              <Switch
+                value={theme === 'dark'}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.border, true: colors.brandPink }}
+                thumbColor={colors.white}
+              />
+            </View>
+          </View>
+        </View>
+
         <Text style={styles.groupTitle}>Legal</Text>
         <View style={styles.groupGlass}>
           <View style={styles.group}>
@@ -141,7 +162,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.neutralBg,

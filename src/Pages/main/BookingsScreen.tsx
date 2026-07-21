@@ -8,9 +8,12 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
+import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { getEventStartDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
+import { NotificationBell } from '../../components/common/Icons';
+import BookingListSkeleton from '../../components/common/BookingListSkeleton';
 
 // TODO: source from user profile / auth state instead of hardcoding
 const CURRENT_USER_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
@@ -71,6 +74,8 @@ const BookingsScreen: React.FC = () => {
     isError: isErrorWaitlist,
     refetch: refetchWaitlist,
   } = useGetMyWaitlistQuery();
+  const { data: notifications = [] } = useGetNotificationsQuery();
+  const hasUnread = notifications.some((n) => !n.readAt);
 
   const isWaitlistTab = activeTab === 'waitlist';
   const isLoading = isWaitlistTab ? isLoadingWaitlist : isLoadingEnrollments;
@@ -110,8 +115,8 @@ const BookingsScreen: React.FC = () => {
             <Text style={styles.iconBtnText}>⌕</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
-            <Text style={styles.iconBtnText}>◔</Text>
-            <View style={styles.bellDot} />
+            <NotificationBell unread={hasUnread} color="#000000" size={22} />
+            {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
             <Image source={CURRENT_USER_AVATAR} style={styles.avatar} />
@@ -138,7 +143,7 @@ const BookingsScreen: React.FC = () => {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <BookingListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>

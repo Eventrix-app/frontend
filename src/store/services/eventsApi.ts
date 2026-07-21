@@ -5,6 +5,8 @@ export interface BackendEvent {
   id: string;
   title: string;
   description?: string;
+  highlights?: string[];
+  whoShouldAttend?: string[];
   categoryId: string;
   organizerId: string;
   venueName: string;
@@ -65,9 +67,13 @@ export interface TicketTypeRecord extends CreateTicketTypePayload {
 export interface CreateEventPayload {
   title: string;
   description?: string;
+  highlights?: string[];
+  whoShouldAttend?: string[];
   categoryId: string;
   venueName: string;
   venueAddress: string;
+  latitude?: number;
+  longitude?: number;
   eventDate: string;
   startTime: string;
   endTime?: string;
@@ -144,6 +150,50 @@ export type UploadPurpose = 'profile-picture' | 'event-image' | 'event-cover' | 
 export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
 export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
 
+export interface ScheduleItemRecord {
+  id: string;
+  eventId: string;
+  time: string;
+  title: string;
+  order: number;
+}
+
+export interface CreateScheduleItemPayload {
+  time: string;
+  title: string;
+  order?: number;
+}
+
+export interface AnnouncementRecord {
+  id: string;
+  eventId: string;
+  postedByUserId: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  postedBy?: { id: string; fullName: string };
+}
+
+export interface CreateAnnouncementPayload {
+  title: string;
+  body: string;
+}
+
+export interface ReviewRecord {
+  id: string;
+  eventId: string;
+  userId: string;
+  rating: number;
+  text?: string;
+  createdAt: string;
+  user?: { id: string; fullName: string };
+}
+
+export interface CreateReviewPayload {
+  rating: number;
+  text?: string;
+}
+
 export interface EventMediaRecord {
   id: string;
   eventId: string;
@@ -161,7 +211,7 @@ export interface CreateEventMediaPayload {
 export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite', 'EventMedia', 'Enrollment'],
+  tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite', 'EventMedia', 'Enrollment', 'Schedule', 'Announcements', 'Reviews'],
   // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
   // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
   // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
@@ -172,7 +222,20 @@ export const eventsApi = createApi({
   refetchOnMountOrArgChange: 10,
   refetchOnFocus: true,
   endpoints: (builder) => ({
-    getEvents: builder.query<BackendEvent[], { categoryId?: string; isOnline?: boolean; page?: number; limit?: number; search?: string }>({
+    getEvents: builder.query<
+      BackendEvent[],
+      {
+        categoryId?: string;
+        isOnline?: boolean;
+        page?: number;
+        limit?: number;
+        search?: string;
+        priceMin?: number;
+        priceMax?: number;
+        dateFrom?: string;
+        dateTo?: string;
+      }
+    >({
       query: (filters) => {
         const params = new URLSearchParams();
         if (filters.categoryId) params.append('categoryId', filters.categoryId);
@@ -180,6 +243,10 @@ export const eventsApi = createApi({
         if (filters.page) params.append('page', String(filters.page));
         if (filters.limit) params.append('limit', String(filters.limit));
         if (filters.search) params.append('search', filters.search);
+        if (filters.priceMin !== undefined) params.append('priceMin', String(filters.priceMin));
+        if (filters.priceMax !== undefined) params.append('priceMax', String(filters.priceMax));
+        if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+        if (filters.dateTo) params.append('dateTo', filters.dateTo);
         return `events?${params.toString()}`;
       },
       // GET /events returns a paginated wrapper ({events, total, page, totalPages}), not a bare array.
@@ -323,6 +390,34 @@ export const eventsApi = createApi({
       }),
       invalidatesTags: (result, error, { eventId }) => [{ type: 'EventMedia', id: eventId }],
     }),
+    getSchedule: builder.query<ScheduleItemRecord[], string>({
+      query: (eventId) => `events/${eventId}/schedule`,
+      providesTags: (result, error, eventId) => [{ type: 'Schedule', id: eventId }],
+    }),
+    createScheduleItem: builder.mutation<ScheduleItemRecord, { eventId: string; body: CreateScheduleItemPayload }>({
+      query: ({ eventId, body }) => ({ url: `events/${eventId}/schedule`, method: 'POST', body }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Schedule', id: eventId }],
+    }),
+    deleteScheduleItem: builder.mutation<void, { eventId: string; itemId: string }>({
+      query: ({ eventId, itemId }) => ({ url: `events/${eventId}/schedule/${itemId}`, method: 'DELETE' }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Schedule', id: eventId }],
+    }),
+    getAnnouncements: builder.query<AnnouncementRecord[], string>({
+      query: (eventId) => `events/${eventId}/announcements`,
+      providesTags: (result, error, eventId) => [{ type: 'Announcements', id: eventId }],
+    }),
+    createAnnouncement: builder.mutation<AnnouncementRecord, { eventId: string; body: CreateAnnouncementPayload }>({
+      query: ({ eventId, body }) => ({ url: `events/${eventId}/announcements`, method: 'POST', body }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Announcements', id: eventId }],
+    }),
+    getReviews: builder.query<ReviewRecord[], string>({
+      query: (eventId) => `events/${eventId}/reviews`,
+      providesTags: (result, error, eventId) => [{ type: 'Reviews', id: eventId }],
+    }),
+    createReview: builder.mutation<ReviewRecord, { eventId: string; body: CreateReviewPayload }>({
+      query: ({ eventId, body }) => ({ url: `events/${eventId}/reviews`, method: 'POST', body }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Reviews', id: eventId }],
+    }),
   }),
 });
 
@@ -351,4 +446,11 @@ export const {
   useGetEventMediaQuery,
   useCreateEventMediaMutation,
   useDeleteEventMediaMutation,
+  useGetScheduleQuery,
+  useCreateScheduleItemMutation,
+  useDeleteScheduleItemMutation,
+  useGetAnnouncementsQuery,
+  useCreateAnnouncementMutation,
+  useGetReviewsQuery,
+  useCreateReviewMutation,
 } = eventsApi;

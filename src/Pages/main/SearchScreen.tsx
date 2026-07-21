@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { CATEGORIES, MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
+import { MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -21,33 +21,39 @@ import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { toCardEvent } from '../../utils/eventCardAdapter';
+import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
 import Noevents from '../../components/common/Noevents';
+import EventListSkeleton from '../../components/common/EventListSkeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
 const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const { data: categories = [] } = useGetCategoriesQuery();
   // Pre-selects the category chip when arriving from a category tap on Home/Explore
-  // (navigation.navigate('Search', { category })) — previously dropped entirely since this
-  // screen never read its route params, so tapping a category silently landed on an
-  // unfiltered search screen.
-  const [category, setCategory] = useState<string | null>(route.params?.category ?? null);
+  // (navigation.navigate('Search', { category })) — the route param is a category *name*
+  // (lowercased, e.g. 'music'), resolved below to a real categoryId once categories load.
+  const routeCategoryName = route.params?.category ?? null;
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!routeCategoryName || categoryId || categories.length === 0) return;
+    const match = categories.find((c) => c.name.toLowerCase() === routeCategoryName);
+    if (match) setCategoryId(match.id);
+  }, [routeCategoryName, categories, categoryId]);
+
   // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
   // sent to the backend so search runs over the full catalog, not just already-loaded pages.
   const debouncedQuery = useDebouncedValue(query.trim(), 400);
+  // Category now goes through the same server-side param as search (GET /events?categoryId=)
+  // instead of filtering only the already-loaded page — previously "load more" while a
+  // category was selected silently returned thin/incomplete results.
   const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents({
     search: debouncedQuery || undefined,
+    categoryId: categoryId ?? undefined,
   });
-  const cardEvents = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
-
-  // Text matching now happens server-side (title/venue); category remains a client-side
-  // filter over the already-fetched page since it's an exact chip selection, not free text.
-  const results = useMemo(() => {
-    if (!category) return cardEvents;
-    return cardEvents.filter((event) => event.category.toLowerCase() === category);
-  }, [cardEvents, category]);
+  const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -85,30 +91,23 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         <TouchableOpacity
           style={styles.chipWrap}
-          onPress={() => setCategory(null)}
+          onPress={() => setCategoryId(null)}
         >
-          <View style={[styles.chipGlass, !category && styles.chipActive]}>
+          <View style={[styles.chipGlass, !categoryId && styles.chipActive]}>
             <View style={styles.chipContent}>
-              <Text style={[styles.chipText, !category && styles.chipTextActive]}>All</Text>
+              <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>All</Text>
             </View>
           </View>
         </TouchableOpacity>
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <TouchableOpacity
             key={cat.id}
             style={styles.chipWrap}
-            onPress={() =>
-              setCategory((prev) => (prev === cat.name.toLowerCase() ? null : cat.name.toLowerCase()))
-            }
+            onPress={() => setCategoryId((prev) => (prev === cat.id ? null : cat.id))}
           >
-            <View style={[styles.chipGlass, category === cat.name.toLowerCase() && styles.chipActive]}>
+            <View style={[styles.chipGlass, categoryId === cat.id && styles.chipActive]}>
               <View style={styles.chipContent}>
-                <Text
-                  style={[
-                    styles.chipText,
-                    category === cat.name.toLowerCase() && styles.chipTextActive,
-                  ]}
-                >
+                <Text style={[styles.chipText, categoryId === cat.id && styles.chipTextActive]}>
                   {cat.name}
                 </Text>
               </View>
@@ -118,7 +117,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <EventListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>⚠️</Text>
@@ -139,7 +138,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           onEndReachedThreshold={0.4}
           ListHeaderComponent={
             <>
-              {!query && !category ? (
+              {!query && !categoryId ? (
                 <>
                   <Text style={styles.sectionTitle}>Recent searches</Text>
                   <View style={styles.recentRow}>

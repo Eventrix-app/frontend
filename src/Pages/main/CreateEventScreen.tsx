@@ -35,6 +35,8 @@ import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { parseDateValue, parseTimeValue, formatTimeValue, formatTimeDisplay } from '../../utils/dateFormat';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
+import { LocationPickerModal } from '../../components/common/LocationPickerModal';
+import { Feather } from '@expo/vector-icons';
 import TicketTypeEditor, {
   TierDraft,
   createBlankTier,
@@ -60,9 +62,15 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // Newline-separated in the form; converted to/from string[] at the DTO boundary.
+  const [highlightsText, setHighlightsText] = useState('');
+  const [whoShouldAttendText, setWhoShouldAttendText] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [venueName, setVenueName] = useState('');
   const [venueAddress, setVenueAddress] = useState('');
+  const [latitude, setLatitude] = useState<number | undefined>(undefined);
+  const [longitude, setLongitude] = useState<number | undefined>(undefined);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [eventDate, setEventDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -119,9 +127,13 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setTitle(existingEvent.title ?? '');
     setDescription(existingEvent.description ?? '');
+    setHighlightsText((existingEvent.highlights ?? []).join('\n'));
+    setWhoShouldAttendText((existingEvent.whoShouldAttend ?? []).join('\n'));
     setCategoryId(existingEvent.categoryId ?? '');
     setVenueName(existingEvent.venueName ?? '');
     setVenueAddress(existingEvent.venueAddress ?? '');
+    setLatitude(existingEvent.latitude ?? undefined);
+    setLongitude(existingEvent.longitude ?? undefined);
     setEventDate(existingEvent.eventDate ?? '');
     setStartTime(existingEvent.startTime ?? '');
     setEndTime(existingEvent.endTime ?? '');
@@ -147,9 +159,13 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     return {
       title: title.trim(),
       description: description.trim() || undefined,
+      highlights: highlightsText.split('\n').map((line) => line.trim()).filter(Boolean),
+      whoShouldAttend: whoShouldAttendText.split('\n').map((line) => line.trim()).filter(Boolean),
       categoryId,
       venueName: venueName.trim(),
       venueAddress: venueAddress.trim(),
+      latitude,
+      longitude,
       eventDate,
       startTime,
       endTime: endTime || undefined,
@@ -427,6 +443,28 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.label}>Description</Text>
         <TextInput style={[styles.input, styles.multiline]} value={description} onChangeText={setDescription} placeholder="What's this event about?" placeholderTextColor={colors.textSecondary} multiline numberOfLines={3} />
 
+        <Text style={styles.label}>Highlights</Text>
+        <TextInput
+          style={[styles.input, styles.multiline]}
+          value={highlightsText}
+          onChangeText={setHighlightsText}
+          placeholder={'One per line, e.g.\nLive performances\nFood & drink stalls'}
+          placeholderTextColor={colors.textSecondary}
+          multiline
+          numberOfLines={3}
+        />
+
+        <Text style={styles.label}>Who Should Attend</Text>
+        <TextInput
+          style={[styles.input, styles.multiline]}
+          value={whoShouldAttendText}
+          onChangeText={setWhoShouldAttendText}
+          placeholder={'One per line, e.g.\nMusic lovers\nFirst-time festival-goers'}
+          placeholderTextColor={colors.textSecondary}
+          multiline
+          numberOfLines={3}
+        />
+
         <Text style={styles.label}>Category *</Text>
         <View style={styles.categoryRow}>
           {categories.map((cat) => (
@@ -447,6 +485,13 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <Text style={styles.label}>Venue Address *</Text>
         <TextInput style={styles.input} value={venueAddress} onChangeText={setVenueAddress} placeholder="Full address" placeholderTextColor={colors.textSecondary} />
+
+        <TouchableOpacity style={styles.mapPinBtn} onPress={() => setShowLocationPicker(true)}>
+          <Feather name="map-pin" size={16} color={colors.brandPink} />
+          <Text style={styles.mapPinBtnText}>
+            {latitude != null && longitude != null ? 'Location pinned — tap to adjust' : 'Pin exact location on map'}
+          </Text>
+        </TouchableOpacity>
 
         <Text style={styles.label}>Date *</Text>
         <InlineDatePicker value={eventDate} onChange={setEventDate} placeholder="Select event date" minimumDate={new Date()} />
@@ -670,6 +715,20 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      <LocationPickerModal
+        visible={showLocationPicker}
+        initialLatitude={latitude}
+        initialLongitude={longitude}
+        onClose={() => setShowLocationPicker(false)}
+        onConfirm={({ latitude: lat, longitude: lng, address }) => {
+          setLatitude(lat);
+          setLongitude(lng);
+          // Only autofills a blank address — never clobbers what the organizer already typed.
+          if (address && !venueAddress.trim()) setVenueAddress(address);
+          setShowLocationPicker(false);
+        }}
+      />
     </View>
   );
 };
@@ -697,6 +756,14 @@ const styles = StyleSheet.create({
 },
   scroll: { padding: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
+  mapPinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  mapPinBtnText: { fontSize: 13, fontWeight: '600', color: colors.brandPink },
   input: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,

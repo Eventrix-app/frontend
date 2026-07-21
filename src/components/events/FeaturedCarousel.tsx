@@ -1,7 +1,6 @@
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   Dimensions,
-  FlatList,
   ImageBackground,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -9,6 +8,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  scrollTo,
+  SharedValue,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -18,9 +27,10 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - spacing.md * 2;
 const CARD_HEIGHT = Math.round(CARD_WIDTH * 0.55);
 const CARD_SPACING = spacing.md;
-const SLOT_WIDTH = CARD_WIDTH + CARD_SPACING;
 const LOOP_MULTIPLIER = 50;
 const AUTO_SCROLL_INTERVAL = 3500;
+const TRANSITION_DURATION_MS = 550;
+const TRANSITION_EASING = Easing.inOut(Easing.cubic);
 
 export interface FeaturedEvent {
   id: string;
@@ -44,14 +54,60 @@ const resolveImageSource = (image: unknown) => {
   return image as any;
 };
 
+// Renders its width/color as a pure worklet function of the *same* scrollX shared value
+// that drives the card slide — not a separately-triggered animation of its own. Deriving
+// both from one number, evaluated on the UI thread, is what actually guarantees they move
+// together: any version where the dot reacts to a discrete "active index" (via React state
+// and a useEffect) has to cross from the UI thread to the JS thread and back before its own
+// animation can even start, which is exactly the gap that was causing the two to visibly
+// drift apart. `loopWidth`/`slotWidth` are plain numbers closed over by the worklet, safe
+// to recompute every render since reanimated's babel plugin re-captures them automatically.
+const Dot: React.FC<{ index: number; slotWidth: number; loopWidth: number; scrollX: SharedValue<number> }> = ({
+  index,
+  slotWidth,
+  loopWidth,
+  scrollX,
+}) => {
+  const style = useAnimatedStyle(() => {
+    const dotCenter = index * slotWidth;
+    let delta = (scrollX.value - dotCenter) % loopWidth;
+    // Shortest signed distance around the loop, so dot 0 also responds to scroll positions
+    // approaching from "just before the wrap" and the last dot responds to positions
+    // approaching from "just after 0" — without this, both ends of the loop would only
+    // ever see the far (long way around) distance and never actually highlight smoothly.
+    if (delta > loopWidth / 2) delta -= loopWidth;
+    if (delta < -loopWidth / 2) delta += loopWidth;
+    const highlight = Math.max(0, 1 - Math.abs(delta) / slotWidth);
+    return {
+      width: 6 + highlight * 10,
+      backgroundColor: `rgba(255,255,255,${0.4 + highlight * 0.6})`,
+    };
+  });
+
+  return <Animated.View style={[styles.dot, style]} />;
+};
+
 const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: cardWidthProp }) => {
   const effectiveCardWidth = cardWidthProp ?? CARD_WIDTH;
   const effectiveSlotWidth = effectiveCardWidth + CARD_SPACING;
-  const [activeIndex, setActiveIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const loopWidth = events.length * effectiveSlotWidth;
+  const animatedRef = useAnimatedRef<Animated.FlatList<any>>();
   const currentRawIndex = useRef(0);
   const isUserInteracting = useRef(false);
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Single source of truth for scroll position — both the real FlatList scroll (via the
+  // reaction below) and every dot's highlight (via Dot's useAnimatedStyle above) are pure
+  // functions of this one UI-thread value. FlatList's own scrollToIndex(animated: true)
+  // uses a fixed, non-customizable native duration/easing, so this instead drives the
+  // scroll programmatically at a chosen duration/easing via reanimated's scrollTo.
+  const scrollX = useSharedValue(0);
+
+  useAnimatedReaction(
+    () => scrollX.value,
+    (value) => {
+      scrollTo(animatedRef, value, 0, false);
+    },
+  );
 
   const loopedEvents = useMemo(() => {
     if (events.length === 0) return [];
@@ -70,27 +126,28 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
     currentRawIndex.current = initialIndex;
     if (events.length > 1) {
       requestAnimationFrame(() => {
-        flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+        scrollX.value = initialIndex * effectiveSlotWidth;
       });
     }
-  }, [initialIndex, events.length]);
+  }, [initialIndex, events.length, effectiveSlotWidth, scrollX]);
 
-  // Single source of truth for the active dot: derive it from actual scroll
-  // position rather than viewability events, which don't reliably fire for
-  // programmatic animated scrollToIndex calls.
-  const updateActiveIndexFromOffset = useCallback(
-    (offsetX: number) => {
-      if (events.length === 0) return;
-      const rawIndex = Math.round(offsetX / effectiveSlotWidth);
-      currentRawIndex.current = rawIndex;
-      const normalized = ((rawIndex % events.length) + events.length) % events.length;
-      setActiveIndex(normalized);
-    },
-    [events.length, effectiveSlotWidth],
-  );
+  // Guards against a subtle native quirk: reanimated's scrollTo (used below to drive the
+  // auto-advance) writes the scroll offset every frame, and Android/iOS can interpret that
+  // write sequence as a real scroll gesture and fire their own onMomentumScrollEnd mid-
+  // transition. Without this guard, that spurious event would make handleMomentumScrollEnd
+  // stomp scrollX with a partial, still-animating offset — visibly cancelling the glide.
+  const isAutoAdvancing = useRef(false);
 
+  // Only tracks bookkeeping (scrollX + currentRawIndex) after a genuine user-driven swipe —
+  // no React state involved, so a manual swipe can never race with (or be overwritten by)
+  // the auto-advance's own bookkeeping the way two independently-triggered state updates could.
   const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    updateActiveIndexFromOffset(e.nativeEvent.contentOffset.x);
+    if (isAutoAdvancing.current) return;
+    const offsetX = e.nativeEvent.contentOffset.x;
+    scrollX.value = offsetX;
+    if (events.length > 0) {
+      currentRawIndex.current = Math.round(offsetX / effectiveSlotWidth);
+    }
   };
 
   const startAutoScroll = useCallback(() => {
@@ -109,18 +166,21 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
         const normalized = ((nextIndex % events.length) + events.length) % events.length;
         nextIndex = initialIndex + normalized;
         currentRawIndex.current = nextIndex;
-        flatListRef.current?.scrollToIndex({ index: nextIndex, animated: false });
-        updateActiveIndexFromOffset(nextIndex * SLOT_WIDTH);
+        scrollX.value = nextIndex * effectiveSlotWidth;
         return;
       }
 
       currentRawIndex.current = nextIndex;
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      // scrollToIndex's own momentum-end will also fire and correct this,
-      // but setting it immediately keeps the dot in sync with the animation.
-      updateActiveIndexFromOffset(nextIndex * effectiveSlotWidth);
+      isAutoAdvancing.current = true;
+      scrollX.value = withTiming(nextIndex * effectiveSlotWidth, {
+        duration: TRANSITION_DURATION_MS,
+        easing: TRANSITION_EASING,
+      });
+      setTimeout(() => {
+        isAutoAdvancing.current = false;
+      }, TRANSITION_DURATION_MS + 100);
     }, AUTO_SCROLL_INTERVAL);
-  }, [events.length, loopedEvents.length, initialIndex, updateActiveIndexFromOffset, effectiveSlotWidth]);
+  }, [events.length, loopedEvents.length, initialIndex, effectiveSlotWidth, scrollX]);
 
   useEffect(() => {
     startAutoScroll();
@@ -172,7 +232,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
                 {events.length > 1 && (
                   <View style={styles.dots}>
                     {events.map((_, i) => (
-                      <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                      <Dot key={i} index={i} slotWidth={effectiveSlotWidth} loopWidth={loopWidth} scrollX={scrollX} />
                     ))}
                   </View>
                 )}
@@ -182,28 +242,28 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
         </TouchableOpacity>
       );
     },
-    [onEventPress, events.length, activeIndex, effectiveCardWidth],
+    [onEventPress, events.length, effectiveCardWidth, effectiveSlotWidth, loopWidth, scrollX],
   );
 
   if (events.length === 0) return null;
 
   return (
-    <FlatList
+    <Animated.FlatList
       style={{ height: CARD_HEIGHT, flexGrow: 0 }}
-      ref={flatListRef}
+      ref={animatedRef}
       data={loopedEvents}
       keyExtractor={(item: any) => item.__loopKey}
       renderItem={renderItem}
       horizontal
       showsHorizontalScrollIndicator={false}
       snapToInterval={effectiveSlotWidth}
-      decelerationRate="fast"
+      decelerationRate="normal"
       onMomentumScrollEnd={handleMomentumScrollEnd}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onScrollToIndexFailed={(info) => {
         setTimeout(() => {
-          flatListRef.current?.scrollToOffset({
+          animatedRef.current?.scrollToOffset({
             offset: info.index * effectiveSlotWidth,
             animated: false,
           });
@@ -215,7 +275,6 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
         index,
       })}
       initialScrollIndex={initialIndex}
-      extraData={activeIndex}
     />
   );
 };
@@ -288,14 +347,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dot: {
-    width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  dotActive: {
-    width: 16,
-    backgroundColor: colors.white,
   },
 });
 

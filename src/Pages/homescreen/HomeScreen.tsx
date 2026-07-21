@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Location from 'expo-location';
 import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
 import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
@@ -20,10 +19,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
+import { NotificationBell, LocationPin } from '../../components/common/Icons';
 
 const bgImage = require('../../../assets/bg.png');
 
@@ -33,13 +34,6 @@ const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" widt
   <line x1="12" y1="18" x2="12" y2="22" stroke="#F43362" stroke-width="2" stroke-linecap="round"/>
   <line x1="8" y1="22" x2="16" y2="22" stroke="#F43362" stroke-width="2" stroke-linecap="round"/>
 </svg>`;
-
-// Inlined from assets/home-screen-categories/searchbar/notifications.svg and
-// notifications_unread.svg — SvgXml needs raw markup, not a require() (see
-// EventrixTabBar.tsx for why RN's Image can't render these files directly).
-const notificationSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FF3366"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></svg>`;
-
-const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#Ff3366"><path d="M480-80q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm0-420ZM160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v13q-11 22-16 45t-4 47q-10-2-19.5-3.5T480-720q-66 0-113 47t-47 113v280h320v-257q18 8 38.5 12.5T720-520v240h80v80H160Zm475-435q-35-35-35-85t35-85q35-35 85-35t85 35q35 35 35 85t-35 85q-35 35-85 35t-85-35Z"/></svg>`;
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -59,7 +53,6 @@ const HomeScreen: React.FC = () => {
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
   const [showInterestSheet, setShowInterestSheet] = useState(false);
-  const [accessedAddress, setAccessedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -92,57 +85,10 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // Turns the coordinates captured during onboarding's location-access step (persisted on
-  // the user's account, GET /users/me) into a real, human-readable address — replaces the
-  // previous hardcoded placeholder string. No new location permission prompt needed here:
-  // this only reverse-geocodes coordinates already on file, it doesn't read live GPS.
-  useEffect(() => {
-    let cancelled = false;
-    if (me?.latitude == null || me?.longitude == null) {
-      setAccessedAddress(null);
-      return;
-    }
-    const { latitude, longitude } = me;
-
-    // expo-location's reverseGeocodeAsync has no web implementation at all — it always
-    // throws there (see expo-location/src/ExpoLocation.web.ts) — and some Android devices
-    // ship without a native Geocoder either. Nominatim's reverse endpoint is a plain HTTP
-    // call, so it works the same everywhere; same API LocationAccessScreen already uses
-    // for forward geocoding of a manually-typed city.
-    const reverseGeocodeViaNominatim = async (): Promise<string | null> => {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Eventrix/1.0 (eventrix-app)' } });
-      const data = await res.json();
-      const address = data?.address ?? {};
-      const parts = [
-        address.suburb || address.city_district || address.neighbourhood,
-        address.city || address.town || address.village || address.county,
-      ].filter((part): part is string => !!part);
-      return parts.length > 0 ? parts.join(', ') : address.state ?? null;
-    };
-
-    Location.reverseGeocodeAsync({ latitude, longitude })
-      .then((results) => {
-        if (cancelled) return null;
-        const first = results[0];
-        const parts = [first?.district || first?.subregion, first?.city].filter(
-          (part): part is string => !!part,
-        );
-        const resolved = parts.length > 0 ? parts.join(', ') : first?.region ?? null;
-        if (resolved) return resolved;
-        return reverseGeocodeViaNominatim();
-      })
-      .catch(() => (cancelled ? null : reverseGeocodeViaNominatim().catch(() => null)))
-      .then((resolved) => {
-        if (!cancelled && resolved !== null) setAccessedAddress(resolved);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [me?.latitude, me?.longitude]);
-
   const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
-  const displayAddress = accessedAddress || me?.city || 'Add your location';
+  // Shared with ProfileScreen (useDisplayAddress) so both show the exact same resolved
+  // location instead of computing/displaying it differently.
+  const displayAddress = useDisplayAddress(me);
   const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
 
   const { data: notifications = [] } = useGetNotificationsQuery();
@@ -178,9 +124,12 @@ const HomeScreen: React.FC = () => {
         <View style={styles.headerTop}>
           <View style={styles.greetingCol}>
             <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
-            <Text style={styles.location} numberOfLines={1}>
-              📍 {displayAddress}
-            </Text>
+            <View style={styles.locationRow}>
+              <LocationPin size={12} color="rgba(255,255,255,0.88)" />
+              <Text style={styles.location} numberOfLines={1}>
+                {displayAddress}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
             {me?.profilePictureUrl ? (
@@ -221,11 +170,7 @@ const HomeScreen: React.FC = () => {
             style={styles.bell}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <SvgXml
-              xml={hasUnread ? notificationUnreadSvg : notificationSvg}
-              width={24}
-              height={24}
-            />
+            <NotificationBell unread={hasUnread} color="#000000" size={24} />
             {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
@@ -384,10 +329,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   location: {
     color: 'rgba(255,255,255,0.88)',
     fontSize: 12,
-    marginTop: 2,
   },
   searchRow: {
     flexDirection: 'row',

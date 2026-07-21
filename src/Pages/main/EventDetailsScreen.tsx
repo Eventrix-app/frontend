@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ImageBackground,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Share,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -29,6 +31,12 @@ import {
   useRemoveFavoriteMutation,
   isWaitlistResult,
   TicketTypeRecord,
+  useGetScheduleQuery,
+  useCreateScheduleItemMutation,
+  useGetAnnouncementsQuery,
+  useCreateAnnouncementMutation,
+  useGetReviewsQuery,
+  useCreateReviewMutation,
 } from '../../store/services/eventsApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
@@ -36,6 +44,9 @@ import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
+import { useChatSocket } from '../../hooks/useChatSocket';
+import HalfScreenModal from '../../components/common/halfscreenmodal';
+import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 
@@ -176,12 +187,71 @@ const MOCK_SCHEDULE: ScheduleItem[] = [
   { id: 's6', time: '1:30 AM', title: 'Send-off and departure', completed: false },
 ];
 
-const ScheduleTab: React.FC = () => {
+const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
+  const { data: realSchedule, isLoading } = useGetScheduleQuery(eventId);
+  const [createScheduleItem, { isLoading: isAdding }] = useCreateScheduleItemMutation();
+  const [time, setTime] = useState('');
+  const [title, setTitle] = useState('');
+
+  // Falls back to filler content only when the organizer hasn't added a real schedule yet
+  // (same "never look bare" reasoning as MOCK_DESCRIPTION/MOCK_HIGHLIGHTS above).
+  const schedule: { id: string; time: string; title: string; completed: boolean }[] = realSchedule?.length
+    ? realSchedule.map((item) => ({ ...item, completed: false }))
+    : MOCK_SCHEDULE;
+
+  const handleAdd = async () => {
+    if (!time.trim() || !title.trim()) {
+      showAlert('Missing details', 'Add both a time and a title for this schedule item.');
+      return;
+    }
+    try {
+      await createScheduleItem({
+        eventId,
+        body: { time: time.trim(), title: title.trim(), order: realSchedule?.length ?? 0 },
+      }).unwrap();
+      setTime('');
+      setTitle('');
+    } catch (err) {
+      showAlert('Could not add schedule item', extractErrorMessage(err, 'Please try again.'));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.tabContent}>
+        <ActivityIndicator color={colors.brandPink} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.tabContent}>
+      {isOwner && (
+        <View style={styles.reviewComposer}>
+          <Text style={styles.sectionLabel}>Add Schedule Item</Text>
+          <TextInput
+            style={styles.chatInput}
+            value={time}
+            onChangeText={setTime}
+            placeholder="e.g. 7:00 PM"
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TextInput
+            style={styles.chatInput}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="e.g. Doors open"
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TouchableOpacity style={styles.reviewSubmitBtn} onPress={handleAdd} disabled={isAdding}>
+            <Text style={styles.chatSendBtnText}>{isAdding ? 'Adding…' : 'Add to Schedule'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.scheduleList}>
-        {MOCK_SCHEDULE.map((item, index) => {
-          const isLast = index === MOCK_SCHEDULE.length - 1;
+        {schedule.map((item, index) => {
+          const isLast = index === schedule.length - 1;
           return (
             <View key={item.id} style={styles.scheduleRow}>
               <View style={styles.scheduleMarkerCol}>
@@ -274,11 +344,72 @@ const StarRow: React.FC<{ rating: number }> = ({ rating }) => (
   </View>
 );
 
-const ReviewsTab: React.FC = () => {
+const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
+  const { data: realReviews, isLoading } = useGetReviewsQuery(eventId);
+  const [createReview, { isLoading: isSubmitting }] = useCreateReviewMutation();
+  const [draftRating, setDraftRating] = useState(0);
+  const [draftText, setDraftText] = useState('');
+
+  const reviews: ReviewItem[] = realReviews?.length
+    ? realReviews.map((r) => ({
+        id: r.id,
+        name: r.user?.fullName ?? 'Attendee',
+        username: '',
+        rating: r.rating,
+        text: r.text ?? '',
+      }))
+    : MOCK_REVIEWS;
+
+  const handleSubmit = async () => {
+    if (draftRating < 1) {
+      showAlert('Pick a rating', 'Tap a star to rate this event before submitting.');
+      return;
+    }
+    try {
+      await createReview({ eventId, body: { rating: draftRating, text: draftText.trim() || undefined } }).unwrap();
+      setDraftRating(0);
+      setDraftText('');
+    } catch (err) {
+      showAlert('Could not submit review', extractErrorMessage(err, 'Please try again.'));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.tabContent}>
+        <ActivityIndicator color={colors.brandPink} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.tabContent}>
+      {!isOwner && (
+        <View style={styles.reviewComposer}>
+          <Text style={styles.sectionLabel}>Write a Review</Text>
+          <View style={styles.reviewComposerStars}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <TouchableOpacity key={n} onPress={() => setDraftRating(n)} hitSlop={4}>
+                <Text style={[styles.reviewStar, n <= draftRating ? styles.reviewStarFilled : styles.reviewStarEmpty]}>★</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={[styles.chatInput, styles.reviewComposerInput]}
+            value={draftText}
+            onChangeText={setDraftText}
+            placeholder="Share your experience (optional)"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+          />
+          <TouchableOpacity style={styles.reviewSubmitBtn} onPress={handleSubmit} disabled={isSubmitting}>
+            <Text style={styles.chatSendBtnText}>{isSubmitting ? 'Submitting…' : 'Submit Review'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.reviewList}>
-        {MOCK_REVIEWS.map((review) => (
+        {reviews.map((review) => (
           <View key={review.id} style={styles.reviewCard}>
             <View style={styles.reviewTopRow}>
               <View style={styles.reviewAvatar}>
@@ -286,16 +417,12 @@ const ReviewsTab: React.FC = () => {
               </View>
               <View style={styles.reviewNameCol}>
                 <Text style={styles.reviewName}>{review.name}</Text>
-                <Text style={styles.reviewUsername}>{review.username}</Text>
+                {!!review.username && <Text style={styles.reviewUsername}>{review.username}</Text>}
               </View>
               <StarRow rating={review.rating} />
             </View>
 
-            <Text style={styles.reviewText}>{review.text}</Text>
-
-            <TouchableOpacity>
-              <Text style={styles.reviewReadMore}>Read More ›</Text>
-            </TouchableOpacity>
+            {!!review.text && <Text style={styles.reviewText}>{review.text}</Text>}
           </View>
         ))}
       </View>
@@ -303,14 +430,147 @@ const ReviewsTab: React.FC = () => {
   );
 };
 
+const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ eventId, currentUserId }) => {
+  const { messages, sendMessage, isConnected, isLoadingHistory } = useChatSocket(eventId);
+  const [draft, setDraft] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+
+  const handleSend = () => {
+    if (!draft.trim()) return;
+    sendMessage(draft);
+    setDraft('');
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.communityWrap}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
+      {isLoadingHistory ? (
+        <ActivityIndicator style={styles.communityLoader} color={colors.brandPink} />
+      ) : messages.length === 0 ? (
+        <Text style={styles.emptyTabText}>No messages yet — be the first to say hi.</Text>
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          style={styles.communyMessagesScroll}
+          contentContainerStyle={styles.communityMessages}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.map((msg) => {
+            const isMine = msg.userId === currentUserId;
+            return (
+              <View key={msg.id} style={[styles.chatBubbleRow, isMine && styles.chatBubbleRowMine]}>
+                <View style={[styles.chatBubble, isMine && styles.chatBubbleMine]}>
+                  {!isMine && <Text style={styles.chatSender}>{msg.user?.fullName ?? 'Attendee'}</Text>}
+                  <Text style={[styles.chatText, isMine && styles.chatTextMine]}>{msg.message}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      <View style={styles.chatComposerRow}>
+        <TextInput
+          style={styles.chatInput}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder={isConnected ? 'Message the community…' : 'Connecting…'}
+          placeholderTextColor={colors.textSecondary}
+          editable={isConnected}
+          onSubmitEditing={handleSend}
+          returnKeyType="send"
+        />
+        <TouchableOpacity style={styles.chatSendBtn} onPress={handleSend} disabled={!isConnected || !draft.trim()}>
+          <Text style={styles.chatSendBtnText}>Send</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+};
+
+const ANNOUNCEMENT_DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
+const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
+  const { data: announcements = [], isLoading } = useGetAnnouncementsQuery(eventId);
+  const [createAnnouncement, { isLoading: isPosting }] = useCreateAnnouncementMutation();
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+
+  const handlePost = async () => {
+    if (!title.trim() || !body.trim()) {
+      showAlert('Missing details', 'Add both a title and a message before posting.');
+      return;
+    }
+    try {
+      await createAnnouncement({ eventId, body: { title: title.trim(), body: body.trim() } }).unwrap();
+      setTitle('');
+      setBody('');
+    } catch (err) {
+      showAlert('Could not post announcement', extractErrorMessage(err, 'Please try again.'));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.tabContent}>
+        <ActivityIndicator color={colors.brandPink} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.tabContent}>
+      {isOwner && (
+        <View style={styles.reviewComposer}>
+          <Text style={styles.sectionLabel}>Post an Announcement</Text>
+          <TextInput
+            style={styles.chatInput}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Title"
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TextInput
+            style={[styles.chatInput, styles.reviewComposerInput]}
+            value={body}
+            onChangeText={setBody}
+            placeholder="What do you want attendees to know?"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+          />
+          <TouchableOpacity style={styles.reviewSubmitBtn} onPress={handlePost} disabled={isPosting}>
+            <Text style={styles.chatSendBtnText}>{isPosting ? 'Posting…' : 'Post Announcement'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {announcements.length === 0 ? (
+        <Text style={styles.emptyTabText}>No announcements yet.</Text>
+      ) : (
+        announcements.map((a) => (
+          <View key={a.id} style={styles.reviewCard}>
+            <Text style={styles.reviewName}>{a.title}</Text>
+            <Text style={styles.reviewText}>{a.body}</Text>
+            <Text style={styles.reviewUsername}>{ANNOUNCEMENT_DATE_FORMATTER.format(new Date(a.createdAt))}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+};
+
 type TierAvailability = 'available' | 'sold_out' | 'not_started' | 'ended';
-type DetailsTab = 'about' | 'schedule' | 'tickets' | 'community' | 'reviews' | 'gallery';
+type DetailsTab = 'about' | 'schedule' | 'tickets' | 'community' | 'announcements' | 'reviews' | 'gallery';
 
 const TABS: { key: DetailsTab; label: string }[] = [
   { key: 'about', label: 'About' },
   { key: 'schedule', label: 'Schedule' },
   { key: 'tickets', label: 'Tickets' },
   { key: 'community', label: 'Community' },
+  { key: 'announcements', label: 'Announcements' },
   { key: 'reviews', label: 'Reviews' },
   { key: 'gallery', label: 'Gallery' },
 ];
@@ -355,6 +615,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<DetailsTab>('about');
   const [descExpanded, setDescExpanded] = useState(false);
+  const [showOrganizerMenu, setShowOrganizerMenu] = useState(false);
   const authUser = useSelector((state: RootState) => state.auth.user);
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
@@ -478,11 +739,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   if (isLoading) {
-    return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator color={colors.brandPink} />
-      </View>
-    );
+    return <EventDetailsSkeleton />;
   }
 
   if (isError || !event) {
@@ -541,13 +798,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (earlyBirdTier) badges.push('Early Bird');
 
   const organizerName = event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer';
-  const description = event.description || MOCK_DESCRIPTION;
-  // TODO: add `highlights?: string[]` / `whoShouldAttend?: string[]` to BackendEvent once
-  // the backend returns them — mocked here so the About tab isn't bare for every event.
-  const highlights: string[] = (event as any).highlights?.length ? (event as any).highlights : MOCK_HIGHLIGHTS;
-  const whoShouldAttend: string[] = (event as any).whoShouldAttend?.length
-    ? (event as any).whoShouldAttend
-    : MOCK_WHO_SHOULD_ATTEND;
+  // Generic filler only when the organizer hasn't filled in the real field yet, so the
+  // About tab never looks bare — see MOCK_DESCRIPTION's own comment for why this is safe
+  // (never used for anything a buyer could treat as a purchase-affecting fact).
+  const aboutDescription = event.description || MOCK_DESCRIPTION;
+  const highlights: string[] = event.highlights?.length ? event.highlights : MOCK_HIGHLIGHTS;
+  const whoShouldAttend: string[] = event.whoShouldAttend?.length ? event.whoShouldAttend : MOCK_WHO_SHOULD_ATTEND;
 
   return (
     <View style={styles.root}>
@@ -742,45 +998,33 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'about' && (
           <View style={styles.tabContent}>
-            {event.description ? (
-              <>
-                <Text style={styles.sectionLabel}>About This Event</Text>
-                {event.description.split('\n').filter(Boolean).map((line, i) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{line}</Text>
-                  </View>
-                ))}
-              </>
-            ) : null}
+            <Text style={styles.sectionLabel}>About This Event</Text>
+            {aboutDescription.split('\n').filter(Boolean).map((line, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{line}</Text>
+              </View>
+            ))}
 
-            {(event as any).highlights?.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>Highlights</Text>
-                {(event as any).highlights.map((h: string, i: number) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{h}</Text>
-                  </View>
-                ))}
-              </>
-            )}
+            <Text style={styles.sectionLabel}>Highlights</Text>
+            {highlights.map((h, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{h}</Text>
+              </View>
+            ))}
 
-            {(event as any).whoShouldAttend?.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>Who Should Attend</Text>
-                {(event as any).whoShouldAttend.map((item: string, i: number) => (
-                  <View key={i} style={styles.bulletRow}>
-                    <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{item}</Text>
-                  </View>
-                ))}
-              </>
-            )}
+            <Text style={styles.sectionLabel}>Who Should Attend</Text>
+            {whoShouldAttend.map((item, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{item}</Text>
+              </View>
+            ))}
           </View>
         )}
 
-        {activeTab === 'schedule' && <ScheduleTab />}
+        {activeTab === 'schedule' && <ScheduleTab eventId={event.id} isOwner={isOwner} />}
 
         {activeTab === 'tickets' && (
           <View style={styles.tabContent}>
@@ -917,13 +1161,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {activeTab === 'community' && (
+        {activeTab === 'community' && event && (
           <View style={styles.tabContent}>
-            <Text style={styles.emptyTabText}>Community discussion coming soon.</Text>
+            <CommunityTab eventId={event.id} currentUserId={authUser?.id} />
           </View>
         )}
 
-        {activeTab === 'reviews' && <ReviewsTab />}
+        {activeTab === 'reviews' && <ReviewsTab eventId={event.id} isOwner={isOwner} />}
+
+        {activeTab === 'announcements' && <AnnouncementsTab eventId={event.id} isOwner={isOwner} />}
 
         {activeTab === 'gallery' && <GalleryTab gallery={mediaItems} />}
       </ScrollView>
@@ -931,28 +1177,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <View style={styles.footerContent}>
           {isOwner ? (
-            <View style={styles.ownerActions}>
-              <TouchableOpacity
-                style={[styles.bookBtn, styles.manageBtn]}
-                onPress={() => navigation.navigate('MyEvents')}
-              >
-                <Text style={styles.bookText}>Manage Event</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.bookBtn, styles.manageTicketsBtn]}
-                onPress={() => navigation.navigate('ManageTicketTypes', { eventId: event.id })}
-              >
-                <Text style={styles.bookText}>Manage Ticket Types</Text>
-              </TouchableOpacity>
-              {event.approvalStatus === 'approved' && (
-                <TouchableOpacity
-                  style={[styles.bookBtn, styles.checkInBtn]}
-                  onPress={() => navigation.navigate('CheckIn', { eventId: event.id })}
-                >
-                  <Text style={styles.bookText}>Check In Attendees</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <TouchableOpacity style={[styles.bookBtn, styles.manageBtn]} onPress={() => setShowOrganizerMenu(true)}>
+              <Text style={styles.bookText}>☰ Organizer Menu</Text>
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={[styles.bookBtn, footerDisabled ? styles.disabledBtn : {}]}
@@ -968,6 +1195,39 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       </View>
+
+      {isOwner && (
+        <HalfScreenModal visible={showOrganizerMenu} onClose={() => setShowOrganizerMenu(false)} heightPercent={0.5}>
+          <View style={styles.organizerMenu}>
+            <Text variant="h3" style={styles.organizerMenuTitle}>Organizer Menu</Text>
+            {[
+              { label: 'Manage Event', icon: '📋', onPress: () => navigation.navigate('MyEvents') },
+              {
+                label: 'Manage Ticket Types',
+                icon: '🎟️',
+                onPress: () => navigation.navigate('ManageTicketTypes', { eventId: event.id }),
+              },
+              ...(event.approvalStatus === 'approved'
+                ? [{ label: 'Check In Attendees', icon: '✅', onPress: () => navigation.navigate('CheckIn', { eventId: event.id }) }]
+                : []),
+              { label: 'Edit Schedule', icon: '🗓️', onPress: () => setActiveTab('schedule') },
+              { label: 'Post Announcement', icon: '📣', onPress: () => setActiveTab('announcements') },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.organizerMenuItem}
+                onPress={() => {
+                  setShowOrganizerMenu(false);
+                  item.onPress();
+                }}
+              >
+                <Text style={styles.organizerMenuIcon}>{item.icon}</Text>
+                <Text style={styles.organizerMenuLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </HalfScreenModal>
+      )}
     </View>
   );
 };
@@ -1167,6 +1427,77 @@ const styles = StyleSheet.create({
   bulletText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   emptyTabText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
 
+  communityWrap: { minHeight: 360 },
+  communityLoader: { marginTop: spacing.xl },
+  communyMessagesScroll: { maxHeight: 420 },
+  communityMessages: { paddingVertical: spacing.sm, gap: spacing.sm },
+  chatBubbleRow: { alignItems: 'flex-start' },
+  chatBubbleRowMine: { alignItems: 'flex-end' },
+  chatBubble: {
+    maxWidth: '80%',
+    backgroundColor: colors.neutralBg,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  chatBubbleMine: { backgroundColor: colors.brandPink },
+  chatSender: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 2 },
+  chatText: { fontSize: 14, color: colors.text },
+  chatTextMine: { color: colors.white },
+  chatComposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderLight,
+  },
+  chatInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.text,
+  },
+  chatSendBtn: {
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  chatSendBtnText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  reviewComposer: {
+    backgroundColor: colors.neutralBg,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  reviewComposerStars: { flexDirection: 'row', gap: spacing.xs },
+  reviewComposerInput: { minHeight: 70, textAlignVertical: 'top' },
+  reviewSubmitBtn: {
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  organizerMenu: { padding: spacing.md },
+  organizerMenuTitle: { marginBottom: spacing.sm },
+  organizerMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderLight,
+  },
+  organizerMenuIcon: { fontSize: 20 },
+  organizerMenuLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
+
   tierList: { gap: spacing.sm },
   tierRow: {
     flexDirection: 'row',
@@ -1247,9 +1578,6 @@ const styles = StyleSheet.create({
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
   bookBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' },
   manageBtn: { backgroundColor: colors.text },
-  manageTicketsBtn: { backgroundColor: '#6D28D9', marginTop: spacing.sm },
-  checkInBtn: { backgroundColor: '#059669', marginTop: spacing.sm },
-  ownerActions: { gap: 0 },
   disabledBtn: { backgroundColor: '#9CA3AF' },
   bookText: { color: colors.white, fontSize: 16, fontWeight: '600' },
 

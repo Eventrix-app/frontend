@@ -10,6 +10,8 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { LocationPin } from '../../components/common/Icons';
+import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 import {
@@ -22,6 +24,7 @@ import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
+import ProfileHeaderSkeleton from '../../components/common/ProfileHeaderSkeleton';
 
 const bgImage = require('../../../assets/bg.png');
 
@@ -89,10 +92,15 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const createdEventsCount = myEvents.length;
   const savedCount = favorites.length;
   const bookingsCount = enrollments.length;
+  const followingCount = me?.followingCount ?? 0;
 
   const displayName = (me?.fullName ?? '').trim() || me?.email || '';
   const initial = displayName.charAt(0).toUpperCase() || '?';
   const memberSince = me?.createdAt ? MEMBER_SINCE_FORMATTER.format(new Date(me.createdAt)) : '';
+  // Shared with HomeScreen (useDisplayAddress) so both show the exact same resolved
+  // location instead of this one showing the raw city field while Home shows the
+  // reverse-geocoded address.
+  const displayAddress = useDisplayAddress(me);
 
   const menuItems: MenuItem[] = [
     { icon: 'edit-2', label: 'Edit Profile', onPress: (nav) => nav.navigate('EditProfile') },
@@ -137,12 +145,10 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
         {me?.email ? (
           <Text variant="caption" style={styles.headerSubtext}>{me.email}</Text>
         ) : null}
-        {me?.city ? (
-          <View style={styles.locationRow}>
-            <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
-            <Text variant="caption" style={styles.headerSubtext}>{me.city}</Text>
-          </View>
-        ) : null}
+        <View style={styles.locationRow}>
+          <LocationPin size={12} color="rgba(255,255,255,0.85)" />
+          <Text variant="caption" style={styles.headerSubtext}>{displayAddress}</Text>
+        </View>
 
         <View style={[styles.statsCard, cardShadow]}>
           <StatBlock value={createdEventsCount} label="Events" />
@@ -150,6 +156,8 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
           <StatBlock value={savedCount} label="Saved" />
           <View style={styles.statDivider} />
           <StatBlock value={bookingsCount} label="Bookings" />
+          <View style={styles.statDivider} />
+          <StatBlock value={followingCount} label="Following" />
         </View>
       </LinearGradient>
 
@@ -230,11 +238,7 @@ const OrganizerProfile: React.FC<{
   const cardEvents = events.map((event) => toCardEvent(event));
 
   if (isLoading) {
-    return (
-      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={colors.brandPink} />
-      </View>
-    );
+    return <ProfileHeaderSkeleton />;
   }
 
   if (isError || !profile) {
