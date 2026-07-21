@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BackendEvent, useGetEventsQuery } from '../store/services/eventsApi';
 
 const PAGE_SIZE = 20;
@@ -8,8 +8,15 @@ const PAGE_SIZE = 20;
 // (or a large fixed limit) up front. Filters resetting (category/online) restarts from page 1.
 export function usePaginatedEvents(filters: { categoryId?: string; isOnline?: boolean; search?: string } = {}) {
   const [page, setPage] = useState(1);
-  const [events, setEvents] = useState<BackendEvent[]>([]);
-  const hasMoreRef = useRef(true);
+  // Pages are stored keyed by page number rather than appended to a flat array. `getEvents`
+  // invalidates under a single shared 'Event' tag (see eventsApi.ts), so creating, editing,
+  // or deleting *any* event anywhere in the app causes RTK Query to silently background-
+  // refetch whichever page is currently subscribed here. With a flat append-only array that
+  // refetch's result got appended a second time on top of the original, duplicating every
+  // item on the current page. Keying by page number makes a refetch of an already-loaded
+  // page replace that page's slice instead.
+  const [pagesById, setPagesById] = useState<Map<number, BackendEvent[]>>(new Map());
+  const [hasMore, setHasMore] = useState(true);
 
   const { data, isFetching, isError, refetch } = useGetEventsQuery({
     categoryId: filters.categoryId,
@@ -22,29 +29,39 @@ export function usePaginatedEvents(filters: { categoryId?: string; isOnline?: bo
   // Filters changed — start over from page 1 rather than appending onto a differently-filtered list.
   useEffect(() => {
     setPage(1);
-    setEvents([]);
-    hasMoreRef.current = true;
+    setPagesById(new Map());
+    setHasMore(true);
   }, [filters.categoryId, filters.isOnline, filters.search]);
 
   useEffect(() => {
     if (!data) return;
-    hasMoreRef.current = data.length === PAGE_SIZE;
-    setEvents((prev) => (page === 1 ? data : [...prev, ...data]));
+    setHasMore(data.length === PAGE_SIZE);
+    setPagesById((prev) => {
+      if (prev.get(page) === data) return prev; // identical reference — nothing changed
+      const next = new Map(prev);
+      next.set(page, data);
+      return next;
+    });
   }, [data, page]);
 
+  const events = useMemo(
+    () => [...pagesById.keys()].sort((a, b) => a - b).flatMap((p) => pagesById.get(p)!),
+    [pagesById],
+  );
+
   const loadMore = () => {
-    if (!isFetching && hasMoreRef.current) setPage((p) => p + 1);
+    if (!isFetching && hasMore) setPage((p) => p + 1);
   };
 
   return {
     events,
     loadMore,
-    isLoading: isFetching && page === 1,
+    isLoading: isFetching && pagesById.size === 0,
     isFetchingMore: isFetching && page > 1,
     isError,
     refetch: () => {
       setPage(1);
-      setEvents([]);
+      setPagesById(new Map());
       refetch();
     },
   };

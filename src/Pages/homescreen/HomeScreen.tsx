@@ -76,7 +76,10 @@ const HomeScreen: React.FC = () => {
   const { events, loadMore, isFetchingMore } = usePaginatedEvents();
   const { data: me } = useGetMeQuery();
   const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
-  const featured = cardEvents.filter((event) => event.featured);
+  // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
+  // here defensively so a stale cached response or a future relaxation of that cap can never
+  // blow out this carousel.
+  const featured = cardEvents.filter((event) => event.featured).slice(0, 5);
   const recommended = cardEvents;
 
   // "Lazy loading": the feed starts with just the first page instead of fetching
@@ -150,7 +153,7 @@ const HomeScreen: React.FC = () => {
   };
 
   const openCategory = (categoryKey: string) => {
-    navigation.navigate('Search', { category: categoryKey } as never);
+    navigation.navigate('Search', { category: categoryKey });
   };
 
   // "View All Events" (bottom of the events sections) goes to the full Explore screen.

@@ -4,7 +4,7 @@ export type RootStackParamList = {
   AdminRedirect: undefined;
   EventDetails: { eventId: string };
   TicketDetails: { bookingId: string };
-  Search: undefined;
+  Search: { category?: string } | undefined;
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;

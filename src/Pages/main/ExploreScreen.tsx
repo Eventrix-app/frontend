@@ -56,7 +56,7 @@ const ExploreScreen: React.FC = () => {
   };
 
   const openCategory = (categoryKey: string) => {
-    navigation.navigate('Search', { category: categoryKey } as never);
+    navigation.navigate('Search', { category: categoryKey });
   };
 
   const openInterestSheet = () => setShowInterestSheet(true);

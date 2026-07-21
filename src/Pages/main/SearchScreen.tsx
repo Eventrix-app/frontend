@@ -26,10 +26,14 @@ import Noevents from '../../components/common/Noevents';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
-const SearchScreen: React.FC<Props> = ({ navigation }) => {
+const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
+  // Pre-selects the category chip when arriving from a category tap on Home/Explore
+  // (navigation.navigate('Search', { category })) — previously dropped entirely since this
+  // screen never read its route params, so tapping a category silently landed on an
+  // unfiltered search screen.
+  const [category, setCategory] = useState<string | null>(route.params?.category ?? null);
   // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
   // sent to the backend so search runs over the full catalog, not just already-loaded pages.
   const debouncedQuery = useDebouncedValue(query.trim(), 400);
