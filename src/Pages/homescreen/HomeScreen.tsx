@@ -21,6 +21,7 @@ import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 
@@ -33,16 +34,12 @@ const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" widt
   <line x1="8" y1="22" x2="16" y2="22" stroke="#F43362" stroke-width="2" stroke-linecap="round"/>
 </svg>`;
 
-const notificationSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-  <path d="M12 2.5c-3.5 0-6 2.7-6 6.2v3.3c0 .6-.2 1.2-.6 1.7L4 15.5c-.6.7-.1 1.8.8 1.8h14.4c.9 0 1.4-1.1.8-1.8l-1.4-1.8c-.4-.5-.6-1.1-.6-1.7V8.7c0-3.5-2.5-6.2-6-6.2Z" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-</svg>`;
+// Inlined from assets/home-screen-categories/searchbar/notifications.svg and
+// notifications_unread.svg — SvgXml needs raw markup, not a require() (see
+// EventrixTabBar.tsx for why RN's Image can't render these files directly).
+const notificationSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FF3366"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></svg>`;
 
-const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-  <path d="M12 2.5c-3.5 0-6 2.7-6 6.2v3.3c0 .6-.2 1.2-.6 1.7L4 15.5c-.6.7-.1 1.8.8 1.8h14.4c.9 0 1.4-1.1.8-1.8l-1.4-1.8c-.4-.5-.6-1.1-.6-1.7V8.7c0-3.5-2.5-6.2-6-6.2Z" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="18.5" cy="5.5" r="4" fill="#FF3B30"/>
-</svg>`;
+const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#Ff3366"><path d="M480-80q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm0-420ZM160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v13q-11 22-16 45t-4 47q-10-2-19.5-3.5T480-720q-66 0-113 47t-47 113v280h320v-257q18 8 38.5 12.5T720-520v240h80v80H160Zm475-435q-35-35-35-85t35-85q35-35 85-35t85 35q35 35 35 85t-35 85q-35 35-85 35t-85-35Z"/></svg>`;
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -145,8 +142,8 @@ const HomeScreen: React.FC = () => {
   const displayAddress = accessedAddress || me?.city || 'Add your location';
   const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
 
-  // TODO: replace with real unread count from notification context/API
-  const hasUnread = true;
+  const { data: notifications = [] } = useGetNotificationsQuery();
+  const hasUnread = notifications.some((n) => !n.readAt);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });

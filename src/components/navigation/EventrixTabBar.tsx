@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     height: 60,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.white,
     paddingTop: spacing.sm,
   },
   tab: {

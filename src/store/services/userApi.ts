@@ -15,6 +15,12 @@ interface UpdateNotificationPrefsBody {
   reelsAndCommunity: boolean;
   specialOffers: boolean;
 }
+// Master per-transport switches (SettingsScreen's toggles) — distinct from the
+// onboarding-category UpdateNotificationPrefsBody above.
+interface UpdateNotificationChannelsBody {
+  pushEnabled?: boolean;
+  emailEnabled?: boolean;
+}
 
 export interface CurrentUser {
   id: string;
@@ -28,6 +34,8 @@ export interface CurrentUser {
   city: string;
   latitude: number | null;
   longitude: number | null;
+  pushEnabled: boolean;
+  emailEnabled: boolean;
   roles: string[];
   createdAt: string;
 }
@@ -65,6 +73,10 @@ export const userApi = createApi({
     updateNotificationPreferences: builder.mutation<void, UpdateNotificationPrefsBody>({
       query: (body) => ({ url: 'users/me/notification-preferences', method: 'PATCH', body }),
     }),
+    updateNotificationChannels: builder.mutation<void, UpdateNotificationChannelsBody>({
+      query: (body) => ({ url: 'users/me/notification-channels', method: 'PATCH', body }),
+      invalidatesTags: ['Me'],
+    }),
     updateParticipant: builder.mutation<void, { id: string; body: UpdateParticipantBody }>({
       query: ({ id, body }) => ({ url: `participants/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Me'],
@@ -73,6 +85,10 @@ export const userApi = createApi({
     // the backend just overwrites whatever token was stored before.
     updatePushToken: builder.mutation<void, string>({
       query: (pushToken) => ({ url: 'users/me/push-token', method: 'PATCH', body: { pushToken } }),
+    }),
+    // Called on logout — see Backend's UsersService.clearPushToken for why.
+    clearPushToken: builder.mutation<void, void>({
+      query: () => ({ url: 'users/me/push-token', method: 'DELETE' }),
     }),
   }),
 });
@@ -83,6 +99,8 @@ export const {
   useUpdateInterestsMutation,
   useUpdateLocationMutation,
   useUpdateNotificationPreferencesMutation,
+  useUpdateNotificationChannelsMutation,
   useUpdateParticipantMutation,
   useUpdatePushTokenMutation,
+  useClearPushTokenMutation,
 } = userApi;

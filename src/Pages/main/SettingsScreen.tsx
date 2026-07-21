@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +10,12 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import {
+  useGetMeQuery,
+  useUpdateNotificationChannelsMutation,
+  useClearPushTokenMutation,
+} from '../../store/services/userApi';
+import { showAlert } from '../../utils/crossPlatformAlert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -33,17 +39,47 @@ const SETTINGS: SettingRow[] = [
 const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
+  const { data: me } = useGetMeQuery();
+  const [updateNotificationChannels] = useUpdateNotificationChannelsMutation();
+  const [clearPushToken] = useClearPushTokenMutation();
+  // push/email default true (matching the backend's default for a newly created account)
+  // until `me` loads, so the switches don't flash off-then-on; location has no backend
+  // field at all and stays purely local/decorative.
   const [toggles, setToggles] = useState({
     push: true,
     email: true,
     location: false,
   });
 
-  const toggle = (id: string) => {
-    setToggles((prev) => ({ ...prev, [id]: !prev[id as keyof typeof prev] }));
+  useEffect(() => {
+    if (!me) return;
+    setToggles((prev) => ({ ...prev, push: me.pushEnabled, email: me.emailEnabled }));
+  }, [me]);
+
+  const toggle = async (id: string) => {
+    const next = !toggles[id as keyof typeof toggles];
+    setToggles((prev) => ({ ...prev, [id]: next }));
+
+    if (id !== 'push' && id !== 'email') return;
+    try {
+      await updateNotificationChannels(id === 'push' ? { pushEnabled: next } : { emailEnabled: next }).unwrap();
+    } catch {
+      // Revert so the switch stays truthful to what's actually persisted server-side.
+      setToggles((prev) => ({ ...prev, [id]: !next }));
+      showAlert('Something went wrong', "Couldn't update this setting. Please check your connection and try again.");
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Best-effort — a logged-out device shouldn't keep receiving this account's pushes,
+    // but a failure here (e.g. offline) must never block the actual logout below.
+    try {
+      await clearPushToken().unwrap();
+    } catch {
+      // ignore — the token will simply be overwritten next time someone registers on
+      // this device, or on this account's next login elsewhere.
+    }
+
     // Clears (and persists) isAuthenticated/token/user — RootNavigator watches
     // isAuthenticated and resets the root stack to 'Auth' itself once this lands (same
     // pattern as AdminRedirectScreen's logout), so no manual navigation call here. Without
