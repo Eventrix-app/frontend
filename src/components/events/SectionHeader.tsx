@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
@@ -10,14 +10,18 @@ type SectionHeaderProps = {
   hideLine?: boolean;
 };
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light, hideLine }) => (
-  <View style={styles.row}>
-    <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
-    {!hideLine && <View style={[styles.line, light && styles.lineLight]} />}
-  </View>
-);
+export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light, hideLine }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
+      {!hideLine && <View style={[styles.line, light && styles.lineLight]} />}
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',

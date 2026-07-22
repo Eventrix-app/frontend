@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   Animated,
   StyleProp,
@@ -6,7 +6,7 @@ import {
   TextStyle,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { Text } from './Text';
 
 type AnimatedLinkProps = {
@@ -17,6 +17,8 @@ type AnimatedLinkProps = {
 };
 
 const AnimatedLink: React.FC<AnimatedLinkProps> = ({ label, onPress, style, disabled }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(1)).current;
   const underline = useRef(new Animated.Value(0)).current;
 
@@ -49,7 +51,7 @@ const AnimatedLink: React.FC<AnimatedLinkProps> = ({ label, onPress, style, disa
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
     alignSelf: 'center',
     alignItems: 'center',

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 
 interface Props {
@@ -14,6 +14,8 @@ interface Props {
 }
 
 const OfflineScreen: React.FC<Props> = ({ onRetry }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.root}>
       <Image
@@ -33,7 +35,7 @@ const OfflineScreen: React.FC<Props> = ({ onRetry }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#F5F3EF',

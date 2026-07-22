@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MockEvent } from '../../data/mockEvents';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../common/Text';
+import { EventBusyIcon, LocationPin, PersonIcon, CalendarIcon, ClockIcon } from '../common/Icons';
 
 type MainEventCardProps = {
   event: MockEvent;
@@ -20,58 +21,74 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
   onPress,
   width,
   onMenuPress,
-}) => (
-  <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
-    <View style={styles.glass}>
-      <View style={styles.glassContent}>
-      <View style={styles.image}>
-        <View style={styles.imageTopRow}>
-          <Text style={styles.categoryPill}>{event.category}</Text>
-          <View style={styles.imageTopRightGroup}>
-            <View style={styles.pricePill}>
-              <Text style={styles.pricePillText}>{event.price}</Text>
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.glass}>
+        <View style={styles.glassContent}>
+        <View style={styles.image}>
+          <View style={styles.imageTopRow}>
+            <Text style={styles.categoryPill}>{event.category}</Text>
+            <View style={styles.imageTopRightGroup}>
+              <View style={styles.pricePill}>
+                <Text style={styles.pricePillText}>{event.price}</Text>
+              </View>
+              {onMenuPress && (
+                <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
+                  <Text style={styles.menuBtnText}>⋮</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            {onMenuPress && (
-              <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
-                <Text style={styles.menuBtnText}>⋮</Text>
-              </TouchableOpacity>
-            )}
           </View>
+          {typeof event.image === 'string' && event.image.startsWith('http') ? (
+            <Image source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
+          ) : typeof event.image !== 'string' ? (
+            <Image source={event.image} style={styles.cardImage} resizeMode="cover" />
+          ) : (
+            <EventBusyIcon color={colors.textSecondary} size={48} />
+          )}
+          {event.featured ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Featured</Text>
+            </View>
+          ) : null}
         </View>
-        {typeof event.image === 'string' && event.image.startsWith('http') ? (
-          <Image source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
-        ) : typeof event.image !== 'string' ? (
-          <Image source={event.image} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <Text style={styles.emoji}>🎪</Text>
-        )}
-        {event.featured ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Featured</Text>
+        <View style={styles.body}>
+          <Text style={styles.category}>{event.category}</Text>
+          <Text style={styles.title} numberOfLines={2}>
+            {event.title}
+          </Text>
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <LocationPin color={colors.textSecondary} size={12} />
+              <Text style={styles.meta} numberOfLines={1}>{event.venue}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <PersonIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.organizer}</Text>
+            </View>
           </View>
-        ) : null}
-      </View>
-      <View style={styles.body}>
-        <Text style={styles.category}>{event.category}</Text>
-        <Text style={styles.title} numberOfLines={2}>
-          {event.title}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>📍 {event.venue}</Text>
-          <Text style={styles.meta}>👤 {event.organizer}</Text>
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <CalendarIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.date}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <ClockIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.time}</Text>
+            </View>
+          </View>
+          <Text style={styles.price}>{event.price}</Text>
         </View>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>📅 {event.date}</Text>
-          <Text style={styles.meta}>🕐 {event.time}</Text>
         </View>
-        <Text style={styles.price}>{event.price}</Text>
       </View>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     borderRadius: 24,
     overflow: 'hidden',
@@ -195,6 +212,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  metaItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   meta: {
     flex: 1,

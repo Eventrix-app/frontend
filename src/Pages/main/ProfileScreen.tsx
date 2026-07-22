@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
@@ -45,11 +45,12 @@ function websiteHostname(url: string): string {
 }
 
 // Soft, colored (not flat-android-gray) shadow — the one directional-shadow treatment used
-// on every card surface across both branches, so they read as one system.
+// on every card surface across both branches, so they read as one system. shadow (brandPink)
+// is identical in both themes, so this constant doesn't need to be theme-aware.
 const cardShadow = Platform.select({
   android: { elevation: 6 },
   default: {
-    shadowColor: colors.shadow,
+    shadowColor: '#FF3366',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
@@ -84,6 +85,8 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const { data: enrollments = [] } = useGetMyEnrollmentsQuery();
   const { data: favorites = [] } = useGetMyFavoritesQuery();
   const { data: myEvents = [] } = useGetMyEventsQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // "Events" here means events this account has created/organizes, not attended — the
   // "Bookings" stat right next to it already covers the enrolled/attended side, so having
@@ -194,12 +197,16 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   );
 };
 
-const StatBlock: React.FC<{ value: number; label: string }> = ({ value, label }) => (
-  <View style={styles.stat}>
-    <Text variant="h4" color="brandPink" style={styles.statValue}>{value}</Text>
-    <Text variant="caption" color="textSecondary">{label}</Text>
-  </View>
-);
+const StatBlock: React.FC<{ value: number; label: string }> = ({ value, label }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.stat}>
+      <Text variant="h4" color="brandPink" style={styles.statValue}>{value}</Text>
+      <Text variant="caption" color="textSecondary">{label}</Text>
+    </View>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Organizer branch — public pass view of someone else's organizer account.
@@ -218,6 +225,8 @@ const OrganizerProfile: React.FC<{
   // Mutation isLoading only flips true on the next render — same double-tap gap as
   // EventDetailsScreen's isEnrollingRef, closed the same way.
   const isTogglingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleToggleFollow = async () => {
     if (!profile || isTogglingRef.current) return;
@@ -370,7 +379,7 @@ const OrganizerProfile: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
   centerText: { textAlign: 'center' },

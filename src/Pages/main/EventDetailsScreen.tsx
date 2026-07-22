@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ImageBackground,
   KeyboardAvoidingView,
@@ -16,9 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Calendar from 'expo-calendar';
+import { SvgXml } from 'react-native-svg';
 import { RootStackParamList } from '../../navigation/types';
 import { RootState } from '../../store';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
@@ -37,13 +38,36 @@ import {
   useCreateAnnouncementMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
+  useCancelEventMutation,
 } from '../../store/services/eventsApi';
-import { showAlert } from '../../utils/crossPlatformAlert';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
+import {
+  LeftArrow,
+  MenuOpenIcon,
+  MenuCloseIcon,
+  EventBusyIcon,
+  CloseCircleIcon,
+  ClipboardIcon,
+  CheckCircleIcon,
+  HourglassIcon,
+  TicketIcon,
+  PersonIcon,
+  ChatIcon,
+  PhoneIcon,
+  CalendarIcon,
+  ClockIcon,
+  LocationPin,
+  PeopleIcon,
+  MegaphoneIcon,
+  BanIcon,
+  PhotoIcon,
+  IconProps,
+} from '../../components/common/Icons';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
@@ -53,20 +77,27 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 const GALLERY_PAGE_SIZE = 6;
 const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
 
+// Inlined from assets/icons/{share,calendar}-{dark,light}.svg — react-native-svg's SvgXml
+// can't load a bare require()'d .svg file on native, same reasoning as EventInterestCard's
+// inlined badge icons. Per ticket: light mode uses the white ("-dark") variant, dark mode
+// uses the black ("-light") variant — these action buttons sit on the hero photo/gradient,
+// not on the app's own background, so the mapping is intentionally the opposite of most
+// theme-driven colors elsewhere in the app.
+const SHARE_DARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
+const SHARE_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#000" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
+const CALENDAR_DARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>`;
+const CALENDAR_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#000" d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>`;
+// From assets/events/bookmark.svg / bookmark-check.svg — same re-filled pair EventInterestCard
+// already uses for the identical unsaved/saved states, kept in sync with that card's accent.
+const BOOKMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
+const BOOKMARK_CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#F43362"><path d="m438-400 198-198-57-56-141 141-57-57-57 57 114 113ZM200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
+
 interface GalleryItem {
   id: string;
   type: 'image' | 'video';
   url: string;
   thumbnailUrl?: string;
 }
-
-const MOCK_GALLERY: GalleryItem[] = [
-  { id: 'g1', type: 'video', url: 'https://example.com/video.mp4', thumbnailUrl: 'https://picsum.photos/400/300?1' },
-  { id: 'g2', type: 'image', url: 'https://picsum.photos/400/300?2' },
-  { id: 'g3', type: 'image', url: 'https://picsum.photos/400/300?3' },
-  { id: 'g4', type: 'image', url: 'https://picsum.photos/400/300?4' },
-  { id: 'g5', type: 'image', url: 'https://picsum.photos/400/300?5' },
-];
 
 // Generic, non-factual filler content — used only when an organizer hasn't filled in the
 // real field yet, so the screen never looks bare. Never used for anything a buyer could
@@ -88,12 +119,12 @@ const MOCK_WHO_SHOULD_ATTEND = [
   'Groups, friends, and first-time explorers alike',
 ];
 
-const MOCK_TICKET_BENEFITS = ['Entry to the event', 'Access to all general areas', 'Complimentary welcome drink'];
-
 const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, style }) => {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const showSkeleton = !loaded || failed;
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={[styles.galleryThumbWrap, style]}>
@@ -115,10 +146,10 @@ const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, styl
 
 const GalleryTab: React.FC<{ gallery: GalleryItem[] }> = ({ gallery: realGallery }) => {
   const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  // Falls back to generic stock imagery when the organizer hasn't uploaded any media yet,
-  // so the tab isn't just an empty "coming soon" state for every event that lacks photos.
-  const gallery = realGallery.length > 0 ? realGallery : MOCK_GALLERY;
+  const gallery = realGallery;
 
   const heroVideo = gallery.find((g) => g.type === 'video');
   const images = gallery.filter((g) => g.type === 'image');
@@ -177,27 +208,16 @@ interface ScheduleItem {
   completed: boolean;
 }
 
-// TODO: replace with real schedule data from the backend once that endpoint exists
-const MOCK_SCHEDULE: ScheduleItem[] = [
-  { id: 's1', time: '9:00 PM', title: 'Participant Check-in Opens', completed: true },
-  { id: 's2', time: '10:00 PM', title: 'Warm-up & Briefing', completed: true },
-  { id: 's3', time: '10:30 PM', title: 'Marathon Flag-off', completed: true },
-  { id: 's4', time: '12:30 AM', title: 'Finish Line Closes', completed: false },
-  { id: 's5', time: '1:00 AM', title: 'Awards & Closing Ceremony', completed: false },
-  { id: 's6', time: '1:30 AM', title: 'Send-off and departure', completed: false },
-];
-
 const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
   const { data: realSchedule, isLoading } = useGetScheduleQuery(eventId);
   const [createScheduleItem, { isLoading: isAdding }] = useCreateScheduleItemMutation();
   const [time, setTime] = useState('');
   const [title, setTitle] = useState('');
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  // Falls back to filler content only when the organizer hasn't added a real schedule yet
-  // (same "never look bare" reasoning as MOCK_DESCRIPTION/MOCK_HIGHLIGHTS above).
-  const schedule: { id: string; time: string; title: string; completed: boolean }[] = realSchedule?.length
-    ? realSchedule.map((item) => ({ ...item, completed: false }))
-    : MOCK_SCHEDULE;
+  const schedule: { id: string; time: string; title: string; completed: boolean }[] =
+    realSchedule?.map((item) => ({ ...item, completed: false })) ?? [];
 
   const handleAdd = async () => {
     if (!time.trim() || !title.trim()) {
@@ -249,36 +269,42 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
         </View>
       )}
 
-      <View style={styles.scheduleList}>
-        {schedule.map((item, index) => {
-          const isLast = index === schedule.length - 1;
-          return (
-            <View key={item.id} style={styles.scheduleRow}>
-              <View style={styles.scheduleMarkerCol}>
-                <View style={[styles.scheduleMarker, item.completed && styles.scheduleMarkerDone]}>
-                  {item.completed && <Text style={styles.scheduleMarkerCheck}>✓</Text>}
+      {schedule.length === 0 ? (
+        <Text style={styles.emptyTabText}>No schedule yet.</Text>
+      ) : (
+        <>
+          <View style={styles.scheduleList}>
+            {schedule.map((item, index) => {
+              const isLast = index === schedule.length - 1;
+              return (
+                <View key={item.id} style={styles.scheduleRow}>
+                  <View style={styles.scheduleMarkerCol}>
+                    <View style={[styles.scheduleMarker, item.completed && styles.scheduleMarkerDone]}>
+                      {item.completed && <Text style={styles.scheduleMarkerCheck}>✓</Text>}
+                    </View>
+                    {!isLast && (
+                      <View style={[styles.scheduleLine, item.completed && styles.scheduleLineDone]} />
+                    )}
+                  </View>
+
+                  <View style={styles.scheduleCard}>
+                    <Text style={styles.scheduleTime}>{item.time}</Text>
+                    <Text style={styles.scheduleTitle}>{item.title}</Text>
+                  </View>
                 </View>
-                {!isLast && (
-                  <View style={[styles.scheduleLine, item.completed && styles.scheduleLineDone]} />
-                )}
-              </View>
+              );
+            })}
+          </View>
 
-              <View style={styles.scheduleCard}>
-                <Text style={styles.scheduleTime}>{item.time}</Text>
-                <Text style={styles.scheduleTitle}>{item.title}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.scheduleFooterNote}>
-        <Text style={styles.scheduleFooterIcon}>ⓘ</Text>
-        <Text style={styles.scheduleFooterText}>
-          Timings may vary slightly. Please arrive early. Need{' '}
-          <Text style={styles.scheduleFooterLink}>help?</Text>
-        </Text>
-      </View>
+          <View style={styles.scheduleFooterNote}>
+            <Text style={styles.scheduleFooterIcon}>ⓘ</Text>
+            <Text style={styles.scheduleFooterText}>
+              Timings may vary slightly. Please arrive early. Need{' '}
+              <Text style={styles.scheduleFooterLink}>help?</Text>
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 };
@@ -292,73 +318,39 @@ interface ReviewItem {
   text: string;
 }
 
-// TODO: replace with real reviews data from the backend once that endpoint exists
-const MOCK_REVIEWS: ReviewItem[] = [
-  {
-    id: 'r1',
-    name: 'Robert D. Jr.',
-    username: '@random_username',
-    rating: 4,
-    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
-  },
-  {
-    id: 'r2',
-    name: 'Henry F.',
-    username: '@random_username',
-    rating: 3,
-    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
-  },
-  {
-    id: 'r3',
-    name: 'Natasha W.',
-    username: '@random_username',
-    rating: 5,
-    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
-  },
-  {
-    id: 'r4',
-    name: 'James Cameron',
-    username: '@random_username',
-    rating: 1,
-    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
-  },
-  {
-    id: 'r5',
-    name: 'Aman F.',
-    username: '@random_username',
-    rating: 3,
-    text: 'Well organized event with great energy and crowd support. Well organized event with great...',
-  },
-];
-
-const StarRow: React.FC<{ rating: number }> = ({ rating }) => (
-  <View style={styles.reviewStarRow}>
-    {[1, 2, 3, 4, 5].map((n) => (
-      <Text
-        key={n}
-        style={[styles.reviewStar, n <= rating ? styles.reviewStarFilled : styles.reviewStarEmpty]}
-      >
-        ★
-      </Text>
-    ))}
-  </View>
-);
+const StarRow: React.FC<{ rating: number }> = ({ rating }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.reviewStarRow}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Text
+          key={n}
+          style={[styles.reviewStar, n <= rating ? styles.reviewStarFilled : styles.reviewStarEmpty]}
+        >
+          ★
+        </Text>
+      ))}
+    </View>
+  );
+};
 
 const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
   const { data: realReviews, isLoading } = useGetReviewsQuery(eventId);
   const [createReview, { isLoading: isSubmitting }] = useCreateReviewMutation();
   const [draftRating, setDraftRating] = useState(0);
   const [draftText, setDraftText] = useState('');
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const reviews: ReviewItem[] = realReviews?.length
-    ? realReviews.map((r) => ({
-        id: r.id,
-        name: r.user?.fullName ?? 'Attendee',
-        username: '',
-        rating: r.rating,
-        text: r.text ?? '',
-      }))
-    : MOCK_REVIEWS;
+  const reviews: ReviewItem[] =
+    realReviews?.map((r) => ({
+      id: r.id,
+      name: r.user?.fullName ?? 'Attendee',
+      username: '',
+      rating: r.rating,
+      text: r.text ?? '',
+    })) ?? [];
 
   const handleSubmit = async () => {
     if (draftRating < 1) {
@@ -408,24 +400,28 @@ const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, 
         </View>
       )}
 
-      <View style={styles.reviewList}>
-        {reviews.map((review) => (
-          <View key={review.id} style={styles.reviewCard}>
-            <View style={styles.reviewTopRow}>
-              <View style={styles.reviewAvatar}>
-                <Text style={styles.reviewAvatarIcon}>🖼️</Text>
+      {reviews.length === 0 ? (
+        <Text style={styles.emptyTabText}>No reviews yet.</Text>
+      ) : (
+        <View style={styles.reviewList}>
+          {reviews.map((review) => (
+            <View key={review.id} style={styles.reviewCard}>
+              <View style={styles.reviewTopRow}>
+                <View style={styles.reviewAvatar}>
+                  <PhotoIcon color={colors.textSecondary} size={18} />
+                </View>
+                <View style={styles.reviewNameCol}>
+                  <Text style={styles.reviewName}>{review.name}</Text>
+                  {!!review.username && <Text style={styles.reviewUsername}>{review.username}</Text>}
+                </View>
+                <StarRow rating={review.rating} />
               </View>
-              <View style={styles.reviewNameCol}>
-                <Text style={styles.reviewName}>{review.name}</Text>
-                {!!review.username && <Text style={styles.reviewUsername}>{review.username}</Text>}
-              </View>
-              <StarRow rating={review.rating} />
-            </View>
 
-            {!!review.text && <Text style={styles.reviewText}>{review.text}</Text>}
-          </View>
-        ))}
-      </View>
+              {!!review.text && <Text style={styles.reviewText}>{review.text}</Text>}
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
@@ -434,6 +430,8 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
   const { messages, sendMessage, isConnected, isLoadingHistory } = useChatSocket(eventId);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleSend = () => {
     if (!draft.trim()) return;
@@ -498,6 +496,8 @@ const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eve
   const [createAnnouncement, { isLoading: isPosting }] = useCreateAnnouncementMutation();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handlePost = async () => {
     if (!title.trim() || !body.trim()) {
@@ -616,7 +616,13 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('about');
   const [descExpanded, setDescExpanded] = useState(false);
   const [showOrganizerMenu, setShowOrganizerMenu] = useState(false);
+  // Real measured height of the sticky footer button — used as scroll padding so tab
+  // content is never hidden underneath it, instead of a guessed flat pixel value that
+  // could fall short on smaller screens or once the footer's own content changes size.
+  const [footerHeight, setFooterHeight] = useState(100);
   const authUser = useSelector((state: RootState) => state.auth.user);
+  const { colors, theme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const { data: ticketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
@@ -625,7 +631,25 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
   const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
   const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
+  const [cancelEvent, { isLoading: isCancelling }] = useCancelEventMutation();
   const saved = !!event && favorites.some((f) => f.id === event.id);
+
+  const handleCancelEvent = () => {
+    if (!event || isCancelling) return;
+    showConfirm(
+      'Cancel this event?',
+      'Every attendee with an active booking will be notified. This cannot be undone.',
+      async () => {
+        try {
+          await cancelEvent({ id: event.id }).unwrap();
+          showAlert('Event cancelled', 'Attendees have been notified.');
+        } catch (err) {
+          showAlert('Could not cancel event', extractErrorMessage(err, 'Please try again.'));
+        }
+      },
+      'Cancel Event',
+    );
+  };
 
   const handleToggleSave = async () => {
     if (!authUser) { navigation.navigate('Auth'); return; }
@@ -807,36 +831,47 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
+      {event.status === 'cancelled' && (
+        <View style={[styles.cancelledBanner, { paddingTop: insets.top + spacing.sm }]}>
+          <Text style={styles.cancelledBannerText}>This event has been cancelled.</Text>
+        </View>
+      )}
       <ImageBackground
         source={coverImage ? { uri: coverImage } : undefined}
         style={[styles.hero, { paddingTop: insets.top }]}
         resizeMode="cover"
       >
         <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
+          <LeftArrow color={colors.white} size={20} />
         </TouchableOpacity>
-        {!coverImage ? <Text style={styles.heroEmoji}>🎪</Text> : null}
+        {!coverImage ? <EventBusyIcon color="#FFFFFF" size={80} /> : null}
         <View style={styles.heroActions}>
           <TouchableOpacity style={styles.heroActionBtn} onPress={handleShare}>
-            <Text style={styles.heroActionIcon}>⤴</Text>
+            <SvgXml xml={theme === 'dark' ? SHARE_LIGHT_SVG : SHARE_DARK_SVG} width={18} height={18} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.heroActionBtn} onPress={handleAddToCalendar} disabled={isAddingToCalendar}>
             {isAddingToCalendar ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Text style={styles.heroActionIcon}>📅</Text>
+              <SvgXml xml={theme === 'dark' ? CALENDAR_LIGHT_SVG : CALENDAR_DARK_SVG} width={18} height={18} />
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.heroActionBtn} onPress={handleToggleSave}>
-            <Text>{saved ? '❤️' : '🤍'}</Text>
+            <SvgXml xml={saved ? BOOKMARK_CHECK_SVG : BOOKMARK_SVG} width={18} height={18} />
           </TouchableOpacity>
         </View>
       </ImageBackground>
 
-      <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={{ paddingBottom: insets.bottom + (isOwner ? spacing.xxl : footerHeight + spacing.md) }}
+      >
         {isOwner && event.approvalStatus === 'rejected' && (
           <View style={styles.rejectionBanner}>
-            <Text style={styles.rejectionTitle}>❌ Event Rejected</Text>
+            <View style={styles.bannerTitleRow}>
+              <CloseCircleIcon color="#DC2626" size={16} />
+              <Text style={styles.rejectionTitle}>Event Rejected</Text>
+            </View>
             {event.rejectionReason ? (
               <Text style={styles.rejectionReason}>{event.rejectionReason}</Text>
             ) : null}
@@ -851,7 +886,10 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {isOwner && event.approvalStatus === 'draft' && (
           <View style={styles.draftBanner}>
-            <Text style={styles.draftTitle}>📝 Draft</Text>
+            <View style={styles.bannerTitleRow}>
+              <ClipboardIcon color={colors.text} size={16} />
+              <Text style={styles.draftTitle}>Draft</Text>
+            </View>
             <TouchableOpacity
               style={styles.editBtn}
               onPress={() => navigation.navigate('CreateEvent', { eventId: event.id })}
@@ -864,9 +902,16 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {isOwner && (event.approvalStatus === 'pending_approval' || event.approvalStatus === 'approved') && (
           <View style={styles.salesBanner}>
             <View style={styles.salesBannerHeader}>
-              <Text style={styles.salesText}>
-                {event.approvalStatus === 'pending_approval' ? '⏳ Pending Review' : '✅ Approved'}
-              </Text>
+              <View style={styles.bannerTitleRow}>
+                {event.approvalStatus === 'pending_approval' ? (
+                  <HourglassIcon color="#065F46" size={15} />
+                ) : (
+                  <CheckCircleIcon color="#065F46" size={15} />
+                )}
+                <Text style={styles.salesText}>
+                  {event.approvalStatus === 'pending_approval' ? 'Pending Review' : 'Approved'}
+                </Text>
+              </View>
               {event.approvalStatus === 'approved' && (
                 <TouchableOpacity
                   style={styles.editBtn}
@@ -877,9 +922,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               )}
             </View>
             {event.totalCapacity != null && event.availableTickets != null && (
-              <Text style={styles.salesCount}>
-                🎫 {event.totalCapacity - event.availableTickets} / {event.totalCapacity} tickets sold
-              </Text>
+              <View style={styles.bannerTitleRow}>
+                <TicketIcon color="#047857" size={14} />
+                <Text style={styles.salesCount}>
+                  {event.totalCapacity - event.availableTickets} / {event.totalCapacity} tickets sold
+                </Text>
+              </View>
             )}
           </View>
         )}
@@ -902,7 +950,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.organizerRow}>
           <View style={styles.organizerAvatar}>
-            <Text style={styles.organizerAvatarText}>👤</Text>
+            <PersonIcon color={colors.textSecondary} size={20} />
           </View>
           <View style={styles.organizerInfo}>
             <Text style={styles.organizerName}>{organizerName}</Text>
@@ -918,10 +966,10 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           <View style={styles.organizerActions}>
             <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
-              <Text style={styles.organizerActionIcon}>💬</Text>
+              <ChatIcon color={colors.brandPink} size={15} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
-              <Text style={styles.organizerActionIcon}>📞</Text>
+              <PhoneIcon color={colors.brandPink} size={15} />
             </TouchableOpacity>
           </View>
         </View>
@@ -943,15 +991,21 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.sectionLabel}>When-n-where?</Text>
         <View style={styles.whenWhereBlock}>
           <View style={styles.infoLine}>
-            <Text style={styles.infoIcon}>🗓️</Text>
+            <View style={styles.infoIconWrap}>
+              <CalendarIcon color={colors.text} size={15} />
+            </View>
             <Text style={styles.infoLineText}>{formatEventDate(event.eventDate)}</Text>
           </View>
           <View style={styles.infoLine}>
-            <Text style={styles.infoIcon}>🕐</Text>
+            <View style={styles.infoIconWrap}>
+              <ClockIcon color={colors.text} size={15} />
+            </View>
             <Text style={styles.infoLineText}>{formatEventTime(event.startTime)}</Text>
           </View>
           <View style={styles.infoLine}>
-            <Text style={styles.infoIcon}>📍</Text>
+            <View style={styles.infoIconWrap}>
+              <LocationPin color={colors.text} size={15} />
+            </View>
             <Text style={styles.infoLineText}>{event.venueName}</Text>
           </View>
         </View>
@@ -960,7 +1014,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.quickInfoRow}>
           {event.totalCapacity != null && (
             <View style={styles.quickInfoCard}>
-              <Text style={styles.quickInfoIcon}>👥</Text>
+              <PeopleIcon color={colors.text} size={20} />
               <View>
                 <Text style={styles.quickInfoLabel}>Capacity</Text>
                 <Text style={styles.quickInfoValue}>{event.totalCapacity} Participants</Text>
@@ -968,7 +1022,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
           <View style={styles.quickInfoCard}>
-            <Text style={styles.quickInfoIcon}>🎟️</Text>
+            <TicketIcon color={colors.text} size={20} />
             <View>
               <Text style={styles.quickInfoLabel}>Entry Type</Text>
               <Text style={styles.quickInfoValue}>{event.isPaid ? 'Paid (Online/Offline)' : 'Free'}</Text>
@@ -1174,13 +1228,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {activeTab === 'gallery' && <GalleryTab gallery={mediaItems} />}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={styles.footerContent}>
-          {isOwner ? (
-            <TouchableOpacity style={[styles.bookBtn, styles.manageBtn]} onPress={() => setShowOrganizerMenu(true)}>
-              <Text style={styles.bookText}>☰ Organizer Menu</Text>
-            </TouchableOpacity>
-          ) : (
+      {!isOwner && (
+        <View
+          style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}
+          onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+        >
+          <View style={styles.footerContent}>
             <TouchableOpacity
               style={[styles.bookBtn, footerDisabled ? styles.disabledBtn : {}]}
               onPress={handleEnroll}
@@ -1192,27 +1245,40 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.bookText}>{footerLabel}</Text>
               )}
             </TouchableOpacity>
-          )}
+          </View>
         </View>
-      </View>
+      )}
+
+      {isOwner && (
+        <TouchableOpacity
+          style={[styles.organizerMenuFab, { bottom: insets.bottom + spacing.md }]}
+          onPress={() => setShowOrganizerMenu((v) => !v)}
+          accessibilityLabel={showOrganizerMenu ? 'Close organizer menu' : 'Open organizer menu'}
+        >
+          {showOrganizerMenu ? <MenuCloseIcon color="#FFFFFF" size={22} /> : <MenuOpenIcon color="#FFFFFF" size={22} />}
+        </TouchableOpacity>
+      )}
 
       {isOwner && (
         <HalfScreenModal visible={showOrganizerMenu} onClose={() => setShowOrganizerMenu(false)} heightPercent={0.5}>
           <View style={styles.organizerMenu}>
             <Text variant="h3" style={styles.organizerMenuTitle}>Organizer Menu</Text>
-            {[
-              { label: 'Manage Event', icon: '📋', onPress: () => navigation.navigate('MyEvents') },
+            {([
+              { label: 'Manage Event', Icon: ClipboardIcon, onPress: () => navigation.navigate('MyEvents') },
               {
                 label: 'Manage Ticket Types',
-                icon: '🎟️',
+                Icon: TicketIcon,
                 onPress: () => navigation.navigate('ManageTicketTypes', { eventId: event.id }),
               },
               ...(event.approvalStatus === 'approved'
-                ? [{ label: 'Check In Attendees', icon: '✅', onPress: () => navigation.navigate('CheckIn', { eventId: event.id }) }]
+                ? [{ label: 'Check In Attendees', Icon: CheckCircleIcon, onPress: () => navigation.navigate('CheckIn', { eventId: event.id }) }]
                 : []),
-              { label: 'Edit Schedule', icon: '🗓️', onPress: () => setActiveTab('schedule') },
-              { label: 'Post Announcement', icon: '📣', onPress: () => setActiveTab('announcements') },
-            ].map((item) => (
+              { label: 'Edit Schedule', Icon: CalendarIcon, onPress: () => setActiveTab('schedule') },
+              { label: 'Post Announcement', Icon: MegaphoneIcon, onPress: () => setActiveTab('announcements') },
+              ...(event.status !== 'cancelled'
+                ? [{ label: 'Cancel Event', Icon: BanIcon, onPress: handleCancelEvent, destructive: true }]
+                : []),
+            ] as { label: string; Icon: React.FC<IconProps>; onPress: () => void; destructive?: boolean }[]).map((item) => (
               <TouchableOpacity
                 key={item.label}
                 style={styles.organizerMenuItem}
@@ -1221,8 +1287,13 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   item.onPress();
                 }}
               >
-                <Text style={styles.organizerMenuIcon}>{item.icon}</Text>
-                <Text style={styles.organizerMenuLabel}>{item.label}</Text>
+                <item.Icon
+                  color={item.destructive ? colors.error : colors.text}
+                  size={20}
+                />
+                <Text style={[styles.organizerMenuLabel, item.destructive && styles.organizerMenuLabelDestructive]}>
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -1232,7 +1303,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
   errorText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
@@ -1258,7 +1329,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: { color: colors.white, fontSize: 22 },
   heroActions: {
     position: 'absolute',
     right: spacing.md,
@@ -1274,12 +1344,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroActionIcon: { fontSize: 17, color: colors.white },
   heroEmoji: { fontSize: 80 },
   body: {
     flex: 1,
     marginTop: -24,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: spacing.md,
@@ -1291,6 +1360,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.xs,
   },
+  bannerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rejectionTitle: { color: '#DC2626', fontSize: 15, fontFamily: 'ZalandoSansExpanded_700Bold' },
   rejectionReason: { color: '#7F1D1D', fontSize: 13 },
   resubmitBtn: {
@@ -1302,7 +1372,7 @@ const styles = StyleSheet.create({
   },
   resubmitBtnText: { color: colors.white, fontWeight: '600' },
   draftBanner: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1357,7 +1427,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -1387,7 +1457,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   descCard: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1398,6 +1468,7 @@ const styles = StyleSheet.create({
   whenWhereBlock: { gap: spacing.sm, marginBottom: spacing.md },
   infoLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   infoIcon: { fontSize: 15, width: 22 },
+  infoIconWrap: { width: 22, alignItems: 'center' },
   infoLineText: { fontSize: 14, color: colors.text },
 
   quickInfoRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
@@ -1406,7 +1477,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.md,
     padding: spacing.md,
   },
@@ -1497,6 +1568,14 @@ const styles = StyleSheet.create({
   },
   organizerMenuIcon: { fontSize: 20 },
   organizerMenuLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
+  organizerMenuLabelDestructive: { color: colors.error },
+  cancelledBanner: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  cancelledBannerText: { color: colors.white, fontWeight: '700', fontSize: 13 },
 
   tierList: { gap: spacing.sm },
   tierRow: {
@@ -1530,7 +1609,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1577,8 +1656,26 @@ const styles = StyleSheet.create({
   },
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
   bookBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' },
-  manageBtn: { backgroundColor: colors.text },
   disabledBtn: { backgroundColor: '#9CA3AF' },
+  organizerMenuFab: {
+    position: 'absolute',
+    left: spacing.md,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.brandPink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+      },
+    }),
+  },
   bookText: { color: colors.white, fontSize: 16, fontWeight: '600' },
 
   ticketStubList: { gap: spacing.md },
@@ -1654,7 +1751,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.muted,
   },
   galleryPlayBtn: {
     width: 56,
@@ -1673,7 +1770,7 @@ const styles = StyleSheet.create({
   galleryThumbWrap: {
     borderRadius: borderRadius.md,
     overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
   },
   galleryTallCell: { height: 180 },
   galleryShortCell: { height: 130 },
@@ -1697,17 +1794,17 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scheduleMarkerDone: { backgroundColor: '#10B981' },
   scheduleMarkerCheck: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  scheduleLine: { width: 2, flex: 1, minHeight: 40, backgroundColor: '#D1D5DB', marginTop: 2 },
+  scheduleLine: { width: 2, flex: 1, minHeight: 40, backgroundColor: colors.border, marginTop: 2 },
   scheduleLineDone: { backgroundColor: '#10B981' },
   scheduleCard: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1728,7 +1825,7 @@ const styles = StyleSheet.create({
   // --- Reviews tab ---
   reviewList: { gap: spacing.md, paddingTop: spacing.sm },
   reviewCard: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
   },
@@ -1741,7 +1838,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,

@@ -5,6 +5,12 @@ export interface PendingSyncEntry {
   ticketCode: string;
   enrollmentId: string;
   checkedInAt: string;
+  // Bumped by useCheckInSyncRetry each time a sync attempt fails for a reason other than
+  // "already checked in" or an expired session (both of which are handled separately) —
+  // e.g. a malformed ticket code the backend will never accept. Without tracking this, an
+  // entry like that retries silently forever on every reconnect with no visible sign it's
+  // permanently stuck rather than just waiting on connectivity.
+  retryCount?: number;
 }
 
 interface EventCheckInCache {
@@ -47,8 +53,14 @@ const checkInCacheSlice = createSlice({
       if (!bucket) return;
       bucket.pendingSync = bucket.pendingSync.filter((p) => p.ticketCode !== ticketCode);
     },
+    markPendingSyncFailed(state, action: PayloadAction<{ eventId: string; ticketCode: string }>) {
+      const { eventId, ticketCode } = action.payload;
+      const entry = state[eventId]?.pendingSync.find((p) => p.ticketCode === ticketCode);
+      if (!entry) return;
+      entry.retryCount = (entry.retryCount ?? 0) + 1;
+    },
   },
 });
 
-export const { cacheEnrollments, markCheckedInLocally, clearPendingSync } = checkInCacheSlice.actions;
+export const { cacheEnrollments, markCheckedInLocally, clearPendingSync, markPendingSyncFailed } = checkInCacheSlice.actions;
 export default checkInCacheSlice.reducer;

@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   StyleSheet,
   TextInput,
@@ -14,13 +13,17 @@ import { CameraView, useCameraPermissions, BarcodeType } from 'expo-camera';
 import NetInfo from '@react-native-community/netinfo';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventEnrollmentsQuery, useCheckInMutation, EnrollmentRecord } from '../../store/services/eventsApi';
 import { cacheEnrollments, markCheckedInLocally } from '../../store/slices/checkInCacheSlice';
 import { AppDispatch, RootState } from '../../store';
 import { Text } from '../../components/common/Text';
+import { ScreenHeader } from '../../components/common/ScreenHeader';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { showAlert } from '../../utils/crossPlatformAlert';
+import { WifiOffIcon, SyncIcon, CameraIcon, SearchIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CheckIn'>;
 
@@ -42,6 +45,14 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isOffline, setIsOffline] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
+  // RTK Query's isCheckingIn only reflects the mutation itself, and doesn't cover the
+  // offline path at all (handleOfflineCheckIn never calls the mutation) or the
+  // NetInfo.fetch() await before it — a fast double-tap can fire again in that gap, before
+  // isCheckingIn's re-render lands. A synchronous ref, set before any await, is what every
+  // other mutation screen in the app uses for the same reason.
+  const isSubmittingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: liveEnrollments = [], isLoading: loadingEnrollments } = useGetEventEnrollmentsQuery(eventId);
   const [checkIn, { isLoading: isCheckingIn }] = useCheckInMutation();
@@ -88,14 +99,14 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       (e) => e.ticketCode === ticketCode || (!!enrollmentId && e.id === enrollmentId),
     );
     if (!target) {
-      Alert.alert(
+      showAlert(
         'Invalid Ticket',
         "This ticket isn't in the cached attendee list for this event. Reconnect once to refresh it.",
       );
       return;
     }
     if (target.checkedInAt) {
-      Alert.alert('Already Checked In', 'This ticket was already used.');
+      showAlert('Already Checked In', 'This ticket was already used.');
       return;
     }
     dispatch(
@@ -106,47 +117,53 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
         checkedInAt: new Date().toISOString(),
       }),
     );
-    Alert.alert('✓ Checked In (Offline)', "Saved locally — it'll sync once you're back online.");
+    showAlert('Checked In (Offline)', "Saved locally — it'll sync once you're back online.");
     setManualCode('');
   };
 
   const handleCheckIn = async (ticketCode: string, enrollmentId?: string) => {
     const code = ticketCode.trim();
     if (!code) {
-      Alert.alert('Error', 'Ticket code is required');
+      showAlert('Error', 'Ticket code is required');
       return;
     }
-
-    const netState = await NetInfo.fetch();
-    const online = netState.isConnected !== false && netState.isInternetReachable !== false;
-    if (!online) {
-      handleOfflineCheckIn(code, enrollmentId);
-      return;
-    }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     try {
-      await checkIn({ ticketCode: code }).unwrap();
-      if (enrollmentId) {
-        setCheckedInIds((prev) => new Set(prev).add(enrollmentId));
-      }
-      Alert.alert('✅ Checked In', 'Ticket successfully checked in.');
-      setManualCode('');
-    } catch (e: any) {
-      // The device can drop signal between the NetInfo check above and this request
-      // actually reaching the backend — fall back to the offline path instead of
-      // surfacing a raw network error for what is still a connectivity problem.
-      if (e?.status === 'FETCH_ERROR' || e?.status === 'TIMEOUT_ERROR') {
+      const netState = await NetInfo.fetch();
+      const online = netState.isConnected !== false && netState.isInternetReachable !== false;
+      if (!online) {
         handleOfflineCheckIn(code, enrollmentId);
         return;
       }
-      const msg: string = e?.data?.message ?? 'Check-in failed';
-      if (msg.toLowerCase().includes('already')) {
-        Alert.alert('Already Checked In', 'This ticket was already used.');
-      } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired')) {
-        Alert.alert('Invalid Ticket', 'This ticket code is invalid or has been tampered with.');
-      } else {
-        Alert.alert('Error', msg);
+
+      try {
+        await checkIn({ ticketCode: code }).unwrap();
+        if (enrollmentId) {
+          setCheckedInIds((prev) => new Set(prev).add(enrollmentId));
+        }
+        showAlert('Checked In', 'Ticket successfully checked in.');
+        setManualCode('');
+      } catch (e: any) {
+        // The device can drop signal between the NetInfo check above and this request
+        // actually reaching the backend — fall back to the offline path instead of
+        // surfacing a raw network error for what is still a connectivity problem.
+        if (e?.status === 'FETCH_ERROR' || e?.status === 'TIMEOUT_ERROR') {
+          handleOfflineCheckIn(code, enrollmentId);
+          return;
+        }
+        const msg: string = e?.data?.message ?? 'Check-in failed';
+        if (msg.toLowerCase().includes('already')) {
+          showAlert('Already Checked In', 'This ticket was already used.');
+        } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired')) {
+          showAlert('Invalid Ticket', 'This ticket code is invalid or has been tampered with.');
+        } else {
+          showAlert('Error', msg);
+        }
       }
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -195,17 +212,17 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Check In</Text>
-      </View>
+      <ScreenHeader title="Check In" onBack={() => navigation.goBack()} />
 
       {(isOffline || pendingSync.length > 0) && (
         <View style={styles.offlineBanner}>
+          {isOffline ? (
+            <WifiOffIcon color="#92400E" size={14} />
+          ) : (
+            <SyncIcon color="#92400E" size={14} />
+          )}
           <Text style={styles.offlineBannerText}>
-            {isOffline ? '📴 Offline — check-ins are being saved locally' : '🔄 Syncing queued check-ins…'}
+            {isOffline ? 'Offline — check-ins are being saved locally' : 'Syncing queued check-ins…'}
             {pendingSync.length > 0 ? ` · ${pendingSync.length} pending` : ''}
           </Text>
         </View>
@@ -213,19 +230,21 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.modeTabs}>
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'scanner' && styles.modeTabActive]}
+          style={[styles.modeTab, styles.modeTabRow, mode === 'scanner' && styles.modeTabActive]}
           onPress={() => setMode('scanner')}
         >
+          <CameraIcon color={mode === 'scanner' ? colors.brandPink : colors.textSecondary} size={15} />
           <Text style={[styles.modeTabText, mode === 'scanner' && styles.modeTabTextActive]}>
-            📷 QR / Code
+            QR / Code
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'search' && styles.modeTabActive]}
+          style={[styles.modeTab, styles.modeTabRow, mode === 'search' && styles.modeTabActive]}
           onPress={() => setMode('search')}
         >
+          <SearchIcon color={mode === 'search' ? colors.brandPink : colors.textSecondary} size={15} />
           <Text style={[styles.modeTabText, mode === 'search' && styles.modeTabTextActive]}>
-            🔍 Search by Name
+            Search by Name
           </Text>
         </TouchableOpacity>
       </View>
@@ -242,7 +261,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           ) : (
             <View style={styles.scannerPlaceholder}>
-              <Text style={styles.scannerPlaceholderText}>📷</Text>
+              <CameraIcon color="#aaa" size={48} />
               <Text style={styles.scannerPlaceholderSub}>
                 {permission === null
                   ? 'Checking camera permission…'
@@ -288,7 +307,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
             autoCapitalize="none"
           />
           {loadingEnrollments && enrollments.length === 0 ? (
-            <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+            <SimpleListSkeleton count={3} />
           ) : (
             <FlatList
               data={filtered}
@@ -308,28 +327,13 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  header: {
+  offlineBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, color: colors.text,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
-  offlineBanner: {
+    gap: 6,
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
     paddingVertical: 8,
@@ -347,6 +351,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modeTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: borderRadius.sm },
+  modeTabRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
   modeTabActive: { backgroundColor: colors.white },
   modeTabText: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
   modeTabTextActive: { color: colors.brandPink, fontWeight: '700' },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Image,
   ImageSourcePropType,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
@@ -19,14 +19,15 @@ type AuthInputProps = TextInputProps & {
   error?: string;
 };
 
-const EyeIcon = ({ color = colors.brandPink, size = 20 }) => (
+// brandPink is identical in both themes, so a hardcoded fallback here is safe.
+const EyeIcon = ({ color = '#FF3366', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <Circle cx="12" cy="12" r="3" />
   </Svg>
 );
 
-const EyeOffIcon = ({ color = colors.brandPink, size = 20 }) => (
+const EyeOffIcon = ({ color = '#FF3366', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
     <Path d="M1 1l22 22" />
@@ -41,6 +42,8 @@ export const AuthInput: React.FC<AuthInputProps> = ({
   ...props
 }) => {
   const [hidden, setHidden] = useState(secureTextEntry);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={styles.wrap}>
@@ -53,7 +56,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
             : null}
           <TextInput
             style={[styles.input, style]}
-            placeholderTextColor="rgba(26,26,46,0.45)"
+            placeholderTextColor={colors.placeholder}
             secureTextEntry={hidden}
             {...props}
           />
@@ -69,7 +72,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
     marginBottom: spacing.md,
   },
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#0D0D0D',
+    color: colors.text,
     padding: 0,
     backgroundColor: 'transparent',
     height: '100%',

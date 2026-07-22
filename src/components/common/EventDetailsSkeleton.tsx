@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Skeleton from './Skeleton';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 
 // Full-screen initial-load placeholder for EventDetailsScreen — hero image, title/meta
 // lines, a tab row, and a couple of content lines, roughly matching the real layout so the
 // screen doesn't visibly "jump" once data lands.
 const EventDetailsSkeleton: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.root}>
       <Skeleton width="100%" height={260 + insets.top} variant="rect" style={styles.hero} />
@@ -34,7 +36,7 @@ const EventDetailsSkeleton: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   hero: { borderRadius: 0 },
   body: { padding: spacing.md },

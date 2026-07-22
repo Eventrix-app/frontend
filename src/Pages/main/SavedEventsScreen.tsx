@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,9 +10,11 @@ import { toCardEvent } from '../../utils/eventCardAdapter';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
+import EventListSkeleton from '../../components/common/EventListSkeleton';
+import { HeartIcon, TrashIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SavedEvents'>;
 
@@ -25,6 +27,8 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
   // Which card's "..." menu is open, if any — a single shared bottom sheet rather than
   // one per card, closed by clearing this back to null.
   const [menuEventId, setMenuEventId] = useState<string | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const menuEventTitle = savedEvents.find((e) => e.id === menuEventId)?.title;
 
   const handleRemove = async () => {
@@ -42,12 +46,13 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Saved Events" onBack={() => navigation.goBack()} />
 
+      {isLoading ? (
+        <EventListSkeleton />
+      ) : (
       <ScrollView contentContainerStyle={styles.scroll}>
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
-        ) : savedEvents.length === 0 ? (
+        {savedEvents.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>❤️</Text>
+            <HeartIcon color={colors.textSecondary} size={56} />
             <Text style={styles.emptyTitle}>No saved events yet</Text>
             <Text style={styles.emptySub}>
               Tap the heart on any event to save it for later
@@ -64,6 +69,7 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
           ))
         )}
       </ScrollView>
+      )}
 
       <HalfScreenModal visible={menuEventId !== null} onClose={() => setMenuEventId(null)} heightPercent={0.26}>
         <View style={styles.menuSheet}>
@@ -75,7 +81,7 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
               <ActivityIndicator color="#DC2626" size="small" />
             ) : (
               <>
-                <Text style={styles.menuRowIcon}>🗑️</Text>
+                <TrashIcon color="#DC2626" size={16} />
                 <Text style={styles.menuRowDestructiveText}>Remove from Saved</Text>
               </>
             )}
@@ -89,7 +95,7 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,

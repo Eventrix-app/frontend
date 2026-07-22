@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Card } from '../common';
-import theme from '../../theme';
+import { spacing } from '../../theme/spacing';
 
 interface Category {
   id: string;
@@ -56,13 +56,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -theme.spacing.sm,
+    marginHorizontal: -spacing.sm,
   },
   categoryItem: {
-    padding: theme.spacing.sm,
+    padding: spacing.sm,
   },
   categoryCard: {
-    padding: theme.spacing.lg,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   categoryContent: {
@@ -74,14 +74,14 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   categoryIcon: {
     fontSize: 28,
   },
   categoryName: {
     fontWeight: '600',
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   eventCount: {
     textAlign: 'center',

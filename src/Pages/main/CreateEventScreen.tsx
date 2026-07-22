@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,8 +13,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
@@ -30,11 +32,13 @@ import {
 } from '../../store/services/eventsApi';
 import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { useRefreshMutation } from '../../store/services/authApi';
+import { useGetMyVerificationStatusQuery } from '../../store/services/organizerApi';
 import * as ImagePicker from 'expo-image-picker';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
-import { parseDateValue, parseTimeValue, formatTimeValue, formatTimeDisplay } from '../../utils/dateFormat';
+import { parseDateValue, parseTimeValue, formatDateValue, formatTimeValue, formatTimeDisplay } from '../../utils/dateFormat';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
+import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { LocationPickerModal } from '../../components/common/LocationPickerModal';
 import { Feather } from '@expo/vector-icons';
 import TicketTypeEditor, {
@@ -57,8 +61,37 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { eventId } = route.params ?? {};
   const isEdit = !!eventId;
-  const prefilledRef = useRef(false);
+  // Keyed by eventId (not a plain boolean) — React Navigation can reuse this screen's
+  // mounted instance across two different "edit event" pushes (e.g. a notification
+  // deep-link to event B while event A was still being edited). A plain "have I ever
+  // prefilled" flag would then leave event A's data on screen while silently submitting
+  // against event B's id; re-keying on the id forces a fresh prefill whenever it changes.
+  const prefilledForRef = useRef<string | null>(null);
   const originalApprovalStatusRef = useRef<string | undefined>(undefined);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  // Admins bypass the KYC gate the same way EventsService.createForUser does server-side
+  // (they're not expected to hold an organizer profile of their own) — in practice admins
+  // are routed to a separate web dashboard and never reach this screen, but the check
+  // stays consistent with the backend rather than assuming that routing never changes.
+  const isAdmin = useSelector((state: RootState) => (state.auth.user?.roles ?? []).includes('admin'));
+  // Only a brand-new event needs the verification gate — an organizer editing an event
+  // they already created has, by definition, already been through it (#7).
+  const { data: verificationStatus, isLoading: isLoadingVerification } = useGetMyVerificationStatusQuery(undefined, {
+    skip: isEdit || isAdmin,
+  });
+
+  // Unverified/pending/rejected organizers never see the create-event form at all — they're
+  // sent straight to the verification screen instead of a gate card with a "Get Verified"
+  // button, per product decision. `replace` (not `navigate`) so OrganizerVerification's own
+  // back button returns to wherever the user was before tapping "Create Event", not into
+  // this now-redirected screen.
+  useEffect(() => {
+    if (isEdit || isAdmin || isLoadingVerification) return;
+    if (verificationStatus?.status !== 'approved') {
+      navigation.replace('OrganizerVerification');
+    }
+  }, [isEdit, isAdmin, isLoadingVerification, verificationStatus, navigation]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -121,7 +154,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const isApprovedEdit = isEdit && existingEvent?.approvalStatus === 'approved';
 
   useEffect(() => {
-    if (!isEdit || !existingEvent || prefilledRef.current) {
+    if (!isEdit || !existingEvent || prefilledForRef.current === existingEvent.id) {
       return;
     }
 
@@ -146,7 +179,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     setCapacity(existingEvent.capacity != null ? String(existingEvent.capacity) : '');
 
     originalApprovalStatusRef.current = existingEvent.approvalStatus;
-    prefilledRef.current = true;
+    prefilledForRef.current = existingEvent.id;
   }, [existingEvent, isEdit]);
 
   const buildPayload = (asDraft: boolean) => {
@@ -155,6 +188,15 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     // real tiers so they stay roughly accurate; ticketTypes below is the source of truth.
     const paidPrices = tiers.map((t) => Number(t.price) || 0).filter((p) => p > 0);
     const representativePrice = isFree ? 0 : (paidPrices.length ? Math.min(...paidPrices) : 0);
+
+    // endTime <= startTime means the event runs past midnight (validate() above only
+    // rejects the two being exactly equal) — tell the backend explicitly via eventEndDate
+    // rather than leaving it to default to eventDate, which would make
+    // getEventEndDateTime compute an end instant before the event's own start instant.
+    const crossesMidnight = !!endTime && parseTimeValue(endTime).getTime() < parseTimeValue(startTime).getTime();
+    const eventEndDate = crossesMidnight
+      ? formatDateValue(new Date(parseDateValue(eventDate).getTime() + 24 * 60 * 60 * 1000))
+      : undefined;
 
     return {
       title: title.trim(),
@@ -169,6 +211,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       eventDate,
       startTime,
       endTime: endTime || undefined,
+      eventEndDate,
       // Only meaningful on create — `tiers` isn't populated with the event's real ticket
       // types in edit mode (pricing is owned by "Manage Ticket Types" post-creation), so
       // representativePrice is always 0 here. Sending it on edit would make the backend's
@@ -210,8 +253,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (parseDateValue(eventDate) < today) return 'Event date cannot be in the past';
-    if (endTime && parseTimeValue(endTime) <= parseTimeValue(startTime)) {
-      return 'End time must be after start time';
+    // An end time earlier than the start time isn't invalid — it means the event runs
+    // past midnight (e.g. 10 PM-2 AM), which buildPayload() below handles by sending
+    // eventEndDate as the following day. Only a truly zero-length event (identical start
+    // and end) is rejected here.
+    if (endTime && parseTimeValue(endTime).getTime() === parseTimeValue(startTime).getTime()) {
+      return 'End time must be different from start time';
     }
     if (isOnline && !meetingLink) return 'Meeting link is required for online events';
     if (capacity.trim() && (!/^\d+$/.test(capacity.trim()) || Number(capacity.trim()) < 1)) {
@@ -417,14 +464,21 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  // Blocks event creation until an admin has approved this organizer's KYC submission
+  // (#7) — mirrors the same check EventsService.createForUser enforces server-side. The
+  // redirect effect above sends the user to OrganizerVerification; this just keeps the
+  // form from flashing on screen during that one render before the redirect fires.
+  if (!isEdit && !isAdmin && (isLoadingVerification || verificationStatus?.status !== 'approved')) {
+    return (
+      <View style={[styles.root, styles.verificationGate, { paddingTop: insets.top }]}>
+        <ActivityIndicator color={colors.brandPink} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>{isEdit ? 'Edit Event' : 'Create Event'}</Text>
-      </View>
+      <ScreenHeader title={isEdit ? 'Edit Event' : 'Create Event'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}>
         {isApprovedEdit && (
@@ -733,27 +787,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, color: colors.text,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
+  verificationGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
   scroll: { padding: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
   mapPinBtn: {

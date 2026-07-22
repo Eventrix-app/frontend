@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -9,17 +9,19 @@ import {
   useMarkAllNotificationsReadMutation,
 } from '../../store/services/notificationsApi';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { MegaphoneIcon, TicketIcon, WalletIcon, NotificationBell, IconProps } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
-const TYPE_ICONS: Record<string, string> = {
-  event_changed: '📢',
-  waitlist_promoted: '🎫',
-  refund_status: '💳',
+const TYPE_ICONS: Record<string, React.FC<IconProps>> = {
+  event_changed: MegaphoneIcon,
+  waitlist_promoted: TicketIcon,
+  refund_status: WalletIcon,
 };
 
 function formatTimeAgo(createdAt: string): string {
@@ -38,6 +40,8 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: items = [], isLoading } = useGetNotificationsQuery();
   const [markRead] = useMarkNotificationReadMutation();
   const [markAllReadMutation] = useMarkAllNotificationsReadMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const markAllRead = () => {
     markAllReadMutation();
@@ -69,10 +73,11 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : null}
 
+      {isLoading ? (
+        <SimpleListSkeleton showLeadingCircle />
+      ) : (
       <ScrollView contentContainerStyle={styles.scroll}>
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <Text style={styles.emptyText}>No notifications yet.</Text>
         ) : null}
         {items.map((item) => {
@@ -87,7 +92,14 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
             }}
           >
             <View style={[styles.iconWrap, !isRead && styles.iconWrapUnread]}>
-              <Text style={styles.icon}>{TYPE_ICONS[item.type] ?? '🔔'}</Text>
+              {(() => {
+                const TypeIcon = TYPE_ICONS[item.type];
+                return TypeIcon ? (
+                  <TypeIcon color={colors.brandPink} size={20} />
+                ) : (
+                  <NotificationBell color={colors.brandPink} size={20} />
+                );
+              })()}
             </View>
             <View style={styles.content}>
               <View style={styles.titleRow}>
@@ -103,11 +115,12 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
           );
         })}
       </ScrollView>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.neutralBg,

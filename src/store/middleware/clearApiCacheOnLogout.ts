@@ -6,6 +6,7 @@ import { userApi } from '../services/userApi';
 import { paymentsApi } from '../services/paymentsApi';
 import { notificationsApi } from '../services/notificationsApi';
 import { organizerApi } from '../services/organizerApi';
+import { chatApi } from '../services/chatApi';
 
 // dispatch(logout()) only ever clears `auth` state — every RTK Query slice's cache
 // (enrollments, favorites, current user, notifications...) survives untouched. On a
@@ -16,7 +17,7 @@ import { organizerApi } from '../services/organizerApi';
 export const clearApiCacheOnLogout: Middleware = (storeApi) => (next) => (action) => {
   const result = next(action);
   if (logout.match(action)) {
-    [eventsApi, authApi, userApi, paymentsApi, notificationsApi, organizerApi].forEach((api) => {
+    [eventsApi, authApi, userApi, paymentsApi, notificationsApi, organizerApi, chatApi].forEach((api) => {
       storeApi.dispatch(api.util.resetApiState());
     });
   }

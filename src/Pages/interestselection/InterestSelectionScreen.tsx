@@ -14,6 +14,7 @@ import { setInterests } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
 import { useSelector } from 'react-redux';
 import { Text } from '../../components/common/Text';
+import { LeftArrow } from '../../components/common/Icons';
 
 const { width: screenWidth } = Dimensions.get('window');
 const MIN_SELECTIONS = 3;
@@ -132,7 +133,7 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <Text style={styles.backArrow}>←</Text>
+            <LeftArrow color="#FF3366" size={18} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -252,7 +253,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backArrow: { fontSize: 18, color: '#FF3366', fontWeight: '800' },
   continueButton: {
     paddingVertical: 14,
     paddingHorizontal: 22,

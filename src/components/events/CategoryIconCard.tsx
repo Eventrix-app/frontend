@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { RightArrow } from '../common/Icons';
 import { Text } from '../common/Text';
@@ -36,6 +36,8 @@ interface Props {
 }
 
 export const CategoryIconCard: React.FC<Props> = ({ item, onPress }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       style={styles.wrap}
@@ -56,6 +58,8 @@ type ViewAllProps = {
 };
 
 export const ViewAllCategoryIconCard: React.FC<ViewAllProps> = ({ onPress }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.8} onPress={onPress}>
       <View style={[styles.iconBox, styles.viewAllIconBox]}>
@@ -70,7 +74,7 @@ export const ViewAllCategoryIconCard: React.FC<ViewAllProps> = ({ onPress }) => 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
  wrap: {
     alignItems: 'center',
     width: 80,

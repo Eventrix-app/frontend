@@ -15,7 +15,7 @@ import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
@@ -25,6 +25,7 @@ import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
 import Noevents from '../../components/common/Noevents';
 import EventListSkeleton from '../../components/common/EventListSkeleton';
+import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -32,6 +33,8 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const { data: categories = [] } = useGetCategoriesQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Pre-selects the category chip when arriving from a category tap on Home/Explore
   // (navigation.navigate('Search', { category })) — the route param is a category *name*
   // (lowercased, e.g. 'music'), resolved below to a real categoryId once categories load.
@@ -65,7 +68,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.searchGlass}>
         <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <SearchIcon color={colors.textSecondary} size={18} />
           <TextInput
             autoFocus
             value={query}
@@ -120,7 +123,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
         <EventListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
+          <WarningIcon color={colors.textSecondary} size={48} />
           <Text style={styles.emptyTitle}>Couldn't load events</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Retry</Text>
@@ -150,7 +153,8 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
                       >
                         <View style={styles.recentChip}>
                           <View style={styles.recentChipContent}>
-                            <Text style={styles.recentText}>🕐 {term}</Text>
+                            <ClockIcon color={colors.textSecondary} size={13} />
+                            <Text style={styles.recentText}>{term}</Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -178,7 +182,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.neutralBg,
@@ -298,6 +302,9 @@ const styles = StyleSheet.create({
     }),
   },
   recentChipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },

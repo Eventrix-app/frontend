@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import { LeftArrow, RightArrow } from '../common/Icons';
+import { LeftArrow } from '../common/Icons';
 import { Text } from '../common/Text';
 
 type AuthActionsProps = {
@@ -17,30 +17,38 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
   onPrimary,
   onBack,
   primaryDisabled,
-}) => (
-  <View style={styles.row}>
-    <TouchableOpacity style={styles.backWrap} onPress={onBack} activeOpacity={0.8}>
-      <View style={styles.backBtn}>
-        <View style={styles.backContent}>
-          <LeftArrow color={colors.brandPink} />
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      <TouchableOpacity style={styles.backWrap} onPress={onBack} activeOpacity={0.8}>
+        <View style={styles.backBtn}>
+          <View style={styles.backContent}>
+            <LeftArrow color={colors.brandPink} />
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-    <TouchableOpacity
-      style={[styles.primaryWrap, primaryDisabled && styles.primaryDisabled]}
-      onPress={onPrimary}
-      disabled={primaryDisabled}
-      activeOpacity={0.9}
-    >
-      <View style={styles.primaryBtn}>
-        <View style={styles.primaryContent}>
-          <Text style={styles.primaryText}>{primaryLabel}</Text>
-          <RightArrow color={colors.white} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.primaryWrap}
+        onPress={onPrimary}
+        disabled={primaryDisabled}
+        activeOpacity={0.9}
+      >
+        <View style={[styles.primaryBtn, primaryDisabled && styles.primaryBtnDisabled]}>
+          <View style={styles.primaryContent}>
+            <Text style={[styles.primaryText, primaryDisabled && styles.primaryTextDisabled]}>
+              {primaryLabel}
+            </Text>
+            <Text style={[styles.primaryText, primaryDisabled && styles.primaryTextDisabled]}>
+              →
+            </Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  </View>
-);
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 type OutlineButtonRowProps = {
   leftLabel: string;
@@ -54,26 +62,30 @@ export const OutlineButtonRow: React.FC<OutlineButtonRowProps> = ({
   rightLabel,
   onLeft,
   onRight,
-}) => (
-  <View style={styles.outlineRow}>
-    <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
-      <View style={styles.outlineBtn}>
-        <View style={styles.outlineContent}>
-          <Text style={styles.outlineText}>{leftLabel}</Text>
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.outlineRow}>
+      <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
+        <View style={styles.outlineBtn}>
+          <View style={styles.outlineContent}>
+            <Text style={styles.outlineText}>{leftLabel}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
-      <View style={styles.outlineBtn}>
-        <View style={styles.outlineContent}>
-          <Text style={styles.outlineText}>{rightLabel}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
+        <View style={styles.outlineBtn}>
+          <View style={styles.outlineContent}>
+            <Text style={styles.outlineText}>{rightLabel}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  </View>
-);
+      </TouchableOpacity>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -107,30 +119,25 @@ const styles = StyleSheet.create({
   },
   primaryWrap: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   primaryContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    minHeight: 56,
-  },
-  backArrow: {
-    fontSize: 22,
-    color: colors.brandPink,
-    fontWeight: '600',
+    minHeight: 52,
   },
   primaryBtn: {
     flex: 1,
-    height: 56,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: colors.brandPink,
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
     ...Platform.select({
       android: { elevation: 6 },
       default: {
@@ -141,13 +148,19 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  primaryDisabled: {
+  primaryBtnDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
     opacity: 0.5,
   },
   primaryText: {
     color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  primaryTextDisabled: {
+    color: '#B5B5BD',
   },
   outlineRow: {
     flexDirection: 'row',

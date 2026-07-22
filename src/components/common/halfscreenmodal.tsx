@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -11,6 +12,8 @@ interface Props {
 }
 
 const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.68, children }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const sheetHeight = SCREEN_HEIGHT * heightPercent;
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -53,7 +56,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
@@ -73,7 +76,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#DDD',
+    backgroundColor: colors.neutralLine,
     alignSelf: 'center',
     marginBottom: 8,
   },

@@ -79,6 +79,12 @@ export const userApi = createApi({
       query: (body) => ({ url: 'users/me/notification-channels', method: 'PATCH', body }),
       invalidatesTags: ['Me'],
     }),
+    // Called once, from the last screen of the post-login onboarding chain
+    // (NotificationPreferencesScreen) — flips the account-level flag so future logins go
+    // straight to Main instead of replaying Onboarding/InterestSelection/etc.
+    completeOnboarding: builder.mutation<void, void>({
+      query: () => ({ url: 'users/me/complete-onboarding', method: 'PATCH' }),
+    }),
     updateParticipant: builder.mutation<void, { id: string; body: UpdateParticipantBody }>({
       query: ({ id, body }) => ({ url: `participants/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Me'],
@@ -105,4 +111,5 @@ export const {
   useUpdateParticipantMutation,
   useUpdatePushTokenMutation,
   useClearPushTokenMutation,
+  useCompleteOnboardingMutation,
 } = userApi;

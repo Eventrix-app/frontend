@@ -77,6 +77,10 @@ export interface CreateEventPayload {
   eventDate: string;
   startTime: string;
   endTime?: string;
+  // Only set when the event's end time crosses midnight relative to eventDate (e.g. a
+  // 10 PM start with a 2 AM end) — see getEventEndDateTime on the backend, which defaults
+  // this to eventDate itself (a same-day event) whenever it's omitted.
+  eventEndDate?: string;
   pricePerTicket?: number;
   totalCapacity?: number;
   // Event-wide seat cap the organizer sets directly; when omitted, the backend derives it
@@ -146,7 +150,16 @@ export interface UploadUrlResponse {
   publicUrl: string;
 }
 
-export type UploadPurpose = 'profile-picture' | 'event-image' | 'event-cover' | 'company-logo';
+export type UploadPurpose =
+  | 'profile-picture'
+  | 'event-image'
+  | 'event-cover'
+  | 'company-logo'
+  // KYC documents for organizer verification (#7) — land in a private bucket server-side,
+  // not the public ones the other purposes above use. See uploads.service.ts.
+  | 'identity-proof'
+  | 'address-proof'
+  | 'pan-or-aadhaar';
 export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
 export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
 
@@ -283,6 +296,14 @@ export const eventsApi = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['Event', 'MyEvents'],
+    }),
+    cancelEvent: builder.mutation<BackendEvent, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: `events/${id}/cancel`,
+        method: 'PATCH',
+        body: reason ? { reason } : undefined,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'Event', id }, 'Event', 'MyEvents'],
     }),
     enrollEvent: builder.mutation<EnrollResult, { eventId: string; ticketTypeId: string; quantity: number }>({
       query: ({ eventId, ticketTypeId, quantity }) => ({
@@ -428,6 +449,7 @@ export const {
   useCreateEventMutation,
   useUpdateEventMutation,
   useDeleteEventMutation,
+  useCancelEventMutation,
   useEnrollEventMutation,
   useGetUploadUrlMutation,
   useGetEventEnrollmentsQuery,

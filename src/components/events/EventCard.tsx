@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Card } from '../common';
-import theme from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { borderRadius } from '../../theme/borderRadius';
+import { useTheme } from '../../theme/ThemeContext';
+import { EventBusyIcon } from '../common/Icons';
 
 interface EventCardProps {
   id: string;
@@ -20,18 +23,24 @@ const EventCard: React.FC<EventCardProps> = ({
   date,
   location,
   price,
-  image = '🎪',
+  image,
   category,
   onPress,
   variant = 'vertical',
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (variant === 'horizontal') {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
         <Card style={styles.horizontalCard}>
           <View style={styles.horizontalContent}>
             <View style={styles.horizontalImage}>
-              <Text style={styles.horizontalEmoji}>{image}</Text>
+              {image ? (
+                <Text style={styles.horizontalEmoji}>{image}</Text>
+              ) : (
+                <EventBusyIcon color={colors.textSecondary} size={36} />
+              )}
             </View>
             <View style={styles.horizontalInfo}>
               <Text variant="h4" style={styles.horizontalTitle} numberOfLines={2}>
@@ -64,7 +73,11 @@ const EventCard: React.FC<EventCardProps> = ({
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <Card style={styles.verticalCard}>
         <View style={styles.verticalImage}>
-          <Text style={styles.verticalEmoji}>{image}</Text>
+          {image ? (
+            <Text style={styles.verticalEmoji}>{image}</Text>
+          ) : (
+            <EventBusyIcon color={colors.textSecondary} size={48} />
+          )}
         </View>
         <View style={styles.verticalInfo}>
           <Text variant="h4" style={styles.verticalTitle} numberOfLines={2}>
@@ -92,9 +105,9 @@ const EventCard: React.FC<EventCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   horizontalCard: {
-    marginBottom: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   horizontalContent: {
     flexDirection: 'row',
@@ -102,11 +115,11 @@ const styles = StyleSheet.create({
   horizontalImage: {
     width: 80,
     height: 80,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing.md,
+    marginRight: spacing.md,
   },
   horizontalEmoji: {
     fontSize: 36,
@@ -116,13 +129,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   horizontalTitle: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   horizontalDate: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   horizontalLocation: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: spacing.sm,
   },
   horizontalMeta: {
     flexDirection: 'row',
@@ -133,16 +146,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   verticalCard: {
-    marginRight: theme.spacing.md,
+    marginRight: spacing.md,
     width: 200,
   },
   verticalImage: {
     height: 120,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   verticalEmoji: {
     fontSize: 48,
@@ -151,13 +164,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   verticalTitle: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   verticalDate: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   verticalLocation: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: spacing.sm,
   },
   verticalMeta: {
     flexDirection: 'row',
@@ -168,10 +181,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryBadge: {
-    backgroundColor: theme.colors.backgroundSecondary,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
 });
 

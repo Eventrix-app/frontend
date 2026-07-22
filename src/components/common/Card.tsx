@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Platform, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 
@@ -11,6 +11,8 @@ interface CardProps {
 }
 
 const Card: React.FC<CardProps> = ({ children, style, shadow = true }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.card, shadow && styles.cardShadow, style]}>
       <View style={styles.content}>{children}</View>
@@ -18,7 +20,7 @@ const Card: React.FC<CardProps> = ({ children, style, shadow = true }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',

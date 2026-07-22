@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Skeleton from './Skeleton';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 
-const BookingRowSkeleton: React.FC = () => (
+const BookingRowSkeleton: React.FC<{ styles: ReturnType<typeof createStyles> }> = ({ styles }) => (
   <View style={styles.row}>
     <Skeleton width={64} height={64} variant="rect" style={styles.thumb} />
     <View style={styles.info}>
@@ -18,15 +18,19 @@ const BookingRowSkeleton: React.FC = () => (
 
 // Full-screen initial-load placeholder for BookingsScreen's enrollment/waitlist lists —
 // in place of a center-screen spinner.
-const BookingListSkeleton: React.FC<{ count?: number }> = ({ count = 4 }) => (
-  <View style={styles.root}>
-    {Array.from({ length: count }).map((_, i) => (
-      <BookingRowSkeleton key={i} />
-    ))}
-  </View>
-);
+const BookingListSkeleton: React.FC<{ count?: number }> = ({ count = 4 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.root}>
+      {Array.from({ length: count }).map((_, i) => (
+        <BookingRowSkeleton key={i} styles={styles} />
+      ))}
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { padding: spacing.md },
   row: {
     flexDirection: 'row',

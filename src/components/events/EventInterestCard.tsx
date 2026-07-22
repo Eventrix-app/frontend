@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { useSelector } from 'react-redux';
@@ -6,7 +6,7 @@ import { RootState } from '../../store';
 import { useAddFavoriteMutation, useGetMyFavoritesQuery, useRemoveFavoriteMutation } from '../../store/services/eventsApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
@@ -81,6 +81,8 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress, onRe
   }
 
   const isTogglingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleToggleSave = async () => {
     if (!authUser) {
@@ -168,7 +170,7 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress, onRe
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     width: '100%',
     backgroundColor: colors.white,
@@ -207,7 +209,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   badgeText: {
-    color: colors.white,
+    // Literal white, not `colors.white` — that token is a dark-mode *surface* color
+    // (see colors.dark.ts), not literal white, and this text sits on a fixed dark
+    // rgba(0,0,0,0.55) overlay in both themes.
+    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -245,7 +250,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    color: '#1a1a1a',
+    color: colors.text,
     marginBottom: spacing.sm,
       fontFamily: 'ZalandoSansExpanded_700Bold'
 },

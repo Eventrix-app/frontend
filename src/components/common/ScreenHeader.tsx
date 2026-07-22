@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from './Text';
+import { LeftArrow } from './Icons';
 
 type ScreenHeaderProps = {
   title: string;
@@ -16,31 +17,35 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   onBack,
   rightAction,
   light = false,
-}) => (
-  <View style={styles.row}>
-    {onBack ? (
-      <View style={styles.backGlass}>
-        <View style={styles.backContent}>
-          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
-            <Text style={[styles.back, light && styles.backLight]}>←</Text>
-          </TouchableOpacity>
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      {onBack ? (
+        <View style={styles.backGlass}>
+          <View style={styles.backContent}>
+            <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
+              <LeftArrow color={light ? colors.white : colors.brandPink} size={22} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.placeholder} />
+      )}
+      <View style={styles.titleGlass}>
+        <View style={styles.titleContent}>
+          <Text style={[styles.title, light && styles.titleLight]} numberOfLines={1}>
+            {title}
+          </Text>
         </View>
       </View>
-    ) : (
-      <View style={styles.placeholder} />
-    )}
-    <View style={styles.titleGlass}>
-      <View style={styles.titleContent}>
-        <Text style={[styles.title, light && styles.titleLight]} numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
+      {rightAction ?? <View style={styles.placeholder} />}
     </View>
-    {rightAction ?? <View style={styles.placeholder} />}
-  </View>
-);
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -71,14 +76,6 @@ const styles = StyleSheet.create({
   backBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  back: {
-    fontSize: 24,
-    color: colors.brandPink,
-    fontWeight: '600',
-  },
-  backLight: {
-    color: colors.white,
   },
   title: {
     flex: 1,

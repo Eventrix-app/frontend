@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   Animated,
   Pressable,
@@ -7,7 +7,8 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { colors, radius, typography } from '../theme';
+import { radius, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Text } from './common/Text';
 
 type Variant = 'solid' | 'ghost' | 'onGradient' | 'ghostOnGradient';
@@ -25,6 +26,8 @@ export const PrimaryButton: React.FC<Props> = ({
   variant = 'solid',
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(1)).current;
 
   const animateTo = (v: number) =>
@@ -70,7 +73,7 @@ export const PrimaryButton: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   base: {
     height: 56,
     borderRadius: radius.pill,

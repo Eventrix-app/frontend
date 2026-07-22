@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
@@ -6,7 +6,7 @@ import { AuthLayout } from '../../components/auth/AuthLayout';
 import { RootStackParamList } from '../../navigation/types';
 import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
 import { useClearPushTokenMutation } from '../../store/services/userApi';
@@ -17,7 +17,9 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const [clearPushToken] = useClearPushTokenMutation();
-  
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://eventrix1.vercel.app/admin';
   const dashboardUrl = `${dashboardBaseUrl}${dashboardBaseUrl.includes('?') ? '&' : '?'}loggedIn=true`;
 
@@ -99,7 +101,7 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    color: 'rgba(0,0,0,0.4)',
+    color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 18,

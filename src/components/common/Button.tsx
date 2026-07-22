@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, ActivityIndicator, Platform, StyleSheet, View, ViewStyle, TextStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from './Text';
@@ -26,6 +26,9 @@ const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderRadius: borderRadius.lg,
@@ -100,7 +103,7 @@ const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },

@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { CATEGORIES } from '../../data/mockEvents';
 import { RightArrow } from '../common/Icons';
 import { spacing } from '../../theme/spacing';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { Text } from '../common/Text';
 
 type CategoryScrollerProps = {
@@ -22,6 +22,8 @@ export const CategoryScroller: React.FC<CategoryScrollerProps> = ({
   onCategoryPress,
 }) => {
   const activeCategories = CATEGORIES.filter((cat) => cat.id in categoryAssets);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <ScrollView
@@ -57,7 +59,7 @@ export const CategoryScroller: React.FC<CategoryScrollerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   content: {
     gap: spacing.md - 4,
     paddingRight: spacing.md,

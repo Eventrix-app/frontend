@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
@@ -18,6 +18,8 @@ interface Props {
 }
 
 export const EventHighlightCard: React.FC<Props> = ({ item, onPress }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.thumbWrap}>
@@ -43,7 +45,7 @@ export const EventHighlightCard: React.FC<Props> = ({ item, onPress }) => {
 
 const CARD_WIDTH = 110;
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
     width: CARD_WIDTH,
     marginRight: spacing.md,
@@ -99,7 +101,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 12,
-    color: '#1a1a1a',
+    color: colors.text,
     marginTop: 6,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },

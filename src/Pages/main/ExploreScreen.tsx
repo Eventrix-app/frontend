@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { SectionHeader } from '../../components/events/SectionHeader';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
@@ -17,9 +17,11 @@ import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
 import { calculateDistanceKm, toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
+import { ScreenHeader } from '../../components/common/ScreenHeader';
 import NoEvents from '../../components/common/Noevents';
 import EventListSkeleton from '../../components/common/EventListSkeleton';
 import { EventFilters, FilterSheet } from '../../components/events/FilterSheet';
+import { SearchIcon, NotificationBell } from '../../components/common/Icons';
 
 const FILTER_CHIPS: { id: keyof EventFilters | 'category'; label: string }[] = [
   { id: 'dateFrom', label: 'Date' },
@@ -78,6 +80,8 @@ const ExploreScreen: React.FC = () => {
   }
   const [showInterestSheet, setShowInterestSheet] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const hasActiveFilter = (id: (typeof FILTER_CHIPS)[number]['id']): boolean => {
     if (id === 'category') return !!filters.categoryId;
     if (id === 'dateFrom') return !!filters.dateFrom;
@@ -99,29 +103,26 @@ const ExploreScreen: React.FC = () => {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Top bar: back, title, search, bell, avatar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.iconText}>←</Text>
-        </TouchableOpacity>
+      <ScreenHeader
+        title="Explore"
+        onBack={() => navigation.goBack()}
+        rightAction={
+          <View style={styles.topBarRight}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+              <SearchIcon color={colors.text} size={18} />
+            </TouchableOpacity>
 
-        <Text style={styles.title}>Explore</Text>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
+              <NotificationBell color={colors.text} size={18} />
+              {hasUnread && <View style={styles.bellDot} />}
+            </TouchableOpacity>
 
-        <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
-            <Text style={styles.iconText}>🔍</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
-            <Text style={styles.iconText}>🔔</Text>
-            {hasUnread && <View style={styles.bellDot} />}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Image source={CURRENT_USER_AVATAR} style={styles.avatarImg} />
-          </TouchableOpacity>
-        </View>
-      </View>
+            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+              <Image source={CURRENT_USER_AVATAR} style={styles.avatarImg} />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       {/* Dropdown-style filter chips */}
       <ScrollView
@@ -223,22 +224,10 @@ const ExploreScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  title: {
-    fontSize: 17,
-    color: colors.text,
-    fontFamily: 'ZalandoSansExpanded_700Bold',
   },
   topBarRight: {
     flexDirection: 'row',

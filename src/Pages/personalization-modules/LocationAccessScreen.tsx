@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -17,7 +17,8 @@ import * as Location from 'expo-location';
 import { useDispatch, useSelector } from 'react-redux';
 import { setLocation, setManualCity } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
-import { colors, spacing } from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Text } from '../../components/common/Text';
 
@@ -33,6 +34,8 @@ const LocationAccessScreen: React.FC = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // ── Animation (identical to NotificationsModal) ──────────────────────────
   const slide = useRef(new Animated.Value(height)).current;
@@ -221,7 +224,7 @@ const LocationAccessScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   // ── Shell (mirrors NotificationsModal exactly) ──────────────────────────
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {

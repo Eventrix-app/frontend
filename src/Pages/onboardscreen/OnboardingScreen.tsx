@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -16,7 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
 import { Dots } from '../../components/Dots';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Text } from '../../components/common/Text';
@@ -73,6 +73,8 @@ const LeftArrow = ({ color }: { color: string }) => (
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const [index, setIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Screen-level slide transition
   const screenX = useRef(new Animated.Value(0)).current;
@@ -252,7 +254,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,

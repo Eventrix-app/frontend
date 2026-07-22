@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
@@ -8,21 +8,25 @@ type LegalFooterProps = {
   compact?: boolean;
 };
 
-export const LegalFooter: React.FC<LegalFooterProps> = ({ compact = false }) => (
-  <View style={[styles.wrap, compact && styles.wrapCompact]}>
-    <Text style={styles.note}>By continuing, you agree to our</Text>
-    <View style={styles.links}>
-      {['Terms of use', 'Privacy Policy', 'Contact Us'].map((label, i) => (
-        <React.Fragment key={label}>
-          {i > 0 ? <Text style={styles.dot}>•</Text> : null}
-          <Text style={styles.link}>{label}</Text>
-        </React.Fragment>
-      ))}
+export const LegalFooter: React.FC<LegalFooterProps> = ({ compact = false }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.wrap, compact && styles.wrapCompact]}>
+      <Text style={styles.note}>By continuing, you agree to our</Text>
+      <View style={styles.links}>
+        {['Terms of use', 'Privacy Policy', 'Contact Us'].map((label, i) => (
+          <React.Fragment key={label}>
+            {i > 0 ? <Text style={styles.dot}>•</Text> : null}
+            <Text style={styles.link}>{label}</Text>
+          </React.Fragment>
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
     alignItems: 'center',
     marginTop: 0,
@@ -34,7 +38,7 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   links: {
@@ -52,6 +56,6 @@ const styles = StyleSheet.create({
   },
   dot: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
   },
 });

@@ -4,10 +4,8 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackParamList } from '../../navigation/types';
-import { RootState } from '../../store';
 
 const logoVideoSource = require('../../../assets/3d-logo-reveal.mp4');
 
@@ -24,12 +22,6 @@ const SplashScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthStackParamList, 'Splash'>>();
   const insets = useSafeAreaInsets();
-  // Persisted per-device (see onboardingDraftSlice) — a returning user who has already
-  // been through the onboarding chain on this device (or just authenticated) skips
-  // straight to Login instead of replaying Onboarding/InterestSelection/etc. every time.
-  const hasCompletedOnboarding = useSelector(
-    (state: RootState) => state.onboardingDraft.hasCompletedOnboarding,
-  );
 
   // Guards against playToEnd/error/timeout/Skip racing each other and firing
   // navigation.replace more than once (or after the screen has already unmounted).
@@ -49,9 +41,12 @@ const SplashScreen = () => {
     // the native splash would otherwise never get hidden.
     hideNativeSplash();
     if (navigation.isFocused()) {
-      navigation.replace(hasCompletedOnboarding ? 'Login' : 'Onboarding');
+      // Login always comes right after the splash video now — the onboarding chain
+      // (carousel/interests/location/notifications) runs after a successful login/register
+      // instead of before it, gated there by the account's hasCompletedOnboarding flag.
+      navigation.replace('Login');
     }
-  }, [navigation, hasCompletedOnboarding, hideNativeSplash]);
+  }, [navigation, hideNativeSplash]);
 
   const player = useVideoPlayer(logoVideoSource, (p) => {
     p.muted = true;

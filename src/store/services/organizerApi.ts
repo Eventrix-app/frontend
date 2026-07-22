@@ -16,11 +16,39 @@ export interface OrganizerPublicProfile {
   isFollowing?: boolean;
 }
 
+// Mirrors VerificationStatusRecord in organizer.service.ts.
+export interface VerificationStatus {
+  status: 'not_submitted' | 'pending' | 'approved' | 'rejected';
+  verificationLevel: 'unverified' | 'email_verified' | 'phone_verified' | 'document_verified';
+  submittedForReviewAt?: string;
+  rejectionReason?: string;
+}
+
+// identityProofUrl/addressProofUrl/panOrAadhaarUrl are storage paths returned by
+// POST /uploads/signed-url (purpose: identity-proof / address-proof / pan-or-aadhaar),
+// not public URLs — the private KYC bucket has no public read access. See uploads.service.ts.
+export interface SubmitVerificationPayload {
+  fullName: string;
+  companyName: string;
+  identityProofUrl: string;
+  addressProofUrl: string;
+  panOrAadhaarUrl: string;
+  upiId: string;
+}
+
 export const organizerApi = createApi({
   reducerPath: 'organizerApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['OrganizerProfile', 'MyFollowing', 'FollowedEvents', 'OrganizerEvents'],
+  tagTypes: ['OrganizerProfile', 'MyFollowing', 'FollowedEvents', 'OrganizerEvents', 'MyVerificationStatus'],
   endpoints: (builder) => ({
+    getMyVerificationStatus: builder.query<VerificationStatus, void>({
+      query: () => 'organizers/verification/me',
+      providesTags: ['MyVerificationStatus'],
+    }),
+    submitVerification: builder.mutation<VerificationStatus, SubmitVerificationPayload>({
+      query: (body) => ({ url: 'organizers/verification', method: 'POST', body }),
+      invalidatesTags: ['MyVerificationStatus'],
+    }),
     getOrganizerProfile: builder.query<OrganizerPublicProfile, string>({
       query: (organizerId) => `organizers/${organizerId}/profile`,
       providesTags: (_result, _error, organizerId) => [{ type: 'OrganizerProfile', id: organizerId }],
@@ -106,4 +134,6 @@ export const {
   useGetOrganizerEventsQuery,
   useFollowOrganizerMutation,
   useUnfollowOrganizerMutation,
+  useGetMyVerificationStatusQuery,
+  useSubmitVerificationMutation,
 } = organizerApi;

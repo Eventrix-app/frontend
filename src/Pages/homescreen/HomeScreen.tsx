@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,7 +13,7 @@ import { SectionHeader } from '../../components/events/SectionHeader';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
@@ -38,6 +38,27 @@ const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" widt
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// Shown in the space revealed above the header while the user pulls down to refresh —
+// picked fresh each time a pull gesture starts, no backend call needed for these.
+const HEALTH_QUOTES = [
+  'A 10-minute walk can lift your mood for hours.',
+  'Drinking enough water keeps your mind sharp.',
+  'A few deep breaths can calm a racing mind.',
+  'Good sleep tonight means a better you tomorrow.',
+  'Stretching for five minutes eases the whole day.',
+  'Small steps every day add up to big health wins.',
+  'Fresh air and sunlight are free mood boosters.',
+  'Laughing with friends is good for your heart, literally.',
+];
+
+function randomHealthQuote(): string {
+  return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
+}
+
+// How far (in negative content-offset px) the user needs to pull before releasing
+// triggers a refresh — mirrors a typical native RefreshControl's trigger distance.
+const PULL_REFRESH_TRIGGER_DISTANCE = 90;
+
 // TODO: pull from a real "shorts"/highlights endpoint once available
 const HIGHLIGHTS: HighlightItem[] = [
   { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
@@ -53,6 +74,8 @@ const HomeScreen: React.FC = () => {
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
   const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -66,8 +89,8 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, loadMore, isFetchingMore } = usePaginatedEvents();
-  const { data: me } = useGetMeQuery();
+  const { events, loadMore, isFetchingMore, refetch } = usePaginatedEvents();
+  const { data: me, refetch: refetchMe } = useGetMeQuery();
   const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
@@ -75,14 +98,65 @@ const HomeScreen: React.FC = () => {
   const featured = cardEvents.filter((event) => event.featured).slice(0, 5);
   const recommended = cardEvents;
 
+  // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
+  // down together (via pullDistance below) and reveals a random health quote behind
+  // them. Driven straight off the ScrollView's own native bounce (contentOffset.y going
+  // negative) rather than a custom PanResponder, so it rides the platform's native
+  // over-scroll physics instead of fighting them.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [pullQuote, setPullQuote] = useState(randomHealthQuote);
+  const hasCrossedPullTriggerRef = useRef(false);
+
+  // A fast fling-to-top can make the native scroll view overshoot a few px past 0 on its
+  // own (pure momentum/rubber-band settle, finger already lifted) — with no dead zone, that
+  // alone was enough to nudge the header down and flash a gap above it near the status bar,
+  // even though the user never meant to trigger the pull-reveal. Below PULL_DEAD_ZONE the
+  // header stays fully pinned; only a deliberate drag past it starts moving anything.
+  const PULL_DEAD_ZONE = 24;
+  const pullDistance = scrollY.interpolate({
+    inputRange: [-150, -PULL_DEAD_ZONE, 0],
+    outputRange: [150 - PULL_DEAD_ZONE, 0, 0],
+    extrapolate: 'clamp',
+  });
+  const pullQuoteOpacity = scrollY.interpolate({
+    inputRange: [-70, -PULL_DEAD_ZONE, 0],
+    outputRange: [1, 0, 0],
+    extrapolate: 'clamp',
+  });
+
   // "Lazy loading": the feed starts with just the first page instead of fetching
   // everything up front, and quietly fetches the next page once the user scrolls
-  // near the bottom of this (single, whole-page) ScrollView.
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 400) {
-      loadMore();
-    }
+  // near the bottom of this (single, whole-page) ScrollView. Also watches for the pull-
+  // to-refresh threshold so onScrollEndDrag knows whether the drop should trigger a refresh.
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+        if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 400) {
+          loadMore();
+        }
+        if (contentOffset.y <= -PULL_REFRESH_TRIGGER_DISTANCE) {
+          hasCrossedPullTriggerRef.current = true;
+        }
+      },
+    },
+  );
+
+  const handlePullStart = () => {
+    setPullQuote(randomHealthQuote());
+    hasCrossedPullTriggerRef.current = false;
+  };
+
+  // Fires on release ("drops the refresh icon") — the ScrollView's own bounce-back
+  // animation already repositions the header/feed and hides the quote (both are driven
+  // off the same scrollY value), this just needs to kick off the actual data refresh.
+  const handlePullEnd = () => {
+    if (!hasCrossedPullTriggerRef.current) return;
+    hasCrossedPullTriggerRef.current = false;
+    refetch();
+    refetchMe();
   };
 
   const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
@@ -113,6 +187,22 @@ const HomeScreen: React.FC = () => {
 
   return (
     <View style={styles.root}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pullQuoteBanner, { paddingTop: insets.top, opacity: pullQuoteOpacity }]}
+      >
+        <Text style={styles.pullQuoteText} numberOfLines={2}>
+          {pullQuote}
+        </Text>
+      </Animated.View>
+
+      {/* Only the header rides the pull-down transform — the ScrollView's own native
+          rubber-band bounce already displaces its content by the same amount on its own,
+          so wrapping both in one transform double-applies the motion (header moves by
+          pullDistance, content moves by pullDistance *and* its own bounce), which is what
+          opened the gap between them. Keeping the transform on the header alone means both
+          move by the same amount through independent, exactly-matching means. */}
+      <Animated.View style={[styles.headerShift, { transform: [{ translateY: pullDistance }] }]}>
       <LinearGradient
         colors={[colors.brandPink, '#F43362']}
         style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
@@ -175,12 +265,18 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      </Animated.View>
 
-      <ScrollView
+      <Animated.ScrollView
+        style={styles.scrollFlex}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         onScroll={handleScroll}
-        scrollEventThrottle={200}
+        onScrollBeginDrag={handlePullStart}
+        onScrollEndDrag={handlePullEnd}
+        scrollEventThrottle={16}
+        bounces
+        overScrollMode="always"
       >
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
@@ -253,7 +349,7 @@ const HomeScreen: React.FC = () => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
      <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
       <InterestSelectionScreen
@@ -266,10 +362,32 @@ const HomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  headerShift: {
+    flexShrink: 0,
+  },
+  scrollFlex: {
+    flex: 1,
+  },
+  pullQuoteBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.sm,
+  },
+  pullQuoteText: {
+    color: colors.brandPink,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   header: {
     paddingHorizontal: spacing.md,

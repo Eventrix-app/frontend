@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from '../common';
-import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 interface TabItem {

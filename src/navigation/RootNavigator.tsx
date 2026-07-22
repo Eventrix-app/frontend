@@ -22,11 +22,13 @@ import ErrorNoInternetScreen from '../Pages/screens/ErrorNoInternetScreen';
 import ErrorGenericScreen from '../Pages/screens/ErrorGenericScreen';
 import MyEventsScreen from '../Pages/main/MyEventsScreen';
 import CreateEventScreen from '../Pages/main/CreateEventScreen';
+import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScreen';
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
+import { showAlert } from '../utils/crossPlatformAlert';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -59,6 +61,12 @@ function navigateForPushData(
     navRef.navigate('TicketDetails', { bookingId: data.enrollmentId });
   } else if (type === 'organizer_followed') {
     navRef.navigate('Profile');
+  } else if (type === 'organizer_verification_approved') {
+    navRef.navigate('Main', { screen: 'Home' });
+    showAlert("You're verified!", 'Your organizer verification was approved — you can now create and publish events.');
+  } else if (type === 'organizer_verification_rejected') {
+    navRef.navigate('Main', { screen: 'Home' });
+    showAlert('Verification needs another look', typeof data?.reason === 'string' && data.reason ? String(data.reason) : undefined);
   } else {
     navRef.navigate('Notifications');
   }
@@ -146,6 +154,7 @@ const RootNavigator = () => {
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+        <Stack.Screen name="OrganizerVerification" component={OrganizerVerificationScreen} />
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />

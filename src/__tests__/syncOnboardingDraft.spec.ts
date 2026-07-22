@@ -174,6 +174,68 @@ describe('Test 4 – No duplicate sync: zero API calls when isSynced is true', (
   });
 });
 
+// ─── completeOnboarding is folded into the same sync/retry bundle ──────────────
+// Regression test: previously NotificationPreferencesScreen fired a separate,
+// un-retried completeOnboarding() call — if it failed while everything else
+// succeeded, the account's hasCompletedOnboarding flag was stranded at false
+// forever (forcing the user through onboarding again on their next login).
+
+describe('syncOnboardingDraft — completeOnboarding is bundled with the real sync', () => {
+  it('initiates a 4th call (completeOnboarding) when there is real draft content', async () => {
+    const store = makeStore({ categoryIds: CAT_IDS });
+
+    let thunkCalls = 0;
+    const patchedDispatch = jest.fn((action: any) => {
+      if (typeof action === 'function') {
+        thunkCalls += 1;
+        return { unwrap: () => Promise.resolve() };
+      }
+      return store.dispatch(action);
+    });
+
+    await syncOnboardingDraft(patchedDispatch as any, store.getState);
+
+    // categoryIds alone -> updateInterests + completeOnboarding = 2 thunks
+    expect(thunkCalls).toBe(2);
+  });
+
+  it('does not call completeOnboarding when the draft is empty (harmless early call from Login/Register)', async () => {
+    const store = makeStore();
+
+    let thunkCalls = 0;
+    const patchedDispatch = jest.fn((action: any) => {
+      if (typeof action === 'function') thunkCalls += 1;
+      return store.dispatch(action);
+    });
+
+    await syncOnboardingDraft(patchedDispatch as any, store.getState);
+
+    expect(thunkCalls).toBe(0);
+  });
+
+  it('does not mark synced when completeOnboarding itself fails, even if the rest succeeds', async () => {
+    const store = makeStore({ categoryIds: CAT_IDS });
+
+    const dispatchedTypes: string[] = [];
+    let call = 0;
+    const patchedDispatch = jest.fn((action: any) => {
+      if (typeof action === 'function') {
+        call += 1;
+        // 1st thunk (updateInterests) succeeds, 2nd (completeOnboarding) fails.
+        return call === 1
+          ? { unwrap: () => Promise.resolve() }
+          : { unwrap: () => Promise.reject(new Error('network blip')) };
+      }
+      if (action?.type) dispatchedTypes.push(action.type);
+      return store.dispatch(action);
+    });
+
+    await syncOnboardingDraft(patchedDispatch as any, store.getState);
+
+    expect(dispatchedTypes).not.toContain('onboardingDraft/markSynced');
+  });
+});
+
 // ─── Test 5 (frontend): 3-minimum enforcement via slice state ─────────────────
 
 describe('Test 5 – 3-minimum enforcement: canContinue logic mirrors InterestSelectionScreen', () => {

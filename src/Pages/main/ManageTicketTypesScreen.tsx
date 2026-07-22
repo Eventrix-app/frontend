@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
@@ -21,6 +21,8 @@ import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { dateOnlyToStartOfDayIso, dateOnlyToEndOfDayIso } from '../../utils/dateFormat';
 import { Text } from '../../components/common/Text';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { WarningIcon, LockIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ManageTicketTypes'>;
 
@@ -33,16 +35,18 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
 
   const { data: ticketTypes = [], isLoading, isError, refetch } = useGetTicketTypesQuery(eventId);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Manage Ticket Types" onBack={() => navigation.goBack()} />
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <SimpleListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
+          <WarningIcon color={colors.textSecondary} size={48} />
           <Text style={styles.emptyTitle}>Couldn't load ticket types</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Retry</Text>
@@ -66,16 +70,23 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const LockedTierCard: React.FC<{ tier: TicketTypeRecord }> = ({ tier }) => (
-  <View style={[styles.card, styles.lockedCard]}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.tierName}>{tier.name}</Text>
-      <Text style={styles.lockedBadge}>🔒 Has sales</Text>
+const LockedTierCard: React.FC<{ tier: TicketTypeRecord }> = ({ tier }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.card, styles.lockedCard]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.tierName}>{tier.name}</Text>
+        <View style={styles.lockedBadgeRow}>
+          <LockIcon color="#92400E" size={13} />
+          <Text style={styles.lockedBadge}>Has sales</Text>
+        </View>
+      </View>
+      <Text style={styles.meta}>{tier.price > 0 ? `₹${tier.price}` : 'Free'} · {tier.quantitySold} sold{tier.quantityTotal != null ? ` of ${tier.quantityTotal}` : ''}</Text>
+      <Text style={styles.lockedNote}>Tiers with sales can't be edited or removed — this protects buyers who already hold a ticket.</Text>
     </View>
-    <Text style={styles.meta}>{tier.price > 0 ? `₹${tier.price}` : 'Free'} · {tier.quantitySold} sold{tier.quantityTotal != null ? ` of ${tier.quantityTotal}` : ''}</Text>
-    <Text style={styles.lockedNote}>Tiers with sales can't be edited or removed — this protects buyers who already hold a ticket.</Text>
-  </View>
-);
+  );
+};
 
 const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = ({ eventId, tier }) => {
   const [name, setName] = useState(tier.name);
@@ -92,6 +103,8 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
   // double-tap on "Save Changes" can fire twice before that happens, so a synchronous
   // ref closes the gap (same pattern as CreateEventScreen's isSubmittingRef).
   const isSubmittingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const debouncedPrice = useDebouncedValue(Number(price) || 0, 400);
   const { data: feeEstimate } = useGetFeeEstimateQuery(debouncedPrice, { skip: debouncedPrice <= 0 });
@@ -216,6 +229,8 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
   // "Add Ticket Type" can fire two createTicketType calls before isLoading flips true,
   // creating two identical tiers.
   const isSubmittingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const debouncedPrice = useDebouncedValue(Number(price) || 0, 400);
   const { data: feeEstimate } = useGetFeeEstimateQuery(debouncedPrice, { skip: debouncedPrice <= 0 });
@@ -309,7 +324,7 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   loader: { marginTop: spacing.xxl },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
@@ -334,6 +349,7 @@ const styles = StyleSheet.create({
   lockedCard: { backgroundColor: '#F9FAFB' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   tierName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  lockedBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lockedBadge: { fontSize: 12, fontWeight: '600', color: '#92400E' },
   meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   lockedNote: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 17 },

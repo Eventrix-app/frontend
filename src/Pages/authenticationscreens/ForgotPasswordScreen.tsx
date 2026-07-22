@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
@@ -6,10 +6,11 @@ import { AuthInput } from '../../components/auth/AuthInput';
 import { AuthActions, OutlineButtonRow } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { AuthStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useForgotPasswordMutation } from '../../store/services/authApi';
 import { Text } from '../../components/common/Text';
+import { WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 
@@ -17,6 +18,8 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleSendRequest = async () => {
     if (!email.trim() || !email.includes('@')) {
@@ -66,8 +69,9 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       {errorMessage ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        <View style={[styles.errorContainer, styles.errorRow]}>
+          <WarningIcon color="#D32F2F" size={16} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -95,7 +99,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   spacer: {
     height: spacing.xxl * 2,
   },
@@ -112,7 +116,13 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',

@@ -22,7 +22,7 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": ""
+        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok"
       },
       "android": {
         "buildType": "apk"
@@ -33,7 +33,7 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": ""
+        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok"
       },
       "android": {
         "buildType": "app-bundle"

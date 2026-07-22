@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
@@ -50,7 +50,10 @@ function statusDisplayFor(enrollment: EnrollmentRecord): { label: string; color:
 // Ticket-stub shaped card, built with plain Views instead of a background image —
 // the "notches" are circles positioned at the card's left/right edges, colored to
 // match the screen background so they read as cutouts.
-const TicketCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+const TicketCard: React.FC<{ children: React.ReactNode; styles: ReturnType<typeof createStyles> }> = ({
+  children,
+  styles,
+}) => (
   <View style={styles.card}>
     {children}
     <View style={styles.notchLeft} />
@@ -62,6 +65,8 @@ const BookingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<TabId>('upcoming');
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     data: enrollments = [],
     isLoading: isLoadingEnrollments,
@@ -165,7 +170,7 @@ const BookingsScreen: React.FC = () => {
               waitingEntries.map((entry) => {
                 const event = entry.event;
                 return (
-                  <TicketCard key={entry.id}>
+                  <TicketCard key={entry.id} styles={styles}>
                     <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
 
                     <View style={styles.infoRow}>
@@ -218,7 +223,7 @@ const BookingsScreen: React.FC = () => {
                 const status = statusDisplayFor(booking);
                 const event = booking.event;
                 return (
-                  <TicketCard key={booking.id}>
+                  <TicketCard key={booking.id} styles={styles}>
                     <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
 
                     <View style={styles.infoRow}>
@@ -267,7 +272,7 @@ const BookingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,

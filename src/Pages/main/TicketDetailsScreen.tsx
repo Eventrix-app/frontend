@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Platform, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEnrollmentByIdQuery } from '../../store/services/eventsApi';
 import { useRequestRefundMutation } from '../../store/services/paymentsApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
+import TicketDetailsSkeleton from '../../components/common/TicketDetailsSkeleton';
+import { TicketIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TicketDetails'>;
 
@@ -30,6 +32,8 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundRequested, setRefundRequested] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleShare = async () => {
     if (!enrollment) return;
@@ -58,8 +62,9 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   if (isLoading) {
     return (
-      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={colors.brandPink} />
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <ScreenHeader title="Ticket Details" onBack={() => navigation.goBack()} />
+        <TicketDetailsSkeleton />
       </View>
     );
   }
@@ -106,7 +111,9 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <View style={styles.details}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailIcon}>🎫</Text>
+              <View style={styles.detailIcon}>
+                <TicketIcon color={colors.text} size={20} />
+              </View>
               <View>
                 <Text style={styles.detailLabel}>Quantity</Text>
                 <Text style={styles.detailValue}>{enrollment.quantity} ticket(s)</Text>
@@ -206,7 +213,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: colors.textSecondary, fontSize: 15 },

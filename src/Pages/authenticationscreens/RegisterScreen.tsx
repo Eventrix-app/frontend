@@ -14,6 +14,7 @@ import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { Text } from '../../components/common/Text';
+import { WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -40,11 +41,17 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const handleRegister = async () => {
     try {
       setErrorMessage(null);
-      await register({ email, password, firstName, lastName }).unwrap();
+      const result = await register({ email, password, firstName, lastName }).unwrap();
       // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
       registerForPushNotifications(dispatch);
-      navigation.getParent()?.navigate('Main' as never);
+      if (!result.hasCompletedOnboarding) {
+        // A brand-new account always needs the onboarding chain now, since it runs after
+        // registration instead of before it.
+        navigation.navigate('Onboarding');
+      } else {
+        navigation.getParent()?.navigate('Main' as never);
+      }
     } catch (err: any) {
       console.error('Registration error details:', err);
       if (err.data && err.data.message) {
@@ -100,8 +107,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       {errorMessage ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        <View style={[styles.errorContainer, styles.errorRow]}>
+          <WarningIcon color="#D32F2F" size={16} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -118,7 +126,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onRight={handleRegister}
       /> */}
 
-      <SocialLoginRow compact />
+      <SocialLoginRow compact appleIconVariant="inverted" />
       <LegalFooter />
     </AuthLayout>
   );
@@ -131,6 +139,12 @@ const styles = StyleSheet.create({
   },
   nameField: {
     flex: 1,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',

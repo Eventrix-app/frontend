@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
@@ -16,6 +16,8 @@ import {
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { WalletIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RefundApproval'>;
 
@@ -35,6 +37,8 @@ const RefundApprovalScreen: React.FC<Props> = ({ navigation }) => {
   // Approve/Confirm Reject can fire twice before the button disables. Same
   // synchronous-ref pattern as EventDetailsScreen's isEnrollingRef.
   const isActingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleApprove = async (refund: RefundRecord) => {
     if (isActingRef.current) return;
@@ -76,14 +80,14 @@ const RefundApprovalScreen: React.FC<Props> = ({ navigation }) => {
       <ScreenHeader title="Refund Requests" onBack={() => navigation.goBack()} />
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <SimpleListSkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
         >
           {refunds.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>💸</Text>
+              <WalletIcon color={colors.textSecondary} size={56} />
               <Text style={styles.emptyTitle}>No pending refunds</Text>
               <Text style={styles.emptySubtitle}>Refund requests from your attendees will show up here.</Text>
             </View>
@@ -188,7 +192,7 @@ const RefundApprovalScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   loader: { marginTop: spacing.xxl },
   scroll: { padding: spacing.md, gap: spacing.md },

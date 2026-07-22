@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing } from 'react-native-reanimated';
-import theme from '../../theme';
+import { borderRadius } from '../../theme/borderRadius';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface SkeletonProps {
   width?: number | string;
@@ -16,6 +17,9 @@ const Skeleton: React.FC<SkeletonProps> = ({
   variant = 'rect',
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   // Pulsing opacity rather than a static gray box — reanimated is already a dependency
   // (~4.1.1) and this reads as "loading" without needing an extra gradient-sweep asset.
   const opacity = useSharedValue(0.4);
@@ -37,7 +41,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
         {
           width: width as any,
           height,
-          borderRadius: variant === 'circle' ? height / 2 : theme.borderRadius.sm,
+          borderRadius: variant === 'circle' ? height / 2 : borderRadius.sm,
         },
         animatedStyle,
         style,
@@ -46,9 +50,9 @@ const Skeleton: React.FC<SkeletonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   skeleton: {
-    backgroundColor: theme.colors.borderLight,
+    backgroundColor: colors.borderLight,
   },
 });
 

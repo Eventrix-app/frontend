@@ -38,7 +38,7 @@ import { registerForPushNotifications } from './src/utils/registerForPushNotific
 import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
-import { ThemeProvider } from './src/theme/ThemeContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
 // Keep the native splash screen up until Redux persist rehydration (handled by
 // PersistGate below), these font files, and — for the logged-out flow — the intro video
@@ -79,6 +79,14 @@ function SplashGate() {
   }, []);
 
   return null;
+}
+
+// "auto" would follow the OS color scheme, not the app's own theme choice — once a user
+// manually toggles dark mode (ThemeContext persists that override independent of the OS
+// setting, see ThemeContext.tsx), the status bar needs to track that choice instead.
+function ThemedStatusBar() {
+  const { theme } = useTheme();
+  return <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />;
 }
 
 function AppStateSync() {
@@ -164,7 +172,7 @@ export default function App() {
                     </ErrorBoundary>
                    </ServerGate>
                 </NetworkGate>
-                <StatusBar style="auto" />
+                <ThemedStatusBar />
               </SafeAreaProvider>
             </BottomSheetModalProvider>
           </ThemeProvider>

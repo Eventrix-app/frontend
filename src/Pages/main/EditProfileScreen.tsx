@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
@@ -31,6 +31,11 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  // A fast double-tap can fire before isSaving's re-render lands (same reasoning as
+  // CreateEventScreen's isSubmittingRef) — this closes that gap synchronously.
+  const isSubmittingRef = useRef(false);
 
   // Prefill once the real profile loads — a plain effect (not defaultValue) since the
   // query resolves after this component has already mounted with empty fields.
@@ -43,7 +48,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   }, [me]);
 
   const handleSave = async () => {
-    if (!userId) return;
+    // `me` guards against the real bug: firstName/lastName/phone/city all start as '' and
+    // only get their real values once getMe() resolves (see the prefill effect above). The
+    // backend treats an explicitly-sent '' as "clear this field" (not "leave unchanged"),
+    // so saving before `me` loads would silently wipe the user's actual name/phone/city.
+    if (!userId || !me || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await updateParticipant({
         id: userId,
@@ -52,6 +62,8 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       navigation.goBack();
     } catch (e: any) {
       showAlert('Error', e?.data?.message ?? 'Failed to save changes');
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -151,7 +163,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving || !me}>
           {isSaving ? (
             <ActivityIndicator color={colors.white} />
           ) : (
@@ -163,7 +175,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,

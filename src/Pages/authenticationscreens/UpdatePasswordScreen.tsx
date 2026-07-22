@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
@@ -6,11 +6,12 @@ import { AuthInput } from '../../components/auth/AuthInput';
 import { AuthActions, OutlineButtonRow } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { AuthStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useResetPasswordMutation } from '../../store/services/authApi';
 import { Text } from '../../components/common/Text';
+import { WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'UpdatePassword'>;
 
@@ -24,6 +25,8 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isSuccess, setIsSuccess] = useState(false);
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Requirements check matching mockup
   const hasMinLength = password.length >= 8;
@@ -195,8 +198,9 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       )}
 
       {errorMessage ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        <View style={[styles.errorContainer, styles.errorRow]}>
+          <WarningIcon color="#D32F2F" size={16} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -224,7 +228,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   spacer: {
     height: spacing.md,
   },
@@ -241,7 +245,13 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',
@@ -346,7 +356,7 @@ const styles = StyleSheet.create({
   },
   reqHeaderTitle: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
       fontFamily: 'ZalandoSansExpanded_500Medium'
 },
   reqHeaderLine: {
@@ -379,10 +389,10 @@ const styles = StyleSheet.create({
   },
   reqLabel: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.4)',
+    color: colors.textMuted,
   },
   reqLabelMet: {
-    color: '#1A1A2E',
+    color: colors.text,
     fontWeight: '500',
   },
 });

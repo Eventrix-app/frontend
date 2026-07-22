@@ -9,9 +9,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MOCK_SHORTS } from '../../data/mockEvents';
-import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
+import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon, ShareArrowIcon } from '../../components/common/Icons';
 
 const { height } = Dimensions.get('window');
 
@@ -38,7 +38,7 @@ const ShortsScreen: React.FC = () => {
             <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
               <Text style={styles.topTitle}>← Shorts</Text>
               <View style={styles.topActions}>
-                <Text style={styles.topIcon}>🔍</Text>
+                <SearchIcon color="#FFFFFF" size={22} />
                 <Text style={styles.topIcon}>⋮</Text>
               </View>
             </View>
@@ -46,7 +46,7 @@ const ShortsScreen: React.FC = () => {
             <View style={styles.bottom}>
               <View style={styles.creator}>
                 <View style={styles.avatar}>
-                  <Text>👤</Text>
+                  <PersonIcon color="#000000" size={16} />
                 </View>
                 <View>
                   <Text style={styles.userName}>{item.user}</Text>
@@ -59,17 +59,17 @@ const ShortsScreen: React.FC = () => {
 
               <View style={styles.actions}>
                 {[
-                  { label: 'Like', value: '' },
-                  { label: String(item.comments), value: '💬' },
-                  { label: 'Share', value: '↗' },
+                  { label: 'Like', Icon: HeartIcon },
+                  { label: String(item.comments), Icon: ChatIcon },
+                  { label: 'Share', Icon: ShareArrowIcon },
                 ].map((action) => (
                   <TouchableOpacity key={action.label} style={styles.actionBtn}>
-                    <Text style={styles.actionIcon}>{action.value || '❤️'}</Text>
+                    <action.Icon color="#FFFFFF" size={24} />
                     <Text style={styles.actionLabel}>{action.label}</Text>
                   </TouchableOpacity>
                 ))}
                 <View style={styles.musicBtn}>
-                  <Text>🎵</Text>
+                  <MusicNoteIcon color="#000000" size={16} />
                 </View>
               </View>
             </View>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   topTitle: {
-    color: colors.white,
+    color: '#FFFFFF',
     fontSize: 18,
     textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   topIcon: {
     fontSize: 22,
-    color: colors.white,
+    color: '#FFFFFF',
   },
   bottom: {
     position: 'absolute',
@@ -137,12 +137,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   userName: {
-    color: colors.white,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '500',
   },
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   caption: {
-    color: colors.white,
+    color: '#FFFFFF',
     fontSize: 12,
     marginTop: spacing.xs,
   },
@@ -164,17 +164,17 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     fontSize: 24,
-    color: colors.white,
+    color: '#FFFFFF',
   },
   actionLabel: {
-    color: colors.white,
+    color: '#FFFFFF',
     fontSize: 12,
   },
   musicBtn: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },

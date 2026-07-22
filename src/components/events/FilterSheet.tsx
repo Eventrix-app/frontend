@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../common/Text';
@@ -62,6 +62,8 @@ interface Props {
 export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
   const [draft, setDraft] = useState<EventFilters>(value);
   const { data: categories = [] } = useGetCategoriesQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const isPriceSelected = (preset: (typeof PRICE_PRESETS)[number]) =>
     draft.priceMin === preset.priceMin && draft.priceMax === preset.priceMax;
@@ -89,6 +91,7 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
             label="Any"
             active={!draft.categoryId}
             onPress={() => setDraft((d) => ({ ...d, categoryId: undefined }))}
+            styles={styles}
           />
           {categories.map((cat) => (
             <FilterChip
@@ -96,6 +99,7 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
               label={cat.name}
               active={draft.categoryId === cat.id}
               onPress={() => setDraft((d) => ({ ...d, categoryId: cat.id }))}
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -108,6 +112,7 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
               label={preset.label}
               active={isPriceSelected(preset)}
               onPress={() => setDraft((d) => ({ ...d, priceMin: preset.priceMin, priceMax: preset.priceMax }))}
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -122,6 +127,7 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
               onPress={() =>
                 setDraft((d) => ({ ...d, dateFrom: preset.range?.dateFrom, dateTo: preset.range?.dateTo }))
               }
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -134,6 +140,7 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
               label={preset.label}
               active={draft.radiusKm === preset.radiusKm}
               onPress={() => setDraft((d) => ({ ...d, radiusKm: preset.radiusKm }))}
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -152,17 +159,18 @@ export const FilterSheet: React.FC<Props> = ({ value, onApply, onClose }) => {
   );
 };
 
-const FilterChip: React.FC<{ label: string; active: boolean; onPress: () => void }> = ({
-  label,
-  active,
-  onPress,
-}) => (
+const FilterChip: React.FC<{
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}> = ({ label, active, onPress, styles }) => (
   <TouchableOpacity style={[styles.filterChip, active && styles.filterChipActive]} onPress={onPress}>
     <Text style={[styles.filterChipLabel, active && styles.filterChipLabelActive]}>{label}</Text>
   </TouchableOpacity>
 );
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, paddingHorizontal: spacing.md },
   header: {
     flexDirection: 'row',

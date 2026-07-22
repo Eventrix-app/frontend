@@ -227,14 +227,16 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: colors.textSecondary,
   },
   logoutWrap: {
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
+    borderRadius: 20,
+    alignSelf: 'center',
+    width: '70%',
     marginTop: spacing.xl,
   },
   logoutBtn: {
-    borderRadius: borderRadius.md,
+    height: 52,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     ...Platform.select({
       android: { elevation: 6 },
       default: {
@@ -247,12 +249,14 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   logoutContent: {
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    justifyContent: 'center',
+    height: '100%',
   },
   logoutText: {
-    color: colors.error,
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   version: {
     textAlign: 'center',

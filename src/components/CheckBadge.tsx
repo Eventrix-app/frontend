@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { colors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Text } from './common/Text';
 
 type Props = { checked: boolean };
@@ -11,6 +11,8 @@ type Props = { checked: boolean };
  * Cross-fades smoothly between the two states.
  */
 export const CheckBadge: React.FC<Props> = ({ checked }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const anim = useRef(new Animated.Value(checked ? 1 : 0)).current;
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export const CheckBadge: React.FC<Props> = ({ checked }) => {
 
 const SIZE = 24;
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: { width: SIZE, height: SIZE },
   layer: {
     position: 'absolute',

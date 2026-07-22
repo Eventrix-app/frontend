@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetMyEventsQuery } from '../../store/services/eventsApi';
 import { Text } from '../../components/common/Text';
+import { ScreenHeader } from '../../components/common/ScreenHeader';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { EventBusyIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyEvents'>;
 
@@ -25,6 +28,8 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState<StatusFilter>('All');
   const { data: events = [], isLoading } = useGetMyEventsQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const filtered = events.filter((e) => {
     if (activeFilter === 'All') return true;
@@ -40,26 +45,20 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>My Events</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.refundsBtn}
-            onPress={() => navigation.navigate('RefundApproval')}
-          >
-            <Text style={styles.refundsBtnText}>Refunds</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => navigation.navigate('CreateEvent', {})}
-          >
-            <Text style={styles.createBtnText}>+ Create</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScreenHeader
+        title="My Events"
+        onBack={() => navigation.goBack()}
+        rightAction={
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.refundsBtn} onPress={() => navigation.navigate('RefundApproval')}>
+              <Text style={styles.refundsBtnText}>Refunds</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.createBtn} onPress={() => navigation.navigate('CreateEvent', {})}>
+              <Text style={styles.createBtnText}>+ Create</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       <ScrollView
         horizontal
@@ -79,12 +78,12 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
       </ScrollView>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <SimpleListSkeleton />
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}>
           {filtered.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🎪</Text>
+              <EventBusyIcon color={colors.textSecondary} size={56} />
               <Text style={styles.emptyTitle}>No events yet</Text>
               <Text style={styles.emptySubtitle}>Create your first event and it will appear here.</Text>
               <TouchableOpacity
@@ -120,28 +119,9 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, color: colors.text, flex: 1,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
-  headerActions: { flexDirection: 'row', gap: spacing.sm },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   createBtn: {
     backgroundColor: colors.brandPink,
     borderRadius: borderRadius.md,

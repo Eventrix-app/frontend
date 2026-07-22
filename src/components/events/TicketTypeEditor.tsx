@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { CreateTicketTypePayload } from '../../store/services/eventsApi';
@@ -85,6 +85,8 @@ interface TicketTypeEditorProps {
 }
 
 const TicketTypeEditor: React.FC<TicketTypeEditorProps> = ({ tiers, onChange, isFree }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const updateTier = (key: string, patch: Partial<TierDraft>) => {
     onChange(tiers.map((t) => (t.key === key ? { ...t, ...patch } : t)));
   };
@@ -122,6 +124,8 @@ interface TierRowProps {
 
 const TierRow: React.FC<TierRowProps> = ({ tier, index, isFree, canRemove, onChange, onRemove }) => {
   const [expanded, setExpanded] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const priceNumber = Number(tier.price) || 0;
   const debouncedPrice = useDebouncedValue(priceNumber, 400);
   // fee-estimate is an authenticated, per-request lookup — only fire it once there's an
@@ -237,7 +241,7 @@ const TierRow: React.FC<TierRowProps> = ({ tier, index, isFree, canRemove, onCha
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: { gap: spacing.md },
   tierCard: {
     backgroundColor: colors.white,

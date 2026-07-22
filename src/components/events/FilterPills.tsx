@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Platform, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text } from '../common';
-import theme from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface FilterOption {
   id: string;
@@ -22,6 +23,8 @@ const FilterPills: React.FC<FilterPillsProps> = ({
   onSelect,
   horizontal = true,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const content = (
     <>
       {options.map((option) => {
@@ -74,40 +77,40 @@ const FilterPills: React.FC<FilterPillsProps> = ({
   return <View style={styles.verticalContainer}>{content}</View>;
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   scrollView: {
-    marginVertical: theme.spacing.sm,
+    marginVertical: spacing.sm,
   },
   horizontalContainer: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   verticalContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: theme.spacing.lg,
+    padding: spacing.lg,
   },
   pill: {
     borderRadius: 999,
-    marginRight: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
   },
   pillSelected: {
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
   },
   pillGlass: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 999,
     overflow: 'hidden',
-    backgroundColor: theme.colors.white,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     minHeight: 40,
     ...Platform.select({
       android: { elevation: 6 },
       default: {
-        shadowColor: theme.colors.shadow,
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.14,
         shadowRadius: 18,
@@ -124,7 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.xs,
+    marginRight: spacing.xs,
     backgroundColor: 'rgba(255,255,255,0.45)',
   },
   iconWrapSelected: {
@@ -141,11 +144,11 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontSize: 10,
-    marginLeft: theme.spacing.xs,
-    color: theme.colors.textSecondary,
+    marginLeft: spacing.xs,
+    color: colors.textSecondary,
   },
   chevronSelected: {
-    color: theme.colors.textInverse,
+    color: colors.textInverse,
   },
 });
 

@@ -26,7 +26,10 @@ module.exports = {
     },
     android: {
       package: 'com.eventrix.app',
-      googleServicesFile: './google-services.json',
+      // Locally this file just sits at the repo root (gitignored). EAS Build clones from
+      // git and never sees gitignored files, so on EAS it's injected as a file environment
+      // variable instead — GOOGLE_SERVICES_JSON then holds the path to that injected copy.
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       adaptiveIcon: {
         foregroundImage: './assets/logo/adaptive-icon-foreground.png',
         backgroundColor: '#FF3366',
@@ -55,6 +58,7 @@ module.exports = {
     },
     plugins: [
       '@react-native-community/datetimepicker',
+      'expo-splash-screen',
       'expo-font',
       [
         'expo-camera',

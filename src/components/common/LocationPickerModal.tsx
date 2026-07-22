@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from './Text';
@@ -41,6 +41,8 @@ export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude,
   const [isLocating, setIsLocating] = useState(false);
   const reverseGeocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [triggerReverseGeocode] = useLazyReverseGeocodeQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Routed through the backend (GET /geocode/reverse) rather than calling Google directly —
   // keeps the Geocoding API key server-side only (see geocode.service.ts).
@@ -147,7 +149,7 @@ export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude,
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.white },
   header: {
     flexDirection: 'row',

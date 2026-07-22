@@ -19,9 +19,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { TicketIcon, CalendarIcon, LocationPin } from '../common/Icons';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - spacing.md * 2;
@@ -84,8 +85,11 @@ const Dot: React.FC<{ index: number; slotWidth: number; loopWidth: number; scrol
     };
   });
 
-  return <Animated.View style={[styles.dot, style]} />;
+  return <Animated.View style={[dotBaseStyle, style]} />;
 };
+
+// Static — doesn't depend on theme colors, so it's not part of createStyles below.
+const dotBaseStyle = { height: 6, borderRadius: 3 } as const;
 
 const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: cardWidthProp }) => {
   const effectiveCardWidth = cardWidthProp ?? CARD_WIDTH;
@@ -101,6 +105,8 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
   // uses a fixed, non-customizable native duration/easing, so this instead drives the
   // scroll programmatically at a chosen duration/easing via reanimated's scrollTo.
   const scrollX = useSharedValue(0);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useAnimatedReaction(
     () => scrollX.value,
@@ -214,7 +220,8 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
             imageStyle={styles.imageRadius}
           >
             <View style={styles.priceTag}>
-              <Text style={styles.priceText}>🎟 {event.price}</Text>
+              <TicketIcon color={colors.white} size={12} />
+              <Text style={styles.priceText}>{event.price}</Text>
             </View>
 
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gradient}>
@@ -224,8 +231,14 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
                     {event.title}
                   </Text>
                   <View style={styles.metaRow}>
-                    <Text style={styles.meta}>📅 {event.date}</Text>
-                    <Text style={styles.meta}>📍 {event.location}</Text>
+                    <View style={styles.metaItem}>
+                      <CalendarIcon color="rgba(255,255,255,0.9)" size={13} />
+                      <Text style={styles.meta}>{event.date}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <LocationPin color="rgba(255,255,255,0.9)" size={13} />
+                      <Text style={styles.meta}>{event.location}</Text>
+                    </View>
                   </View>
                 </View>
 
@@ -242,7 +255,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
         </TouchableOpacity>
       );
     },
-    [onEventPress, events.length, effectiveCardWidth, effectiveSlotWidth, loopWidth, scrollX],
+    [onEventPress, events.length, effectiveCardWidth, effectiveSlotWidth, loopWidth, scrollX, styles],
   );
 
   if (events.length === 0) return null;
@@ -279,7 +292,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     height: CARD_HEIGHT,
     marginRight: CARD_SPACING,
@@ -335,6 +348,11 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   meta: {
     color: 'rgba(255,255,255,0.9)',

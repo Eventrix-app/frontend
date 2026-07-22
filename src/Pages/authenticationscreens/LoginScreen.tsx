@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
@@ -6,7 +6,7 @@ import { AuthInput } from '../../components/auth/AuthInput';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
 import AnimatedLink from '../../components/common/AnimatedLink';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
@@ -15,12 +15,8 @@ import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-};
+import { WarningIcon } from '../../components/common/Icons';
+import { AuthStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -34,6 +30,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [login, { isLoading }] = useLoginMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
   
@@ -56,6 +54,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       registerForPushNotifications(dispatch);
       if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
+      } else if (!result.hasCompletedOnboarding) {
+        // First time this account has ever logged in (or an admin-created account that
+        // skipped it) — walk the onboarding chain now, before landing on Main.
+        navigation.navigate('Onboarding');
       } else {
         navigation.getParent()?.navigate('Main' as never);
       }
@@ -133,8 +135,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {errorMessage ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <View style={[styles.errorContainer, styles.errorRow]}>
+            <WarningIcon color="#D32F2F" size={16} />
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
@@ -191,7 +194,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -273,6 +276,12 @@ const styles = StyleSheet.create({
   registerHint: {
     fontSize: 14,
     color: colors.textMuted,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',

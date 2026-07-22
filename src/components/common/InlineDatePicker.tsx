@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { parseDateValue, formatDateValue, DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
@@ -21,6 +21,8 @@ interface Props {
 // show/hide-state + DateTimePicker + platform-specific "Done" button boilerplate.
 const InlineDatePicker: React.FC<Props> = ({ value, onChange, placeholder = 'Select date', minimumDate, maximumDate, style }) => {
   const [show, setShow] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View>
@@ -53,7 +55,7 @@ const InlineDatePicker: React.FC<Props> = ({ value, onChange, placeholder = 'Sel
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   input: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,

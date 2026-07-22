@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   Easing,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '../common/Text';
@@ -31,6 +31,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   scrollable = false,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const logoTranslateY = useRef(new Animated.Value(-40)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -127,7 +129,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#FFF8FA',
@@ -242,7 +244,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     textAlign: 'center',
     textAlignVertical: 'center',
-    color: '#0D0D0D',
+    color: colors.text,
   },
   subtitle: {
     fontFamily: 'ZalandoSansExpanded_500Medium',
@@ -251,6 +253,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     textAlign: 'center',
     textAlignVertical: 'center',
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
   },
 });
