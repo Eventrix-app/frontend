@@ -13,7 +13,7 @@ import { useGetMeQuery } from '../../store/services/userApi';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { getEventStartDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
-import { NotificationBell } from '../../components/common/Icons';
+import { NotificationBell, LeftArrow } from '../../components/common/Icons';
 import BookingListSkeleton from '../../components/common/BookingListSkeleton';
 
 type TabId = 'upcoming' | 'previous' | 'waitlist' | 'cancelled';
@@ -111,10 +111,15 @@ const BookingsScreen: React.FC = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
+        {/* Absolutely centered on the whole bar (not flex-centered between the back button
+            and the wider right-icon group) so the title lands on true center instead of
+            drifting toward the back button — see left/right reservation math in styles. */}
+        <View style={styles.titleAbsoluteWrap} pointerEvents="box-none">
+          <Text style={styles.title} numberOfLines={1}>My Bookings</Text>
+        </View>
         <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.iconBtnText}>‹</Text>
+          <LeftArrow color={colors.text} size={22} />
         </TouchableOpacity>
-        <Text style={styles.title}>My Bookings</Text>
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
             <Image
@@ -289,16 +294,31 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingHorizontal: spacing.md,
   },
   topBar: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
+  // Reserves the same width on both sides — the right icon group (search + bell + avatar,
+  // 36+36+34 plus two 8px gaps = 122) is far wider than the single 36px back button, so
+  // reserving only each side's own width would still leave the centered text off true
+  // center; reserving the wider side's width symmetrically is what actually centers it.
+  titleAbsoluteWrap: {
+    position: 'absolute',
+    left: 130,
+    right: 130,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontSize: 18,
     color: colors.text,
     fontFamily: 'ZalandoSansExpanded_700Bold',
+    textAlign: 'center',
   },
   topBarRight: {
     flexDirection: 'row',
@@ -311,10 +331,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconBtnText: {
-    fontSize: 20,
-    color: colors.text,
   },
   searchIconImg: {
     width: 20,

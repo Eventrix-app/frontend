@@ -40,6 +40,7 @@ import { parseDateValue, parseTimeValue, formatDateValue, formatTimeValue, forma
 import InlineDatePicker from '../../components/common/InlineDatePicker';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { LocationPickerModal } from '../../components/common/LocationPickerModal';
+import CreateEventSkeleton from '../../components/common/CreateEventSkeleton';
 import { Feather } from '@expo/vector-icons';
 import TicketTypeEditor, {
   TierDraft,
@@ -470,8 +471,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   // form from flashing on screen during that one render before the redirect fires.
   if (!isEdit && !isAdmin && (isLoadingVerification || verificationStatus?.status !== 'approved')) {
     return (
-      <View style={[styles.root, styles.verificationGate, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={colors.brandPink} />
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <ScreenHeader title="Create Event" onBack={() => navigation.goBack()} />
+        <CreateEventSkeleton />
       </View>
     );
   }
@@ -789,7 +791,6 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  verificationGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
   scroll: { padding: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
   mapPinBtn: {
