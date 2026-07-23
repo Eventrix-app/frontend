@@ -81,6 +81,7 @@ module.exports = {
       ],
       'expo-video',
       'expo-secure-store',
+      'expo-web-browser',
     ],
     extra: {
       eas: {

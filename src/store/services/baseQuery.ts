@@ -1,7 +1,7 @@
 import { fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../index';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/';
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
 // Named/shaped as a BaseQueryFn (rather than exporting fetchBaseQuery(...) directly) so
 // every API slice can keep calling createFallbackBaseQuery(withAuth) — only one backend

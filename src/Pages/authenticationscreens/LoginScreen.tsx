@@ -97,7 +97,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       title="Log in"
       subtitle="Enter your credentials and log in to continue."
       centerTitle
-      scrollable={false}
+      scrollable={true}
     >
       <View onLayout={handleContentLayout}>
         <AuthInput

@@ -27,6 +27,11 @@ export interface User {
   updatedAt: string;
 }
 
+export interface SocialLoginCredentials {
+  provider: 'google' | 'apple' | 'facebook';
+  token: string; // id_token for Google/Apple, access_token for Facebook
+}
+
 export interface AuthResponse {
   accessToken: string;
   id: string;
@@ -89,6 +94,13 @@ export const authApi = createApi({
         body: { token, password },
       }),
     }),
+    socialLogin: builder.mutation<AuthResponse, SocialLoginCredentials>({
+      query: (body) => ({
+        url: 'auth/social',
+        method: 'POST',
+        body,
+      }),
+    }),
     getCurrentUser: builder.query<User, void>({
       query: () => 'users/me',
       providesTags: ['Auth'],
@@ -103,5 +115,6 @@ export const {
   useLogoutMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
+  useSocialLoginMutation,
   useGetCurrentUserQuery,
 } = authApi;

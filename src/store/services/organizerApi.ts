@@ -14,6 +14,7 @@ export interface OrganizerPublicProfile {
   eventCount: number;
   followerCount: number;
   isFollowing?: boolean;
+  phone?: string;
 }
 
 // Mirrors VerificationStatusRecord in organizer.service.ts.

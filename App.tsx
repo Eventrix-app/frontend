@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+//import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
@@ -161,7 +161,7 @@ export default function App() {
       <PersistGate loading={null} persistor={persistor}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <ThemeProvider>
-            <BottomSheetModalProvider>
+            {/* <BottomSheetModalProvider> */}
               <SafeAreaProvider>
                 <SplashGate />
                 <AppStateSync />
@@ -174,7 +174,7 @@ export default function App() {
                 </NetworkGate>
                 <ThemedStatusBar />
               </SafeAreaProvider>
-            </BottomSheetModalProvider>
+           {/* </BottomSheetModalProvider> */}
           </ThemeProvider>
         </GestureHandlerRootView>
       </PersistGate>

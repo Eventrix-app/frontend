@@ -11,6 +11,7 @@ import {
   View,
   ActivityIndicator,
   Image,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -59,6 +60,7 @@ import {
   PersonIcon,
   ChatIcon,
   PhoneIcon,
+  WhatsAppIcon,
   CalendarIcon,
   ClockIcon,
   LocationPin,
@@ -68,6 +70,7 @@ import {
   PhotoIcon,
   IconProps,
 } from '../../components/common/Icons';
+import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
@@ -632,6 +635,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
   const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
   const [cancelEvent, { isLoading: isCancelling }] = useCancelEventMutation();
+  const { data: organizerProfile } = useGetOrganizerProfileQuery(
+    event?.organizer?.id ?? '',
+    { skip: !event?.organizer?.id },
+  );
+  const organizerPhone = organizerProfile?.phone;
   const saved = !!event && favorites.some((f) => f.id === event.id);
 
   const handleCancelEvent = () => {
@@ -783,6 +791,45 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   const coverImage = event.coverImageUrl || event.imageUrl;
+
+  const handleCall = async () => {
+    if (!organizerPhone) {
+      showAlert('No phone number', "This organizer hasn't added a contact number yet.");
+      return;
+    }
+    const url = `tel:${organizerPhone}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        showAlert("Couldn't open dialer", 'Calling is not supported on this device.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      showAlert("Couldn't open dialer", 'Something went wrong. Please try again.');
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    if (!organizerPhone) {
+      showAlert('No phone number', "This organizer hasn't added a WhatsApp number yet.");
+      return;
+    }
+    // Strip everything except digits and leading +
+    const digits = organizerPhone.replace(/[^\d]/g, '');
+    // If number doesn't start with country code, assume India (+91)
+    const withCountry = digits.startsWith('91') && digits.length === 12
+      ? digits
+      : digits.length === 10
+        ? `91${digits}`
+        : digits;
+    const url = `https://wa.me/${withCountry}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      showAlert("Couldn't open WhatsApp", 'Make sure WhatsApp is installed on your device.');
+    }
+  };
 
   const notApprovedYet = event.isPaid && event.approvalStatus !== 'approved';
   const selectedAvailability = selectedTier ? tierAvailability(selectedTier) : null;
@@ -965,10 +1012,10 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.organizerActions}>
-            <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
-              <ChatIcon color={colors.brandPink} size={15} />
+            <TouchableOpacity style={styles.organizerActionBtn} onPress={handleWhatsApp}>
+              <WhatsAppIcon color={colors.brandPink} size={15} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.organizerActionBtn} onPress={() => {}}>
+            <TouchableOpacity style={styles.organizerActionBtn} onPress={handleCall}>
               <PhoneIcon color={colors.brandPink} size={15} />
             </TouchableOpacity>
           </View>
