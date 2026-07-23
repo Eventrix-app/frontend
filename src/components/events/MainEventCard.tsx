@@ -146,8 +146,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.pill,
   },
   categoryPill: {
+    // Always a light glass pill over the event photo, independent of app theme — so its
+    // text must stay a fixed dark color too. colors.text flips to near-white in dark mode
+    // (meant for surfaces that flip with the theme, not this fixed-light pill), which made
+    // the label unreadable — near-white text on a near-white background.
     backgroundColor: 'rgba(255,255,255,0.85)',
-    color: colors.text,
+    color: '#1A1A2E',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -168,7 +172,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.pill,
   },
   pricePillText: {
-    color: colors.white,
+    // Same fixed-dark-navy background regardless of theme, so text must stay literal white
+    // — colors.white is a *surface* token (remapped to a near-black dark-mode surface, not
+    // literally white), which made this near-invisible against the navy pill in dark mode.
+    color: colors.textInverse,
     fontSize: 11,
     fontWeight: '700',
   },

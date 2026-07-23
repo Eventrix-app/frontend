@@ -71,6 +71,7 @@ import {
 import { useChatSocket } from '../../hooks/useChatSocket';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 
@@ -239,7 +240,7 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
   if (isLoading) {
     return (
       <View style={styles.tabContent}>
-        <ActivityIndicator color={colors.brandPink} />
+        <SimpleListSkeleton count={3} />
       </View>
     );
   }
@@ -369,7 +370,7 @@ const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, 
   if (isLoading) {
     return (
       <View style={styles.tabContent}>
-        <ActivityIndicator color={colors.brandPink} />
+        <SimpleListSkeleton count={3} showLeadingCircle />
       </View>
     );
   }
@@ -446,7 +447,7 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
       keyboardVerticalOffset={90}
     >
       {isLoadingHistory ? (
-        <ActivityIndicator style={styles.communityLoader} color={colors.brandPink} />
+        <SimpleListSkeleton count={3} showLeadingCircle />
       ) : messages.length === 0 ? (
         <Text style={styles.emptyTabText}>No messages yet — be the first to say hi.</Text>
       ) : (
@@ -516,7 +517,7 @@ const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eve
   if (isLoading) {
     return (
       <View style={styles.tabContent}>
-        <ActivityIndicator color={colors.brandPink} />
+        <SimpleListSkeleton count={3} />
       </View>
     );
   }
@@ -1499,7 +1500,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   emptyTabText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
 
   communityWrap: { minHeight: 360 },
-  communityLoader: { marginTop: spacing.xl },
   communyMessagesScroll: { maxHeight: 420 },
   communityMessages: { paddingVertical: spacing.sm, gap: spacing.sm },
   chatBubbleRow: { alignItems: 'flex-start' },
