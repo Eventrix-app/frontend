@@ -14,6 +14,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
 import { calculateDistanceKm, toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
@@ -21,7 +22,7 @@ import { ScreenHeader } from '../../components/common/ScreenHeader';
 import NoEvents from '../../components/common/Noevents';
 import EventListSkeleton from '../../components/common/EventListSkeleton';
 import { EventFilters, FilterSheet } from '../../components/events/FilterSheet';
-import { SearchIcon, NotificationBell } from '../../components/common/Icons';
+import { NotificationBell } from '../../components/common/Icons';
 
 const FILTER_CHIPS: { id: keyof EventFilters | 'category'; label: string }[] = [
   { id: 'dateFrom', label: 'Date' },
@@ -29,10 +30,6 @@ const FILTER_CHIPS: { id: keyof EventFilters | 'category'; label: string }[] = [
   { id: 'radiusKm', label: 'Distance' },
   { id: 'category', label: 'Category' },
 ];
-
-// TODO: source from user profile / auth state instead of hardcoding
-const CURRENT_USER_AVATAR = require('../../../assets/profile/avatar-placeholder.png');
-const hasUnread = true; // TODO: replace with real unread count from notification context/API
 
 const ExploreScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -60,6 +57,9 @@ const ExploreScreen: React.FC = () => {
     refetch: refetchFollowed,
   } = useGetFollowedEventsQuery(undefined, { skip: !followingOnly });
   const { data: me } = useGetMeQuery();
+  const { data: notifications = [] } = useGetNotificationsQuery();
+  const hasUnread = notifications.some((n) => !n.readAt);
+  const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
 
   const isLoading = followingOnly ? isLoadingFollowed : isLoadingAll;
   const isError = followingOnly ? isErrorFollowed : isErrorAll;
@@ -109,16 +109,26 @@ const ExploreScreen: React.FC = () => {
         rightAction={
           <View style={styles.topBarRight}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
-              <SearchIcon color={colors.text} size={18} />
+              <Image
+                source={require('../../../assets/location/search.png')}
+                style={styles.searchIconImg}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
-              <NotificationBell color={colors.text} size={18} />
+              <NotificationBell unread={hasUnread} color={colors.brandPink} size={22} />
               {hasUnread && <View style={styles.bellDot} />}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-              <Image source={CURRENT_USER_AVATAR} style={styles.avatarImg} />
+              {me?.profilePictureUrl ? (
+                <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarFallbackText}>{avatarInitial}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         }
@@ -244,6 +254,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   iconText: {
     fontSize: 18,
   },
+  searchIconImg: {
+    width: 18,
+    height: 18,
+    tintColor: colors.text,
+  },
   bellDot: {
     position: 'absolute',
     top: 4,
@@ -251,7 +266,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#FF3366',
     borderWidth: 1.5,
     borderColor: colors.white,
   },
@@ -259,6 +274,19 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: 34,
     height: 34,
     borderRadius: 17,
+  },
+  avatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.brandPink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.white,
   },
   chipsScroll: {
     flexGrow: 0,

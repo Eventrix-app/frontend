@@ -223,9 +223,12 @@ export const NotificationPreferencesScreen: React.FC<ScreenProps> = () => {
   // LocationAccess -> here) — Login has already happened by this point, so push the
   // collected interests/location/prefs (syncOnboardingDraft also marks the account as
   // onboarded once that sync succeeds — see its own comment), then land on Main.
-  const handleContinue = () => {
+  // Awaited (not fire-and-forget) so the account's hasCompletedOnboarding flag is durably
+  // set server-side before the user can leave/background the app — otherwise a login
+  // shortly after would still see hasCompletedOnboarding: false and re-run onboarding.
+  const handleContinue = async () => {
     setVisible(false);
-    syncOnboardingDraft(dispatch, store.getState);
+    await syncOnboardingDraft(dispatch, store.getState);
     navigation.getParent()?.navigate('Main' as never);
   };
 

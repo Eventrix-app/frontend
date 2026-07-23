@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -89,14 +89,16 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, loadMore, isFetchingMore, refetch } = usePaginatedEvents();
+  const { events, refetch } = usePaginatedEvents();
   const { data: me, refetch: refetchMe } = useGetMeQuery();
   const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
   // blow out this carousel.
   const featured = cardEvents.filter((event) => event.featured).slice(0, 5);
-  const recommended = cardEvents;
+  // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
+  // lives on the Explore screen via "View All Events" below.
+  const recommended = cardEvents.slice(0, 15);
 
   // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
   // down together (via pullDistance below) and reveals a random health quote behind
@@ -124,19 +126,14 @@ const HomeScreen: React.FC = () => {
     extrapolate: 'clamp',
   });
 
-  // "Lazy loading": the feed starts with just the first page instead of fetching
-  // everything up front, and quietly fetches the next page once the user scrolls
-  // near the bottom of this (single, whole-page) ScrollView. Also watches for the pull-
-  // to-refresh threshold so onScrollEndDrag knows whether the drop should trigger a refresh.
+  // Home shows a fixed latest-15 feed (see `recommended` above), so scroll only needs to
+  // watch for the pull-to-refresh threshold — no lazy-loading trigger here anymore.
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
       useNativeDriver: true,
       listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-        if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 400) {
-          loadMore();
-        }
+        const { contentOffset } = e.nativeEvent;
         if (contentOffset.y <= -PULL_REFRESH_TRIGGER_DISTANCE) {
           hasCrossedPullTriggerRef.current = true;
         }
@@ -338,8 +335,6 @@ const HomeScreen: React.FC = () => {
         {recommended.map((event) => (
           <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
         ))}
-
-        {isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null}
 
         <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
           <Text style={styles.viewAllText}>View All Events</Text>
@@ -557,9 +552,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   footerText: {
     fontSize: 13,
     color: colors.textSecondary,
-  },
-  loadMoreLoader: {
-    marginVertical: spacing.md,
   },
   viewAllBtn: {
     flexDirection: 'row',

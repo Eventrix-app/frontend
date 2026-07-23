@@ -220,7 +220,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
             imageStyle={styles.imageRadius}
           >
             <View style={styles.priceTag}>
-              <TicketIcon color={colors.white} size={12} />
+              <TicketIcon color={colors.textInverse} size={12} />
               <Text style={styles.priceText}>{event.price}</Text>
             </View>
 
@@ -322,7 +322,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     gap: 4,
   },
   priceText: {
-    color: colors.white,
+    color: colors.textInverse,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -340,7 +340,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     flex: 1,
   },
   title: {
-    color: colors.white,
+    color: colors.textInverse,
     fontSize: 20,
     marginBottom: 4,
       fontFamily: 'ZalandoSansExpanded_700Bold'

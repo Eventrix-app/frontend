@@ -78,6 +78,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   wrap: {
     paddingHorizontal: spacing.sm,
     alignItems: 'center',
+    backgroundColor: colors.background,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     shadowColor: '#000',

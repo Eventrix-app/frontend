@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { NavigationContainer, NavigationState, NavigationContainerRef } from '@react-navigation/native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { DarkTheme, DefaultTheme, NavigationContainer, NavigationState, NavigationContainerRef, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from './types';
@@ -29,6 +29,7 @@ import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
+import { useTheme } from '../theme/ThemeContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -81,6 +82,31 @@ const RootNavigator = () => {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const wasAuthenticated = useRef(isAuthenticated);
 
+  // Without this, NavigationContainer defaults to react-navigation's own DefaultTheme
+  // (background #fff) regardless of our app's dark/light mode — its native-stack and
+  // bottom-tabs internals paint screen/scene containers with that background, so it shows
+  // through as a stray white sliver at screen edges (e.g. around the custom tab bar) any
+  // time our own screen content doesn't pixel-perfectly cover the area. Mapping our
+  // ThemeContext colors onto react-navigation's Theme keeps those internal backgrounds in
+  // sync with the app's actual theme instead.
+  const { theme: appTheme, colors: appColors } = useTheme();
+  const navigationTheme = useMemo<Theme>(() => {
+    const base = appTheme === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      dark: appTheme === 'dark',
+      colors: {
+        ...base.colors,
+        primary: appColors.brandPink,
+        background: appColors.background,
+        card: appColors.white,
+        text: appColors.text,
+        border: appColors.border,
+        notification: appColors.brandPink,
+      },
+    };
+  }, [appTheme, appColors]);
+
   // initialRouteName below only applies on the Navigator's first mount — it does not
   // re-route on its own if isAuthenticated flips to false later (e.g. the 2-day inactivity
   // logout, or a live ban). Without this, a user logged out mid-session (anywhere other
@@ -130,6 +156,7 @@ const RootNavigator = () => {
   return (
     <NavigationContainer
       ref={navigationRef}
+      theme={navigationTheme}
       onStateChange={(state) => {
         const routeName = getActiveRouteName(state);
         if (routeName) dispatch(setCurrentScreen(routeName));
