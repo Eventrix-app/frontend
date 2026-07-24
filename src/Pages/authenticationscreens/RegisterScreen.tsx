@@ -74,6 +74,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       subtitle="Enter your credentials and register to continue."
       centerTitle
       scrollable={true}
+      brandCardHeight={150}
     >
       <View style={styles.nameRow}>
         <View style={styles.nameField}>

@@ -240,15 +240,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     gap: spacing.md,
   },
   socialBtn: {
-    width: 300,
-    height: 300,
+    width: 200,
+    height: 200,
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   socialBtnCompact: {
-    width: 72,
-    height: 72,
+    width: 68,
+    height: 68,
     borderRadius: 20,
   },
   socialGlass: {

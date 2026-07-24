@@ -21,6 +21,7 @@ type AuthLayoutProps = {
   subtitle: string;
   centerTitle?: boolean;
   scrollable?: boolean;
+  brandCardHeight?: number;
 };
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({
@@ -29,6 +30,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   subtitle,
   centerTitle = false,
   scrollable = false,
+  brandCardHeight,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -60,7 +62,13 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
 
   const body = (
     <>
-      <View style={[styles.brandCard, !scrollable && styles.brandCardCompact]}>
+      <View
+        style={[
+          styles.brandCard,
+          !scrollable && styles.brandCardCompact,
+          brandCardHeight != null && { height: brandCardHeight },
+        ]}
+      >
         <View style={[styles.brandCardContent, { paddingTop: insets.top }]}>
           <Animated.View style={{ opacity: logoOpacity, transform: [{ translateY: logoTranslateY }] }}>
             <Image
