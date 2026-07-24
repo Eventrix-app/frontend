@@ -15,6 +15,7 @@ import SearchScreen from '../Pages/main/SearchScreen';
 import ProfileScreen from '../Pages/main/ProfileScreen';
 import EditProfileScreen from '../Pages/main/EditProfileScreen';
 import SettingsScreen from '../Pages/main/SettingsScreen';
+import VerifyEmailScreen from '../Pages/main/VerifyEmailScreen';
 import SavedEventsScreen from '../Pages/main/SavedEventsScreen';
 import NotificationsScreen from '../Pages/main/NotificationsScreen';
 import AdminRedirectScreen from '../Pages/authenticationscreens/AdminRedirectScreen';
@@ -177,6 +178,7 @@ const RootNavigator = () => {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />

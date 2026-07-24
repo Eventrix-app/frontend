@@ -65,8 +65,12 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
   const appleIconXml = wantsDarkVariant ? APPLE_DARK_SVG : APPLE_LIGHT_SVG;
   const iconSize = compact ? 72 : 104;
 
-  // Google OAuth
-  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+  // Google OAuth — useIdTokenAuthRequest (not useAuthRequest) so the web flow requests a
+  // real signed JWT id_token (response_type=id_token) instead of the default implicit
+  // access-token flow. Native already exchanges its auth code for an id_token either way;
+  // this only changes web, and it's required — the backend only verifies id_tokens
+  // (google-auth-library's verifyIdToken), which can't validate an opaque access token.
+  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,

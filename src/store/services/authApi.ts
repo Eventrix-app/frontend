@@ -101,6 +101,21 @@ export const authApi = createApi({
         body,
       }),
     }),
+    // Both deliberately not passed an email — always acts on the logged-in caller's own
+    // account (see auth.controller.ts), so withAuth's Bearer header is what identifies them.
+    sendEmailVerificationOtp: builder.mutation<void, void>({
+      query: () => ({
+        url: 'auth/verify-email/send',
+        method: 'POST',
+      }),
+    }),
+    confirmEmailVerification: builder.mutation<void, { otp: string }>({
+      query: (body) => ({
+        url: 'auth/verify-email/confirm',
+        method: 'POST',
+        body,
+      }),
+    }),
     getCurrentUser: builder.query<User, void>({
       query: () => 'users/me',
       providesTags: ['Auth'],
@@ -116,5 +131,7 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useSocialLoginMutation,
+  useSendEmailVerificationOtpMutation,
+  useConfirmEmailVerificationMutation,
   useGetCurrentUserQuery,
 } = authApi;

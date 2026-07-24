@@ -63,6 +63,13 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = null;
       })
+      .addMatcher(authApi.endpoints.socialLogin.matchFulfilled, (state, { payload }) => {
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
+        state.token = payload.accessToken;
+        state.isAuthenticated = true;
+        state.isLoading = false;
+        state.error = null;
+      })
       .addMatcher(authApi.endpoints.refresh.matchFulfilled, (state, { payload }) => {
         // refresh() is fired-and-forgotten from AppStateSync (on launch/foreground) with no
         // await at the call site, so it can still be in flight when the user explicitly logs

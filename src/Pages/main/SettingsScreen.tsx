@@ -96,6 +96,31 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       <ScreenHeader title="Settings" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.groupTitle}>Account</Text>
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            {me?.isEmailVerified ? (
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <Text style={styles.label}>Email address</Text>
+                  <Text style={styles.subtitle}>{me.email}</Text>
+                </View>
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedBadgeText}>Verified</Text>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('VerifyEmail')}>
+                <View style={styles.rowText}>
+                  <Text style={styles.label}>Verify Email</Text>
+                  <Text style={styles.subtitle}>{me?.email ?? 'Confirm your email address'}</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         <Text style={styles.groupTitle}>Preferences</Text>
         <View style={styles.groupGlass}>
           <View style={styles.group}>
@@ -225,6 +250,17 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   chevron: {
     fontSize: 20,
     color: colors.textSecondary,
+  },
+  verifiedBadge: {
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  verifiedBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.success,
   },
   logoutWrap: {
     borderRadius: 20,

@@ -30,6 +30,7 @@ export interface CurrentUser {
   lastName: string;
   phoneNumber: string | null;
   profilePictureUrl: string | null;
+  isEmailVerified: boolean;
   location: string | null;
   city: string;
   latitude: number | null;

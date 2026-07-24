@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  VerifyEmail: undefined;
   SavedEvents: undefined;
   Notifications: undefined;
   MyEvents: undefined;
