@@ -93,9 +93,9 @@ module.exports = {
     ],
     extra: {
       eas: {
-        projectId: 'edfe8b87-7c19-4917-b0f0-ccca04f33197',
+        projectId: 'bd75abcd-7153-41dc-987a-7e0bdd9240c6',
       },
     },
-    owner: 'aarish45',
+    owner: 'aarish34',
   },
 };
