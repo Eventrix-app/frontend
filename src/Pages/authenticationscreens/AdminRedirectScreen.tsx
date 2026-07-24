@@ -10,6 +10,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
 import { useClearPushTokenMutation } from '../../store/services/userApi';
+import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminRedirect'>;
 
@@ -54,9 +55,10 @@ const AdminRedirectScreen: React.FC<Props> = () => {
 
   const handleLogout = async () => {
     // Same best-effort push-token cleanup as SettingsScreen's logout — must never block
-    // the actual sign-out below.
+    // the actual sign-out below. Only this device's token is cleared (multi-device push).
     try {
-      await clearPushToken().unwrap();
+      const pushToken = await getExpoPushTokenSafe();
+      if (pushToken) await clearPushToken(pushToken).unwrap();
     } catch {
       // ignore
     }

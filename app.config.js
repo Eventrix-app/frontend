@@ -7,6 +7,13 @@ module.exports = {
     name: 'Eventrix',
     slug: 'frontend',
     version: '1.0.0',
+    // Custom URL scheme for deep links (eventrix://event/<id>, etc.) — see
+    // navigation/linking.ts. This works immediately with no extra hosting/console setup;
+    // upgrading to universal/app links (https://yourdomain.com/... that also falls back to
+    // a web page when the app isn't installed) additionally requires: a production domain,
+    // hosting .well-known/apple-app-site-association + assetlinks.json there, and adding
+    // `ios.associatedDomains` / `android.intentFilters` here — none of that is set up yet.
+    scheme: 'eventrix',
     orientation: 'portrait',
     sdkVersion: '54.0.0',
     icon: './assets/logo/logo.jpg',
@@ -82,6 +89,7 @@ module.exports = {
       'expo-video',
       'expo-secure-store',
       'expo-web-browser',
+      '@sentry/react-native/expo',
     ],
     extra: {
       eas: {

@@ -1,24 +1,41 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { RootStackParamList } from '../../navigation/types';
 
 type LegalFooterProps = {
   compact?: boolean;
 };
 
+// Auth-stack screens (Register/Login/ForgotPassword/UpdatePassword) sit inside the "Auth"
+// child navigator — these links target RootStack screens, so they go through the parent
+// navigator, same pattern RegisterScreen already uses for its post-register redirect.
+const LINKS: { label: string; onPress: (root: NativeStackNavigationProp<RootStackParamList> | undefined) => void }[] = [
+  { label: 'Terms of use', onPress: (root) => root?.navigate('LegalDocument', { doc: 'terms' }) },
+  { label: 'Privacy Policy', onPress: (root) => root?.navigate('LegalDocument', { doc: 'privacy' }) },
+  { label: 'Contact Us', onPress: (root) => root?.navigate('HelpCenter') },
+];
+
 export const LegalFooter: React.FC<LegalFooterProps> = ({ compact = false }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const navigation = useNavigation();
+  const root = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+
   return (
     <View style={[styles.wrap, compact && styles.wrapCompact]}>
       <Text style={styles.note}>By continuing, you agree to our</Text>
       <View style={styles.links}>
-        {['Terms of use', 'Privacy Policy', 'Contact Us'].map((label, i) => (
+        {LINKS.map(({ label, onPress }, i) => (
           <React.Fragment key={label}>
             {i > 0 ? <Text style={styles.dot}>•</Text> : null}
-            <Text style={styles.link}>{label}</Text>
+            <TouchableOpacity onPress={() => onPress(root)} hitSlop={6}>
+              <Text style={styles.link}>{label}</Text>
+            </TouchableOpacity>
           </React.Fragment>
         ))}
       </View>

@@ -91,13 +91,28 @@ export const userApi = createApi({
       invalidatesTags: ['Me'],
     }),
     // Re-registered on every login/app start (see utils/registerForPushNotifications.ts) —
-    // the backend just overwrites whatever token was stored before.
+    // upserts a device_tokens row server-side; multiple devices can each hold their own.
     updatePushToken: builder.mutation<void, string>({
       query: (pushToken) => ({ url: 'users/me/push-token', method: 'PATCH', body: { pushToken } }),
     }),
-    // Called on logout — see Backend's UsersService.clearPushToken for why.
-    clearPushToken: builder.mutation<void, void>({
-      query: () => ({ url: 'users/me/push-token', method: 'DELETE' }),
+    // Called on logout — clears only *this* device's registration (push tokens are
+    // multi-device now), not every device this account is signed in on. See
+    // utils/getExpoPushToken.ts for how the caller obtains its own current token, and
+    // Backend's UsersService.clearPushToken for the server side.
+    clearPushToken: builder.mutation<void, string>({
+      query: (pushToken) => ({ url: 'users/me/push-token', method: 'DELETE', body: { pushToken } }),
+    }),
+    // Self-service account deletion (Settings → Delete Account). Soft-deletes the account
+    // server-side — see Backend's UsersService.deleteMe. The caller is responsible for
+    // dispatching logout() afterwards; this mutation only performs the deletion itself.
+    deleteAccount: builder.mutation<void, void>({
+      query: () => ({ url: 'users/me', method: 'DELETE' }),
+    }),
+    // Self-service data export (Settings → Download My Data) — the backend emails a JSON
+    // copy to the account's own registered address rather than returning it here. See
+    // Backend's UsersService.exportMyData for exactly what's included.
+    exportMyData: builder.mutation<void, void>({
+      query: () => ({ url: 'users/me/export', method: 'POST' }),
     }),
   }),
 });
@@ -113,4 +128,6 @@ export const {
   useUpdatePushTokenMutation,
   useClearPushTokenMutation,
   useCompleteOnboardingMutation,
+  useDeleteAccountMutation,
+  useExportMyDataMutation,
 } = userApi;

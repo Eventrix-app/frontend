@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch } from 'react-redux';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { RootStackParamList } from '../../navigation/types';
+import { RootStackParamList, LegalDocumentKey } from '../../navigation/types';
 import { logout } from '../../store/slices/authSlice';
 import { ColorPalette } from '../../theme/colors.light';
 import { useTheme } from '../../theme/ThemeContext';
@@ -15,8 +15,11 @@ import {
   useGetMeQuery,
   useUpdateNotificationChannelsMutation,
   useClearPushTokenMutation,
+  useDeleteAccountMutation,
+  useExportMyDataMutation,
 } from '../../store/services/userApi';
-import { showAlert } from '../../utils/crossPlatformAlert';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -25,15 +28,24 @@ type SettingRow = {
   label: string;
   subtitle?: string;
   type: 'toggle' | 'link' | 'danger';
+  legalDoc?: LegalDocumentKey;
 };
 
 const SETTINGS: SettingRow[] = [
   { id: 'push', label: 'Push Notifications', subtitle: 'Event reminders & updates', type: 'toggle' },
   { id: 'email', label: 'Email Notifications', subtitle: 'Receipts and confirmations', type: 'toggle' },
   { id: 'location', label: 'Location Services', subtitle: 'Show nearby events', type: 'toggle' },
-  { id: 'privacy', label: 'Privacy Policy', type: 'link' },
-  { id: 'terms', label: 'Terms of Service', type: 'link' },
   { id: 'help', label: 'Help & Support', type: 'link' },
+  { id: 'privacy', label: 'Privacy Policy', type: 'link', legalDoc: 'privacy' },
+  { id: 'terms', label: 'Terms of Service', type: 'link', legalDoc: 'terms' },
+  { id: 'payment', label: 'Payment Policy', type: 'link', legalDoc: 'payment' },
+  { id: 'refund', label: 'Refund & Cancellation Policy', type: 'link', legalDoc: 'refund' },
+  { id: 'community', label: 'Community Guidelines', type: 'link', legalDoc: 'community' },
+  { id: 'security', label: 'Security Policy', type: 'link', legalDoc: 'security' },
+  { id: 'dataRetention', label: 'Data Retention Policy', type: 'link', legalDoc: 'dataRetention' },
+  { id: 'accountDeletion', label: 'Account Deletion Policy', type: 'link', legalDoc: 'accountDeletion' },
+  { id: 'cookies', label: 'Cookie Policy', type: 'link', legalDoc: 'cookies' },
+  { id: 'grievance', label: 'Contact & Grievance Policy', type: 'link', legalDoc: 'grievance' },
   { id: 'logout', label: 'Log Out', type: 'danger' },
 ];
 
@@ -43,6 +55,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: me } = useGetMeQuery();
   const [updateNotificationChannels] = useUpdateNotificationChannelsMutation();
   const [clearPushToken] = useClearPushTokenMutation();
+  const [deleteAccount, { isLoading: isDeletingAccount }] = useDeleteAccountMutation();
+  const [exportMyData, { isLoading: isExportingData }] = useExportMyDataMutation();
   const { theme, colors, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // push/email default true (matching the backend's default for a newly created account)
@@ -75,9 +89,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleLogout = async () => {
     // Best-effort — a logged-out device shouldn't keep receiving this account's pushes,
-    // but a failure here (e.g. offline) must never block the actual logout below.
+    // but a failure here (e.g. offline) must never block the actual logout below. Only
+    // this device's token is cleared (multi-device push) — read it back rather than
+    // guessing, since nothing else in the app holds onto it after registration.
     try {
-      await clearPushToken().unwrap();
+      const pushToken = await getExpoPushTokenSafe();
+      if (pushToken) await clearPushToken(pushToken).unwrap();
     } catch {
       // ignore — the token will simply be overwritten next time someone registers on
       // this device, or on this account's next login elsewhere.
@@ -89,6 +106,38 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     // actually clearing this state, a browser refresh would rehydrate the stale
     // isAuthenticated: true and silently sign the user back in.
     dispatch(logout());
+  };
+
+  const handleExportData = async () => {
+    try {
+      await exportMyData().unwrap();
+      showAlert('Export requested', `We've emailed a copy of your account data to ${me?.email ?? 'your registered email address'}.`);
+    } catch (err: any) {
+      if (err?.status === 429) {
+        showAlert('Please wait', "You've requested a few too many exports recently — try again in a bit.");
+        return;
+      }
+      showAlert('Something went wrong', "Couldn't request your data export. Please check your connection and try again.");
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    showConfirm(
+      'Delete your account?',
+      'This permanently deactivates your account and signs you out. This action cannot be undone.',
+      async () => {
+        try {
+          await deleteAccount().unwrap();
+        } catch {
+          showAlert('Something went wrong', "Couldn't delete your account. Please check your connection and try again.");
+          return;
+        }
+        // Only sign out on confirmed success — an unsuccessful request must never leave
+        // the user believing their account is gone while it still exists server-side.
+        dispatch(logout());
+      },
+      'Delete Account',
+    );
   };
 
   return (
@@ -118,6 +167,20 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('ActiveSessions')}>
+              <View style={styles.rowText}>
+                <Text style={styles.label}>Active Sessions</Text>
+                <Text style={styles.subtitle}>Manage devices signed in to your account</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('BlockedUsers')}>
+              <View style={styles.rowText}>
+                <Text style={styles.label}>Blocked Users</Text>
+                <Text style={styles.subtitle}>Manage who can't reach you in event chat</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -165,11 +228,51 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.groupGlass}>
           <View style={styles.group}>
             {SETTINGS.filter((s) => s.type === 'link').map((item) => (
-              <TouchableOpacity key={item.id} style={styles.row}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.row}
+                onPress={() => {
+                  if (item.id === 'help') navigation.navigate('HelpCenter');
+                  else if (item.legalDoc) navigation.navigate('LegalDocument', { doc: item.legalDoc });
+                }}
+              >
                 <Text style={styles.label}>{item.label}</Text>
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+
+        <Text style={styles.groupTitle}>Data & Privacy</Text>
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            <TouchableOpacity
+              style={styles.singleRow}
+              onPress={handleExportData}
+              disabled={isExportingData}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.label}>{isExportingData ? 'Requesting…' : 'Download My Data'}</Text>
+                <Text style={styles.subtitle}>Emails a copy of your account data to you</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <Text style={styles.groupTitle}>Danger Zone</Text>
+        <View style={styles.groupGlass}>
+          <View style={styles.group}>
+            <TouchableOpacity
+              style={styles.singleRow}
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.dangerLabel}>{isDeletingAccount ? 'Deleting…' : 'Delete Account'}</Text>
+                <Text style={styles.subtitle}>Permanently deactivate your account</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -250,6 +353,18 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   chevron: {
     fontSize: 20,
     color: colors.textSecondary,
+  },
+  singleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  dangerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.error,
   },
   verifiedBadge: {
     borderRadius: 999,

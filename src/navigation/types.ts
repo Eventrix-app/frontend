@@ -1,3 +1,16 @@
+// Kept in sync with the DOCUMENTS map in Pages/main/LegalDocumentScreen.tsx.
+export type LegalDocumentKey =
+  | 'privacy'
+  | 'terms'
+  | 'refund'
+  | 'cookies'
+  | 'community'
+  | 'dataRetention'
+  | 'security'
+  | 'payment'
+  | 'accountDeletion'
+  | 'grievance';
+
 export type RootStackParamList = {
   Auth: undefined;
   Main: { screen?: keyof MainTabParamList } | undefined;
@@ -9,6 +22,10 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   VerifyEmail: undefined;
+  HelpCenter: undefined;
+  LegalDocument: { doc: LegalDocumentKey };
+  ActiveSessions: undefined;
+  BlockedUsers: undefined;
   SavedEvents: undefined;
   Notifications: undefined;
   MyEvents: undefined;

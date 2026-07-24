@@ -1,5 +1,6 @@
 // components/common/ErrorBoundary.tsx
 import React from 'react';
+import * as Sentry from '@sentry/react-native';
 import ErrorScreen from './ErrorScreen';
 
 interface Props {
@@ -19,8 +20,10 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // TODO: send to your crash-reporting service (Sentry, etc.) once you have one
     console.log('ErrorBoundary caught:', error, info);
+    // No-ops when EXPO_PUBLIC_SENTRY_DSN isn't set (see App.tsx's Sentry.init) — same
+    // graceful-degradation as the backend's equivalent capture in http-exception.filter.ts.
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   handleReset = () => {

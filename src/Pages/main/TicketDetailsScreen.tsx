@@ -35,6 +35,18 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  // Reachable directly via deep link (eventrix://booking/:bookingId) or a push-notification
+  // tap (see navigateForPushData in RootNavigator.tsx), either of which can land here as the
+  // first screen in the stack — goBack() throws "GO_BACK was not handled" with nothing to
+  // pop to. Fall back to the Bookings tab instead of leaving the back button a no-op.
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main', { screen: 'Bookings' });
+    }
+  };
+
   const handleShare = async () => {
     if (!enrollment) return;
     const title = enrollment.event?.title ?? 'my event';
@@ -63,7 +75,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Ticket Details" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Ticket Details" onBack={handleGoBack} />
         <TicketDetailsSkeleton />
       </View>
     );
@@ -72,7 +84,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (isError || !enrollment) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Ticket Details" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Ticket Details" onBack={handleGoBack} />
         <View style={styles.center}>
           <Text style={styles.errorText}>Could not load ticket details.</Text>
         </View>
@@ -87,7 +99,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader
         title="Ticket Details"
-        onBack={() => navigation.goBack()}
+        onBack={handleGoBack}
         rightAction={
           <TouchableOpacity style={styles.shareIconBtn} onPress={handleShare} hitSlop={8}>
             <Text style={styles.shareIconText}>⤴</Text>

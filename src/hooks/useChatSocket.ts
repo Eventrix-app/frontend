@@ -1,26 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { io, Socket } from 'socket.io-client';
-import type { RootState } from '../store';
-import { ChatMessageRecord, useGetChatHistoryQuery } from '../store/services/chatApi';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { getSupabaseRealtimeClient } from '../utils/supabaseRealtimeClient';
+import { ChatMessageRecord, useGetChatHistoryQuery, useSendChatMessageMutation } from '../store/services/chatApi';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/';
-// The socket.io server is mounted on the app's HTTP server directly, not behind Nest's
-// global 'api' prefix (that prefix only applies to REST controller routes) — strip it back
-// off the REST base URL to get the actual socket host.
-const SOCKET_BASE_URL = API_URL.replace(/\/api\/?$/, '');
-
-const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
-
+// Live delivery via Supabase Realtime Broadcast, one channel per event ('event:<eventId>',
+// matching the topic ChatRealtimeService broadcasts to on the backend). Sending is a plain
+// REST call (chatApi's sendChatMessage) — decoupled from this subscription on purpose, so a
+// user can still send while the broadcast channel is reconnecting; `isConnected` here only
+// reflects whether *live* delivery is currently up, not whether sending will work.
+//
+// This used to be a self-hosted socket.io connection straight to this app's own backend
+// (ChatGateway) — that broke once the backend moved to Vercel Serverless Functions, which
+// can't hold a WebSocket connection open. Supabase's Realtime server is a separate, always-on
+// service, so it doesn't have that problem.
 export function useChatSocket(eventId: string | undefined) {
-  const token = useSelector((state: RootState) => state.auth.token);
-  const { data: history = [], isLoading: isLoadingHistory } = useGetChatHistoryQuery(eventId!, { skip: !eventId });
+  const { data: history = [], isLoading: isLoadingHistory, error: historyError } = useGetChatHistoryQuery(eventId!, {
+    skip: !eventId,
+  });
+  // Chat is scoped to the event's organizer/admin/confirmed attendees (see ChatService on the
+  // backend) — a 403 here means "signed in fine, just not allowed in this event's chat",
+  // distinct from a loading/network failure.
+  const isForbidden = (historyError as { status?: number } | undefined)?.status === 403;
+  const [sendChatMessage] = useSendChatMessageMutation();
 
   const [liveMessages, setLiveMessages] = useState<ChatMessageRecord[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
-  const reconnectAttemptRef = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
     // Cleared whenever history reloads for a new event, so switching events doesn't show
@@ -29,66 +34,45 @@ export function useChatSocket(eventId: string | undefined) {
   }, [eventId]);
 
   useEffect(() => {
-    if (!eventId || !token) return;
+    if (!eventId || isForbidden) return;
+    const client = getSupabaseRealtimeClient();
+    if (!client) return; // Realtime not configured — history + sending still work, see getSupabaseRealtimeClient.
 
     let cancelled = false;
+    const channel = client.channel(`event:${eventId}`);
+    channelRef.current = channel;
 
-    const connect = () => {
-      const socket = io(`${SOCKET_BASE_URL}/chat`, {
-        auth: { token },
-        transports: ['websocket'],
-        reconnection: false, // manual backoff below, so we control the retry schedule
-      });
-      socketRef.current = socket;
+    channel.on('broadcast', { event: 'newMessage' }, ({ payload }: { payload: ChatMessageRecord }) => {
+      if (cancelled || payload.eventId !== eventId) return;
+      setLiveMessages((prev) => (prev.some((m) => m.id === payload.id) ? prev : [...prev, payload]));
+    });
 
-      socket.on('connect', () => {
-        if (cancelled) return;
-        reconnectAttemptRef.current = 0;
-        setIsConnected(true);
-        socket.emit('joinEvent', { eventId });
-      });
-
-      socket.on('newMessage', (message: ChatMessageRecord) => {
-        if (cancelled || message.eventId !== eventId) return;
-        setLiveMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
-      });
-
-      const scheduleReconnect = () => {
-        if (cancelled) return;
-        setIsConnected(false);
-        const delay = RECONNECT_DELAYS_MS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS_MS.length - 1)];
-        reconnectAttemptRef.current += 1;
-        reconnectTimerRef.current = setTimeout(() => {
-          socket.connect();
-        }, delay);
-      };
-
-      socket.on('disconnect', scheduleReconnect);
-      socket.on('connect_error', scheduleReconnect);
-      socket.on('authError', () => {
-        // Bad/expired token — don't keep hammering reconnects with credentials that won't work.
-        cancelled = true;
-        socket.disconnect();
-      });
-    };
-
-    connect();
+    channel.subscribe((status) => {
+      if (cancelled) return;
+      setIsConnected(status === 'SUBSCRIBED');
+    });
 
     return () => {
       cancelled = true;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      socketRef.current?.emit('leaveEvent', { eventId });
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+      client.removeChannel(channel);
+      channelRef.current = null;
       setIsConnected(false);
     };
-  }, [eventId, token]);
+  }, [eventId, isForbidden]);
 
-  const sendMessage = useCallback((message: string) => {
-    const trimmed = message.trim();
-    if (!trimmed || !eventId || !socketRef.current?.connected) return;
-    socketRef.current.emit('sendMessage', { eventId, message: trimmed });
-  }, [eventId]);
+  // Throws on failure so the caller can restore the user's draft text / show an error —
+  // matches EventDetailsScreen's CommunityTab handling.
+  const sendMessage = useCallback(
+    async (message: string) => {
+      const trimmed = message.trim();
+      if (!trimmed || !eventId) return;
+      const record = await sendChatMessage({ eventId, message: trimmed }).unwrap();
+      // Local echo — don't wait for the broadcast round-trip to show the sender their own
+      // message. Dedup below covers the (small) window where the broadcast also arrives.
+      setLiveMessages((prev) => (prev.some((m) => m.id === record.id) ? prev : [...prev, record]));
+    },
+    [eventId, sendChatMessage],
+  );
 
   // History is oldest-first (see ChatService.getHistory); live messages arrive in order and
   // are simply appended. Dedup guards the (small) window where a message sent right as
@@ -96,5 +80,5 @@ export function useChatSocket(eventId: string | undefined) {
   const seenIds = new Set(history.map((m) => m.id));
   const messages = [...history, ...liveMessages.filter((m) => !seenIds.has(m.id))];
 
-  return { messages, sendMessage, isConnected, isLoadingHistory };
+  return { messages, sendMessage, isConnected, isLoadingHistory, isForbidden };
 }

@@ -5,6 +5,7 @@ import { createFallbackBaseQuery } from './baseQuery';
 export interface LoginCredentials {
   email: string;
   password: string;
+  deviceLabel?: string; // e.g. "iPhone 14 Pro · iOS 17.4" — shown in Settings → Active Sessions
 }
 
 export interface RegisterCredentials {
@@ -13,6 +14,8 @@ export interface RegisterCredentials {
   firstName: string;
   lastName: string;
   phone?: string;
+  dateOfBirth: string; // 'YYYY-MM-DD' — backend enforces a minimum age of 18
+  deviceLabel?: string;
 }
 
 export interface User {
@@ -30,6 +33,7 @@ export interface User {
 export interface SocialLoginCredentials {
   provider: 'google' | 'apple' | 'facebook';
   token: string; // id_token for Google/Apple, access_token for Facebook
+  deviceLabel?: string;
 }
 
 export interface AuthResponse {
@@ -42,13 +46,22 @@ export interface AuthResponse {
   expiresIn?: number;
 }
 
+export interface SessionRecord {
+  id: string;
+  deviceLabel: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  isCurrent: boolean;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   // withAuth=true so POST /auth/refresh (the only endpoint here that requires a token) gets
   // its Authorization header; login/register/forgot/reset-password are all @Public() on the
   // backend and ignore it when there's no token yet (state.auth.token is null pre-login).
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['Auth'],
+  tagTypes: ['Auth', 'Sessions'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
       query: (credentials) => ({
@@ -120,6 +133,19 @@ export const authApi = createApi({
       query: () => 'users/me',
       providesTags: ['Auth'],
     }),
+    // Settings → Active Sessions.
+    listSessions: builder.query<SessionRecord[], void>({
+      query: () => 'auth/sessions',
+      providesTags: ['Sessions'],
+    }),
+    revokeSession: builder.mutation<void, string>({
+      query: (id) => ({ url: `auth/sessions/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Sessions'],
+    }),
+    revokeOtherSessions: builder.mutation<{ revoked: number }, void>({
+      query: () => ({ url: 'auth/sessions/others', method: 'DELETE' }),
+      invalidatesTags: ['Sessions'],
+    }),
   }),
 });
 
@@ -134,4 +160,7 @@ export const {
   useSendEmailVerificationOtpMutation,
   useConfirmEmailVerificationMutation,
   useGetCurrentUserQuery,
+  useListSessionsQuery,
+  useRevokeSessionMutation,
+  useRevokeOtherSessionsMutation,
 } = authApi;

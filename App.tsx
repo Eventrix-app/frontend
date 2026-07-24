@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Sentry from '@sentry/react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -39,6 +40,16 @@ import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+
+// Error/crash reporting — dsn: undefined (EXPO_PUBLIC_SENTRY_DSN unset) is documented,
+// safe behavior: the SDK simply never sends anything, same graceful-degradation as every
+// other optional integration in this app. Must run at module scope, before anything else
+// below, so it's active for the earliest possible render.
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 0.1,
+});
 
 // Keep the native splash screen up until Redux persist rehydration (handled by
 // PersistGate below), these font files, and — for the logged-out flow — the intro video
@@ -132,7 +143,7 @@ function AppStateSync() {
   return null;
 }
 
-export default function App() {
+function App() {
   const [fontsLoaded, fontError] = useFonts({
     ZalandoSansExpanded_200ExtraLight,
     ZalandoSansExpanded_300Light,
@@ -181,3 +192,8 @@ export default function App() {
     </Provider>
   );
 }
+
+// Sentry.wrap adds a top-level error boundary + touch-event breadcrumbs around the whole
+// tree — complements (doesn't replace) the app's own ErrorBoundary further down, which
+// still owns the actual fallback UI shown to the user.
+export default Sentry.wrap(App);

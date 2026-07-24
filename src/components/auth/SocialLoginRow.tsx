@@ -12,6 +12,7 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
+import { getDeviceLabel } from '../../utils/getDeviceLabel';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -107,7 +108,7 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
       return;
     }
     try {
-      const result = await socialLogin({ provider, token }).unwrap();
+      const result = await socialLogin({ provider, token, deviceLabel: getDeviceLabel() }).unwrap();
       handlePostLogin(result);
     } catch {
       showAlert('Sign in failed', 'Could not sign in with this account. Please try again.');
@@ -122,7 +123,7 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
       return;
     }
     try {
-      const result = await socialLogin({ provider: 'apple', token: code }).unwrap();
+      const result = await socialLogin({ provider: 'apple', token: code, deviceLabel: getDeviceLabel() }).unwrap();
       handlePostLogin(result);
     } catch {
       showAlert('Sign in failed', 'Could not sign in with Apple. Please try again.');

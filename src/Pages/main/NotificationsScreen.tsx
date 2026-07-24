@@ -49,11 +49,22 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
 
   const unreadCount = items.filter((n) => !n.readAt).length;
 
+  // Reachable directly via a push-notification tap with no data payload (see
+  // navigateForPushData in RootNavigator.tsx), which can land here as the first screen in
+  // the stack — goBack() throws "GO_BACK was not handled" with nothing to pop to.
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main', { screen: 'Home' });
+    }
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader
         title="Notifications"
-        onBack={() => navigation.goBack()}
+        onBack={handleGoBack}
         rightAction={
           unreadCount > 0 ? (
             <TouchableOpacity onPress={markAllRead}>

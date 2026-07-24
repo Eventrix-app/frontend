@@ -184,6 +184,7 @@ export interface AnnouncementRecord {
   title: string;
   body: string;
   createdAt: string;
+  updatedAt: string;
   postedBy?: { id: string; fullName: string };
 }
 
@@ -192,6 +193,8 @@ export interface CreateAnnouncementPayload {
   body: string;
 }
 
+export type UpdateAnnouncementPayload = Partial<CreateAnnouncementPayload>;
+
 export interface ReviewRecord {
   id: string;
   eventId: string;
@@ -199,6 +202,7 @@ export interface ReviewRecord {
   rating: number;
   text?: string;
   createdAt: string;
+  updatedAt: string;
   user?: { id: string; fullName: string };
 }
 
@@ -206,6 +210,8 @@ export interface CreateReviewPayload {
   rating: number;
   text?: string;
 }
+
+export type UpdateReviewPayload = Partial<CreateReviewPayload>;
 
 export interface EventMediaRecord {
   id: string;
@@ -431,12 +437,42 @@ export const eventsApi = createApi({
       query: ({ eventId, body }) => ({ url: `events/${eventId}/announcements`, method: 'POST', body }),
       invalidatesTags: (result, error, { eventId }) => [{ type: 'Announcements', id: eventId }],
     }),
+    updateAnnouncement: builder.mutation<
+      AnnouncementRecord,
+      { eventId: string; announcementId: string; body: UpdateAnnouncementPayload }
+    >({
+      query: ({ eventId, announcementId, body }) => ({
+        url: `events/${eventId}/announcements/${announcementId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Announcements', id: eventId }],
+    }),
+    deleteAnnouncement: builder.mutation<void, { eventId: string; announcementId: string }>({
+      query: ({ eventId, announcementId }) => ({
+        url: `events/${eventId}/announcements/${announcementId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Announcements', id: eventId }],
+    }),
     getReviews: builder.query<ReviewRecord[], string>({
       query: (eventId) => `events/${eventId}/reviews`,
       providesTags: (result, error, eventId) => [{ type: 'Reviews', id: eventId }],
     }),
     createReview: builder.mutation<ReviewRecord, { eventId: string; body: CreateReviewPayload }>({
       query: ({ eventId, body }) => ({ url: `events/${eventId}/reviews`, method: 'POST', body }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Reviews', id: eventId }],
+    }),
+    updateReview: builder.mutation<ReviewRecord, { eventId: string; reviewId: string; body: UpdateReviewPayload }>({
+      query: ({ eventId, reviewId, body }) => ({
+        url: `events/${eventId}/reviews/${reviewId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (result, error, { eventId }) => [{ type: 'Reviews', id: eventId }],
+    }),
+    deleteReview: builder.mutation<void, { eventId: string; reviewId: string }>({
+      query: ({ eventId, reviewId }) => ({ url: `events/${eventId}/reviews/${reviewId}`, method: 'DELETE' }),
       invalidatesTags: (result, error, { eventId }) => [{ type: 'Reviews', id: eventId }],
     }),
   }),
@@ -473,6 +509,10 @@ export const {
   useDeleteScheduleItemMutation,
   useGetAnnouncementsQuery,
   useCreateAnnouncementMutation,
+  useUpdateAnnouncementMutation,
+  useDeleteAnnouncementMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
+  useUpdateReviewMutation,
+  useDeleteReviewMutation,
 } = eventsApi;

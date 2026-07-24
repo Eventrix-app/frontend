@@ -13,6 +13,7 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
+import { getDeviceLabel } from '../../utils/getDeviceLabel';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
@@ -48,7 +49,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       setErrorMessage(null);
-      const result = await login({ email, password }).unwrap();
+      const result = await login({ email, password, deviceLabel: getDeviceLabel() }).unwrap();
       // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
       registerForPushNotifications(dispatch);

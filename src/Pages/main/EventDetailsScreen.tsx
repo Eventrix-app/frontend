@@ -33,12 +33,18 @@ import {
   useRemoveFavoriteMutation,
   isWaitlistResult,
   TicketTypeRecord,
+  AnnouncementRecord,
   useGetScheduleQuery,
   useCreateScheduleItemMutation,
+  useDeleteScheduleItemMutation,
   useGetAnnouncementsQuery,
   useCreateAnnouncementMutation,
+  useUpdateAnnouncementMutation,
+  useDeleteAnnouncementMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
+  useUpdateReviewMutation,
+  useDeleteReviewMutation,
   useCancelEventMutation,
 } from '../../store/services/eventsApi';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
@@ -71,6 +77,7 @@ import {
   IconProps,
 } from '../../components/common/Icons';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
+import { useCreateReportMutation, useBlockUserMutation } from '../../store/services/moderationApi';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
@@ -215,6 +222,7 @@ interface ScheduleItem {
 const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
   const { data: realSchedule, isLoading } = useGetScheduleQuery(eventId);
   const [createScheduleItem, { isLoading: isAdding }] = useCreateScheduleItemMutation();
+  const [deleteScheduleItem] = useDeleteScheduleItemMutation();
   const [time, setTime] = useState('');
   const [title, setTitle] = useState('');
   const { colors } = useTheme();
@@ -238,6 +246,21 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
     } catch (err) {
       showAlert('Could not add schedule item', extractErrorMessage(err, 'Please try again.'));
     }
+  };
+
+  const handleDelete = (itemId: string, itemTitle: string) => {
+    showConfirm(
+      `Remove "${itemTitle}"?`,
+      'This schedule item will be removed for everyone viewing this event.',
+      async () => {
+        try {
+          await deleteScheduleItem({ eventId, itemId }).unwrap();
+        } catch (err) {
+          showAlert('Could not remove schedule item', extractErrorMessage(err, 'Please try again.'));
+        }
+      },
+      'Remove',
+    );
   };
 
   if (isLoading) {
@@ -294,6 +317,15 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
                   <View style={styles.scheduleCard}>
                     <Text style={styles.scheduleTime}>{item.time}</Text>
                     <Text style={styles.scheduleTitle}>{item.title}</Text>
+                    {isOwner && (
+                      <TouchableOpacity
+                        style={styles.reportLinkWrap}
+                        onPress={() => handleDelete(item.id, item.title)}
+                        hitSlop={6}
+                      >
+                        <Text style={styles.reportLinkText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -316,6 +348,7 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
 // --- Reviews tab ---
 interface ReviewItem {
   id: string;
+  userId: string;
   name: string;
   username: string;
   rating: number; // 1-5
@@ -339,17 +372,28 @@ const StarRow: React.FC<{ rating: number }> = ({ rating }) => {
   );
 };
 
-const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
+const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean; currentUserId?: string }> = ({
+  eventId,
+  isOwner,
+  currentUserId,
+}) => {
   const { data: realReviews, isLoading } = useGetReviewsQuery(eventId);
   const [createReview, { isLoading: isSubmitting }] = useCreateReviewMutation();
+  const [updateReview, { isLoading: isSavingEdit }] = useUpdateReviewMutation();
+  const [deleteReview] = useDeleteReviewMutation();
+  const [createReport] = useCreateReportMutation();
   const [draftRating, setDraftRating] = useState(0);
   const [draftText, setDraftText] = useState('');
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editRating, setEditRating] = useState(0);
+  const [editText, setEditText] = useState('');
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const reviews: ReviewItem[] =
     realReviews?.map((r) => ({
       id: r.id,
+      userId: r.userId,
       name: r.user?.fullName ?? 'Attendee',
       username: '',
       rating: r.rating,
@@ -368,6 +412,45 @@ const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, 
     } catch (err) {
       showAlert('Could not submit review', extractErrorMessage(err, 'Please try again.'));
     }
+  };
+
+  const startEdit = (review: ReviewItem) => {
+    setEditingReviewId(review.id);
+    setEditRating(review.rating);
+    setEditText(review.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingReviewId(null);
+    setEditRating(0);
+    setEditText('');
+  };
+
+  const handleSaveEdit = async (reviewId: string) => {
+    if (editRating < 1) {
+      showAlert('Pick a rating', 'Tap a star to rate this event before saving.');
+      return;
+    }
+    try {
+      await updateReview({
+        eventId,
+        reviewId,
+        body: { rating: editRating, text: editText.trim() || undefined },
+      }).unwrap();
+      cancelEdit();
+    } catch (err) {
+      showAlert('Could not save changes', extractErrorMessage(err, 'Please try again.'));
+    }
+  };
+
+  const handleDeleteReview = (reviewId: string) => {
+    showConfirm('Delete this review?', 'This cannot be undone.', async () => {
+      try {
+        await deleteReview({ eventId, reviewId }).unwrap();
+      } catch (err) {
+        showAlert('Could not delete review', extractErrorMessage(err, 'Please try again.'));
+      }
+    }, 'Delete');
   };
 
   if (isLoading) {
@@ -408,22 +491,102 @@ const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, 
         <Text style={styles.emptyTabText}>No reviews yet.</Text>
       ) : (
         <View style={styles.reviewList}>
-          {reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewTopRow}>
-                <View style={styles.reviewAvatar}>
-                  <PhotoIcon color={colors.textSecondary} size={18} />
-                </View>
-                <View style={styles.reviewNameCol}>
-                  <Text style={styles.reviewName}>{review.name}</Text>
-                  {!!review.username && <Text style={styles.reviewUsername}>{review.username}</Text>}
-                </View>
-                <StarRow rating={review.rating} />
-              </View>
+          {reviews.map((review) => {
+            const isMine = currentUserId && review.userId === currentUserId;
+            const isEditing = editingReviewId === review.id;
 
-              {!!review.text && <Text style={styles.reviewText}>{review.text}</Text>}
-            </View>
-          ))}
+            if (isEditing) {
+              return (
+                <View key={review.id} style={styles.reviewComposer}>
+                  <View style={styles.reviewComposerStars}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <TouchableOpacity key={n} onPress={() => setEditRating(n)} hitSlop={4}>
+                        <Text style={[styles.reviewStar, n <= editRating ? styles.reviewStarFilled : styles.reviewStarEmpty]}>★</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={[styles.chatInput, styles.reviewComposerInput]}
+                    value={editText}
+                    onChangeText={setEditText}
+                    placeholder="Share your experience (optional)"
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                  />
+                  <View style={styles.chatActionsRow}>
+                    <TouchableOpacity
+                      style={styles.reviewSubmitBtn}
+                      onPress={() => handleSaveEdit(review.id)}
+                      disabled={isSavingEdit}
+                    >
+                      <Text style={styles.chatSendBtnText}>{isSavingEdit ? 'Saving…' : 'Save'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.reportLinkWrap} onPress={cancelEdit} hitSlop={6}>
+                      <Text style={styles.reportLinkText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }
+
+            return (
+              <View key={review.id} style={styles.reviewCard}>
+                <View style={styles.reviewTopRow}>
+                  <View style={styles.reviewAvatar}>
+                    <PhotoIcon color={colors.textSecondary} size={18} />
+                  </View>
+                  <View style={styles.reviewNameCol}>
+                    <Text style={styles.reviewName}>{review.name}</Text>
+                    {!!review.username && <Text style={styles.reviewUsername}>{review.username}</Text>}
+                  </View>
+                  <StarRow rating={review.rating} />
+                </View>
+
+                {!!review.text && <Text style={styles.reviewText}>{review.text}</Text>}
+
+                {isMine ? (
+                  <View style={styles.chatActionsRow}>
+                    <TouchableOpacity style={styles.reportLinkWrap} onPress={() => startEdit(review)} hitSlop={6}>
+                      <Text style={styles.reportLinkText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.reportLinkWrap}
+                      onPress={() => handleDeleteReview(review.id)}
+                      hitSlop={6}
+                    >
+                      <Text style={styles.reportLinkText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : currentUserId ? (
+                  <TouchableOpacity
+                    style={styles.reportLinkWrap}
+                    onPress={() => {
+                      showConfirm(
+                        'Report this review?',
+                        "This will be sent to our moderation team for review.",
+                        async () => {
+                          try {
+                            await createReport({
+                              targetType: 'review',
+                              targetId: review.id,
+                              reason: `Reported review by ${review.name}`,
+                            }).unwrap();
+                            showAlert('Reported', "Thanks — we'll take a look.");
+                          } catch {
+                            showAlert('Something went wrong', 'Could not submit the report. Please try again.');
+                          }
+                        },
+                        'Report',
+                      );
+                    }}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.reportLinkText}>Report</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       )}
     </View>
@@ -431,17 +594,71 @@ const ReviewsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, 
 };
 
 const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ eventId, currentUserId }) => {
-  const { messages, sendMessage, isConnected, isLoadingHistory } = useChatSocket(eventId);
+  const { messages, sendMessage, isConnected, isLoadingHistory, isForbidden } = useChatSocket(eventId);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [createReport] = useCreateReportMutation();
+  const [blockUser] = useBlockUserMutation();
 
-  const handleSend = () => {
-    if (!draft.trim()) return;
-    sendMessage(draft);
+  const handleSend = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
     setDraft('');
+    try {
+      await sendMessage(trimmed);
+    } catch {
+      setDraft(trimmed);
+      showAlert('Message not sent', 'Please check your connection and try again.');
+    }
   };
+
+  const handleReportMessage = (messageId: string, senderName: string, messageText: string) => {
+    showConfirm(
+      'Report this message?',
+      'This will be sent to our moderation team for review.',
+      async () => {
+        try {
+          await createReport({
+            targetType: 'chat_message',
+            targetId: messageId,
+            reason: `Reported message from ${senderName}: "${messageText.slice(0, 200)}"`,
+          }).unwrap();
+          showAlert('Reported', "Thanks — we'll take a look.");
+        } catch {
+          showAlert('Something went wrong', 'Could not submit the report. Please try again.');
+        }
+      },
+      'Report',
+    );
+  };
+
+  const handleBlockUser = (userId: string, senderName: string) => {
+    showConfirm(
+      `Block ${senderName}?`,
+      "They won't be able to reach you in event chat anymore. You can unblock them anytime from Settings.",
+      async () => {
+        try {
+          await blockUser(userId).unwrap();
+          showAlert('Blocked', `You won't see messages from ${senderName} anymore.`);
+        } catch {
+          showAlert('Something went wrong', 'Could not block this user. Please try again.');
+        }
+      },
+      'Block',
+    );
+  };
+
+  if (isForbidden) {
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.emptyTabText}>
+          Only confirmed attendees can access this event's community chat. Book a ticket to join the conversation.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -462,11 +679,22 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
         >
           {messages.map((msg) => {
             const isMine = msg.userId === currentUserId;
+            const senderName = msg.user?.fullName ?? 'Attendee';
             return (
               <View key={msg.id} style={[styles.chatBubbleRow, isMine && styles.chatBubbleRowMine]}>
                 <View style={[styles.chatBubble, isMine && styles.chatBubbleMine]}>
-                  {!isMine && <Text style={styles.chatSender}>{msg.user?.fullName ?? 'Attendee'}</Text>}
+                  {!isMine && <Text style={styles.chatSender}>{senderName}</Text>}
                   <Text style={[styles.chatText, isMine && styles.chatTextMine]}>{msg.message}</Text>
+                  {!isMine && currentUserId ? (
+                    <View style={styles.chatActionsRow}>
+                      <TouchableOpacity onPress={() => handleReportMessage(msg.id, senderName, msg.message)} hitSlop={6}>
+                        <Text style={styles.reportLinkText}>Report</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleBlockUser(msg.userId, senderName)} hitSlop={6}>
+                        <Text style={styles.reportLinkText}>Block</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             );
@@ -479,13 +707,12 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
           style={styles.chatInput}
           value={draft}
           onChangeText={setDraft}
-          placeholder={isConnected ? 'Message the community…' : 'Connecting…'}
+          placeholder={isConnected ? 'Message the community…' : 'Message the community… (live updates connecting)'}
           placeholderTextColor={colors.textSecondary}
-          editable={isConnected}
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity style={styles.chatSendBtn} onPress={handleSend} disabled={!isConnected || !draft.trim()}>
+        <TouchableOpacity style={styles.chatSendBtn} onPress={handleSend} disabled={!draft.trim()}>
           <Text style={styles.chatSendBtnText}>Send</Text>
         </TouchableOpacity>
       </View>
@@ -498,8 +725,13 @@ const ANNOUNCEMENT_DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', { day: 'num
 const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId, isOwner }) => {
   const { data: announcements = [], isLoading } = useGetAnnouncementsQuery(eventId);
   const [createAnnouncement, { isLoading: isPosting }] = useCreateAnnouncementMutation();
+  const [updateAnnouncement, { isLoading: isSavingEdit }] = useUpdateAnnouncementMutation();
+  const [deleteAnnouncement] = useDeleteAnnouncementMutation();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editBody, setEditBody] = useState('');
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -515,6 +747,45 @@ const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eve
     } catch (err) {
       showAlert('Could not post announcement', extractErrorMessage(err, 'Please try again.'));
     }
+  };
+
+  const startEdit = (announcement: AnnouncementRecord) => {
+    setEditingId(announcement.id);
+    setEditTitle(announcement.title);
+    setEditBody(announcement.body);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditBody('');
+  };
+
+  const handleSaveEdit = async (announcementId: string) => {
+    if (!editTitle.trim() || !editBody.trim()) {
+      showAlert('Missing details', 'Add both a title and a message before saving.');
+      return;
+    }
+    try {
+      await updateAnnouncement({
+        eventId,
+        announcementId,
+        body: { title: editTitle.trim(), body: editBody.trim() },
+      }).unwrap();
+      cancelEdit();
+    } catch (err) {
+      showAlert('Could not save changes', extractErrorMessage(err, 'Please try again.'));
+    }
+  };
+
+  const handleDelete = (announcementId: string) => {
+    showConfirm('Delete this announcement?', 'This cannot be undone.', async () => {
+      try {
+        await deleteAnnouncement({ eventId, announcementId }).unwrap();
+      } catch (err) {
+        showAlert('Could not delete announcement', extractErrorMessage(err, 'Please try again.'));
+      }
+    }, 'Delete');
   };
 
   if (isLoading) {
@@ -554,13 +825,59 @@ const AnnouncementsTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eve
       {announcements.length === 0 ? (
         <Text style={styles.emptyTabText}>No announcements yet.</Text>
       ) : (
-        announcements.map((a) => (
-          <View key={a.id} style={styles.reviewCard}>
-            <Text style={styles.reviewName}>{a.title}</Text>
-            <Text style={styles.reviewText}>{a.body}</Text>
-            <Text style={styles.reviewUsername}>{ANNOUNCEMENT_DATE_FORMATTER.format(new Date(a.createdAt))}</Text>
-          </View>
-        ))
+        announcements.map((a) => {
+          if (isOwner && editingId === a.id) {
+            return (
+              <View key={a.id} style={styles.reviewComposer}>
+                <TextInput
+                  style={styles.chatInput}
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="Title"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <TextInput
+                  style={[styles.chatInput, styles.reviewComposerInput]}
+                  value={editBody}
+                  onChangeText={setEditBody}
+                  placeholder="What do you want attendees to know?"
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                />
+                <View style={styles.chatActionsRow}>
+                  <TouchableOpacity
+                    style={styles.reviewSubmitBtn}
+                    onPress={() => handleSaveEdit(a.id)}
+                    disabled={isSavingEdit}
+                  >
+                    <Text style={styles.chatSendBtnText}>{isSavingEdit ? 'Saving…' : 'Save'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.reportLinkWrap} onPress={cancelEdit} hitSlop={6}>
+                    <Text style={styles.reportLinkText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }
+
+          return (
+            <View key={a.id} style={styles.reviewCard}>
+              <Text style={styles.reviewName}>{a.title}</Text>
+              <Text style={styles.reviewText}>{a.body}</Text>
+              <Text style={styles.reviewUsername}>{ANNOUNCEMENT_DATE_FORMATTER.format(new Date(a.createdAt))}</Text>
+              {isOwner && (
+                <View style={styles.chatActionsRow}>
+                  <TouchableOpacity style={styles.reportLinkWrap} onPress={() => startEdit(a)} hitSlop={6}>
+                    <Text style={styles.reportLinkText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.reportLinkWrap} onPress={() => handleDelete(a.id)} hitSlop={6}>
+                    <Text style={styles.reportLinkText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })
       )}
     </View>
   );
@@ -642,6 +959,19 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   );
   const organizerPhone = organizerProfile?.phone;
   const saved = !!event && favorites.some((f) => f.id === event.id);
+
+  // navigation.goBack() throws "GO_BACK was not handled by any navigator" whenever this
+  // screen has no previous screen to pop to — e.g. opened directly via a deep link
+  // (eventrix://event/:id) or a push-notification tap (see navigateForPushData in
+  // RootNavigator.tsx), both of which can land here as the first screen in the stack. Fall
+  // back to Home in that case instead of leaving the back button a no-op.
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main', { screen: 'Home' });
+    }
+  };
 
   const handleCancelEvent = () => {
     if (!event || isCancelling) return;
@@ -783,7 +1113,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.backLinkBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backLinkBtn} onPress={handleGoBack}>
             <Text style={styles.backLinkText}>Go back</Text>
           </TouchableOpacity>
         </View>
@@ -889,7 +1219,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         style={[styles.hero, { paddingTop: insets.top }]}
         resizeMode="cover"
       >
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.back} onPress={handleGoBack}>
           <LeftArrow color={colors.white} size={20} />
         </TouchableOpacity>
         {!coverImage ? <EventBusyIcon color="#FFFFFF" size={80} /> : null}
@@ -1269,7 +1599,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {activeTab === 'reviews' && <ReviewsTab eventId={event.id} isOwner={isOwner} />}
+        {activeTab === 'reviews' && <ReviewsTab eventId={event.id} isOwner={isOwner} currentUserId={authUser?.id} />}
 
         {activeTab === 'announcements' && <AnnouncementsTab eventId={event.id} isOwner={isOwner} />}
 
@@ -1909,6 +2239,20 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     fontWeight: '700',
     color: colors.text,
     alignSelf: 'flex-end',
+  },
+  reportLinkWrap: {
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  reportLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.error,
+  },
+  chatActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: 4,
   },
 });
 

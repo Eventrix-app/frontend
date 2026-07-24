@@ -105,9 +105,18 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
                       <Text style={styles.cardTitle}>{event.title}</Text>
                       <Text style={styles.cardDate}>{event.eventDate}</Text>
                     </View>
-                    <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
-                      <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
-                    </View>
+                    {event.status === 'cancelled' ? (
+                      // Cancelling only flips `status`, not `approvalStatus` — an organizer's
+                      // cancelled event would otherwise still show a green "approved" badge
+                      // here with no indication it's been cancelled at all.
+                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                        <Text style={styles.badgeText}>Event cancelled</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
+                        <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>

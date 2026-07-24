@@ -88,6 +88,17 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  // Reachable directly via a push-notification tap (organizer_followed, see
+  // navigateForPushData in RootNavigator.tsx), which can land here as the first screen in
+  // the stack — goBack() throws "GO_BACK was not handled" with nothing to pop to.
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main', { screen: 'Home' });
+    }
+  };
+
   // "Events" here means events this account has created/organizes, not attended — the
   // "Bookings" stat right next to it already covers the enrolled/attended side, so having
   // both measure enrollment would be redundant. findMyEvents returns [] for an account with
@@ -132,7 +143,7 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
           <Image source={bgImage} style={styles.headerBg} contentFit="cover" />
         </View>
 
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} hitSlop={8}>
+        <TouchableOpacity style={styles.back} onPress={handleGoBack} hitSlop={8}>
           <Feather name="arrow-left" size={20} color={colors.white} />
         </TouchableOpacity>
 

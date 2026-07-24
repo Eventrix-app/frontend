@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -13,27 +13,39 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
+import { getDeviceLabel } from '../../utils/getDeviceLabel';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
+import InlineDatePicker from '../../components/common/InlineDatePicker';
+import { isAtLeastAge, latestDateOfBirthForMinAge } from '../../utils/dateFormat';
+import { useTheme } from '../../theme/ThemeContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
+const MIN_AGE = 18;
+
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [register, { isLoading }] = useRegisterMutation();
 
+  const isOldEnough = !!dateOfBirth && isAtLeastAge(dateOfBirth, MIN_AGE);
   const canSubmit =
     firstName.trim() &&
     lastName.trim() &&
     email.trim() &&
     password.length >= 8 &&
     password === confirm &&
+    isOldEnough &&
+    agreedToTerms &&
     !isLoading;
 
   const dispatch = useDispatch<AppDispatch>();
@@ -41,7 +53,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const handleRegister = async () => {
     try {
       setErrorMessage(null);
-      const result = await register({ email, password, firstName, lastName }).unwrap();
+      const result = await register({
+        email,
+        password,
+        firstName,
+        lastName,
+        dateOfBirth,
+        deviceLabel: getDeviceLabel(),
+      }).unwrap();
       // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
       registerForPushNotifications(dispatch);
@@ -106,6 +125,26 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onChangeText={setConfirm}
         secureTextEntry
       />
+      <InlineDatePicker
+        value={dateOfBirth}
+        onChange={setDateOfBirth}
+        placeholder="Date of Birth"
+        maximumDate={latestDateOfBirthForMinAge(MIN_AGE)}
+      />
+      {dateOfBirth && !isOldEnough ? (
+        <Text style={styles.ageHint}>You must be at least {MIN_AGE} to create an account.</Text>
+      ) : null}
+
+      <TouchableOpacity
+        style={styles.agreeRow}
+        onPress={() => setAgreedToTerms((prev) => !prev)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.checkbox, agreedToTerms && { backgroundColor: colors.brandPink, borderColor: colors.brandPink }]}>
+          {agreedToTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        </View>
+        <Text style={styles.agreeText}>I agree to the Terms of Use and Privacy Policy</Text>
+      </TouchableOpacity>
 
       {errorMessage ? (
         <View style={[styles.errorContainer, styles.errorRow]}>
@@ -140,6 +179,36 @@ const styles = StyleSheet.create({
   },
   nameField: {
     flex: 1,
+  },
+  ageHint: {
+    color: '#D32F2F',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  agreeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#C8C8D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxMark: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  agreeText: {
+    flex: 1,
+    fontSize: 13,
   },
   errorRow: {
     flexDirection: 'row',

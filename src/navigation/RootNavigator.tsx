@@ -3,6 +3,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, NavigationState, Navigati
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from './types';
+import { linking } from './linking';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
 import { setCurrentScreen } from '../store/slices/uiSlice';
@@ -16,6 +17,10 @@ import ProfileScreen from '../Pages/main/ProfileScreen';
 import EditProfileScreen from '../Pages/main/EditProfileScreen';
 import SettingsScreen from '../Pages/main/SettingsScreen';
 import VerifyEmailScreen from '../Pages/main/VerifyEmailScreen';
+import HelpCenterScreen from '../Pages/main/HelpCenterScreen';
+import LegalDocumentScreen from '../Pages/main/LegalDocumentScreen';
+import ActiveSessionsScreen from '../Pages/main/ActiveSessionsScreen';
+import BlockedUsersScreen from '../Pages/main/BlockedUsersScreen';
 import SavedEventsScreen from '../Pages/main/SavedEventsScreen';
 import NotificationsScreen from '../Pages/main/NotificationsScreen';
 import AdminRedirectScreen from '../Pages/authenticationscreens/AdminRedirectScreen';
@@ -54,7 +59,10 @@ function navigateForPushData(
   data: Record<string, unknown> | undefined,
 ): void {
   const type = data?.type;
-  if ((type === 'event_changed' || type === 'announcement') && typeof data?.eventId === 'string') {
+  if (
+    (type === 'event_changed' || type === 'announcement' || type === 'event_approved' || type === 'event_rejected') &&
+    typeof data?.eventId === 'string'
+  ) {
     navRef.navigate('EventDetails', { eventId: data.eventId });
   } else if (
     (type === 'waitlist_promoted' || type === 'refund_status') &&
@@ -158,6 +166,7 @@ const RootNavigator = () => {
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
+      linking={linking}
       onStateChange={(state) => {
         const routeName = getActiveRouteName(state);
         if (routeName) dispatch(setCurrentScreen(routeName));
@@ -179,6 +188,10 @@ const RootNavigator = () => {
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+        <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+        <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
+        <Stack.Screen name="ActiveSessions" component={ActiveSessionsScreen} />
+        <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
