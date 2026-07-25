@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 import {
   Dimensions,
   ImageBackground,
@@ -53,6 +53,32 @@ const resolveImageSource = (image: unknown) => {
   if (!image) return undefined;
   if (typeof image === 'string') return { uri: image };
   return image as any;
+};
+
+// Previously only `!imageSource` (no URL at all) fell back to the plain-color background —
+// a URL that 404s/expires had no onError handling, so the hero carousel card silently
+// showed a blank background behind the gradient/text with no visible fallback. Extracted
+// into its own component (rather than a useState inside the FlatList renderItem callback)
+// so the per-card `failed` state has a stable component instance to live on.
+const FeaturedCardImage: React.FC<{
+  imageSource: unknown;
+  imageStyle: any;
+  fallbackStyle: any;
+  radiusStyle: any;
+  children: React.ReactNode;
+}> = ({ imageSource, imageStyle, fallbackStyle, radiusStyle, children }) => {
+  const [failed, setFailed] = useState(false);
+  const showFallback = !imageSource || failed;
+  return (
+    <ImageBackground
+      source={showFallback ? undefined : (imageSource as any)}
+      style={[imageStyle, showFallback && fallbackStyle]}
+      imageStyle={radiusStyle}
+      onError={() => setFailed(true)}
+    >
+      {children}
+    </ImageBackground>
+  );
 };
 
 // Renders its width/color as a pure worklet function of the *same* scrollX shared value
@@ -214,10 +240,11 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
           style={[styles.card, { width: effectiveCardWidth }]}
           onPress={() => onEventPress(event.id)}
         >
-          <ImageBackground
-            source={imageSource}
-            style={[styles.image, !imageSource && styles.imageFallback]}
-            imageStyle={styles.imageRadius}
+          <FeaturedCardImage
+            imageSource={imageSource}
+            imageStyle={styles.image}
+            fallbackStyle={styles.imageFallback}
+            radiusStyle={styles.imageRadius}
           >
             <View style={styles.priceTag}>
               <TicketIcon color={colors.textInverse} size={12} />
@@ -251,7 +278,7 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
                 )}
               </View>
             </LinearGradient>
-          </ImageBackground>
+          </FeaturedCardImage>
         </TouchableOpacity>
       );
     },

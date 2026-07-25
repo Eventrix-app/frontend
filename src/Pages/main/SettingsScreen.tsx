@@ -20,6 +20,7 @@ import {
 } from '../../store/services/userApi';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
+import { DeleteMyDataModal } from '../../components/common/DeleteMyDataModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -57,6 +58,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [clearPushToken] = useClearPushTokenMutation();
   const [deleteAccount, { isLoading: isDeletingAccount }] = useDeleteAccountMutation();
   const [exportMyData, { isLoading: isExportingData }] = useExportMyDataMutation();
+  const [deleteMyDataModalVisible, setDeleteMyDataModalVisible] = useState(false);
   const { theme, colors, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // push/email default true (matching the backend's default for a newly created account)
@@ -138,6 +140,15 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       },
       'Delete Account',
     );
+  };
+
+  // Called by DeleteMyDataModal once the backend has confirmed erasure — the modal owns
+  // the identity-verification + mutation call itself, this just finishes the flow the same
+  // way handleDeleteAccount does (sign out only after confirmed success).
+  const handleDataErased = () => {
+    setDeleteMyDataModalVisible(false);
+    showAlert('Your data has been deleted', 'Your personal data has been erased. You have been signed out.');
+    dispatch(logout());
   };
 
   return (
@@ -273,6 +284,15 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.subtitle}>Permanently deactivate your account</Text>
               </View>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.singleRow}
+              onPress={() => setDeleteMyDataModalVisible(true)}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.dangerLabel}>Delete My Data</Text>
+                <Text style={styles.subtitle}>Erase your personal data, beyond what we're legally required to keep</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -286,6 +306,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
         <Text style={styles.version}>Eventrix v1.0.0</Text>
       </ScrollView>
+
+      <DeleteMyDataModal
+        visible={deleteMyDataModalVisible}
+        onClose={() => setDeleteMyDataModalVisible(false)}
+        onErased={handleDataErased}
+        hasPassword={me?.hasPassword ?? true}
+        authProviders={me?.authProviders ?? []}
+      />
     </View>
   );
 };

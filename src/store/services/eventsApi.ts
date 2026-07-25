@@ -294,7 +294,12 @@ export const eventsApi = createApi({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Event', id }, 'MyEvents'],
+      // Also invalidates the plain 'Event' tag (not just the specific id) — without it,
+      // getEvents' list query (providesTags: ['Event'], used by Home/Explore/Search) kept
+      // serving cached pre-edit data until its own TTL/focus-refetch happened to fire,
+      // making an edit look like it silently didn't save. Matches createEvent/deleteEvent/
+      // cancelEvent below, which already invalidate the broad tag.
+      invalidatesTags: (result, error, { id }) => [{ type: 'Event', id }, 'Event', 'MyEvents'],
     }),
     deleteEvent: builder.mutation<void, string>({
       query: (id) => ({
@@ -365,6 +370,20 @@ export const eventsApi = createApi({
       invalidatesTags: (result) => [
         'MyEnrollments',
         ...(result ? [{ type: 'Event' as const, id: result.eventId }] : []),
+      ],
+    }),
+    cancelEnrollment: builder.mutation<EnrollmentRecord, string>({
+      query: (enrollmentId) => ({ url: `events/enrollments/${enrollmentId}/cancel`, method: 'PATCH' }),
+      // Cancelling frees a seat exactly like enrollEvent claims one (and can trigger a
+      // waitlist promotion server-side, per EventsService.cancelEnrollment) — mirrors
+      // enrollEvent's invalidatesTags so ticket-tier availability and any promoted
+      // waitlist entry refresh without a manual pull-to-refresh.
+      invalidatesTags: (result, error, enrollmentId) => [
+        'MyEnrollments',
+        'MyWaitlist',
+        'Event',
+        { type: 'Enrollment', id: enrollmentId },
+        ...(result ? [{ type: 'Event' as const, id: result.eventId }, { type: 'TicketType' as const, id: result.eventId }] : []),
       ],
     }),
     getEnrollmentById: builder.query<EnrollmentRecord, string>({
@@ -495,6 +514,7 @@ export const {
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
   useCheckInMutation,
+  useCancelEnrollmentMutation,
   useGetEnrollmentByIdQuery,
   useGetTicketTypesQuery,
   useLazyGetTicketTypesQuery,

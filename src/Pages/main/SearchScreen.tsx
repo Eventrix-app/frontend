@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SvgXml } from 'react-native-svg';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
+import { CATEGORIES as CATEGORY_SVGS } from '../../components/events/CategoryIconCard';
 import { MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
@@ -28,6 +30,15 @@ import EventListSkeleton from '../../components/common/EventListSkeleton';
 import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
+
+// Bridges the backend's category name (e.g. "Music") to the home-screen icon set, which
+// is keyed the same way lowercased ("music") — only the 6 categories with a matching SVG
+// (Music/Tech/Sports/Health/Education/Business) get an icon; others (Food, Art, ...) have
+// none and stay text-only, same as before this change.
+const CATEGORY_SVG_BY_NAME: Record<string, string> = Object.fromEntries(
+  CATEGORY_SVGS.map((c) => [c.key, c.svg]),
+);
+const svgForCategoryName = (name: string): string | undefined => CATEGORY_SVG_BY_NAME[name.toLowerCase()];
 
 const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -102,21 +113,26 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </TouchableOpacity>
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={styles.chipWrap}
-            onPress={() => setCategoryId((prev) => (prev === cat.id ? null : cat.id))}
-          >
-            <View style={[styles.chipGlass, categoryId === cat.id && styles.chipActive]}>
-              <View style={styles.chipContent}>
-                <Text style={[styles.chipText, categoryId === cat.id && styles.chipTextActive]}>
-                  {cat.name}
-                </Text>
+        {categories.map((cat) => {
+          const isSelected = categoryId === cat.id;
+          const svg = isSelected ? svgForCategoryName(cat.name) : undefined;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={styles.chipWrap}
+              onPress={() => setCategoryId((prev) => (prev === cat.id ? null : cat.id))}
+            >
+              <View style={[styles.chipGlass, isSelected && styles.chipActive]}>
+                <View style={[styles.chipContent, svg && styles.chipContentWithIcon]}>
+                  {svg ? <SvgXml xml={svg} width={20} height={20} /> : null}
+                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                    {cat.name}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {isLoading ? (
@@ -254,6 +270,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   chipContent: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  chipContentWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs ?? 6,
   },
   chipActive: {
     backgroundColor: 'rgba(244,51,98,0.16)',

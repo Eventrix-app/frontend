@@ -78,7 +78,7 @@ export const privacyPolicyDocument: LegalDocument = {
           'Notification preferences — your chosen categories (event reminders, nearby events, community updates, offers) and master on/off switches for push and email notifications.',
           'Standard technical/request metadata (such as IP address and request timestamps) may be logged by our hosting and infrastructure providers for security, abuse prevention, and reliability purposes, consistent with their own standard logging practices.',
         ]),
-        p('3.3 Information from third-party sign-in: if you register or log in using Google, Apple, or Facebook, we receive and store your name, email address, and profile picture as made available by that provider, and a provider-issued identifier used to link your social account to your Eventrix account. We independently and cryptographically verify these sign-ins with the relevant provider before trusting any identity information they supply; we do not accept unverified claims from your device.'),
+        p('3.3 Information from third-party sign-in: if you register or log in using Google, Apple, or Facebook, we receive and store your name, email address, and profile picture as made available by that provider, and a provider-issued identifier used to link your social account to your Eventrix account. We independently and cryptographically verify these sign-ins with the relevant provider before trusting any identity information they supply; we do not accept unverified claims from your device. Signing in with Facebook specifically requires granting us access to your email address — if that permission is declined, sign-in is not completed, since we do not create an account without a real, usable email address on file.'),
         p('3.4 Information we do not collect: we do not collect card numbers, CVV, bank account numbers, or UPI PINs. Full payment credentials are entered directly into our payment gateway\'s own secure interface and never pass through or are stored on Eventrix\'s servers. See §9 (Payment Information).'),
       ],
     },
@@ -175,15 +175,17 @@ export const privacyPolicyDocument: LegalDocument = {
           'Access the Personal Data we hold about you (available directly in-app via your Profile).',
           'Correct inaccurate profile information (available directly in-app via Edit Profile).',
           'Withdraw consent for optional features such as location sharing or notifications, via your device or in-app settings.',
-          'Request deletion of your account and associated Personal Data, directly in-app via Settings → Delete Account, as described in our Account Deletion Policy.',
+          'Request deletion of your account, directly in-app via Settings → Delete Account, as described in our Account Deletion Policy.',
+          'Request erasure of your Personal Data beyond a simple account deactivation, directly in-app via Settings → Delete My Data, under Section 12 of the Digital Personal Data Protection Act, 2023 — see §13 below and our Account Deletion Policy §7 and Data Retention Policy §5.2 for exactly what this erases versus what we remain legally required to retain.',
           'Raise a grievance regarding how your data is handled, as described in our Contact & Grievance Policy.',
         ]),
       ],
     },
     {
-      heading: '13. Account Deletion',
+      heading: '13. Account Deletion and Data Erasure',
       blocks: [
         p('You may delete your account at any time directly within the App, from Settings → Delete Account. Deletion takes effect immediately: your session is ended and your account can no longer be used to log in. Full details of what is deleted, what is retained, and why, are set out in our Account Deletion Policy. If you are unable to access the App, you may also request deletion by contacting us using the details in §16.'),
+        p('Deleting your account deactivates it but does not, by itself, erase your Personal Data — certain records are retained as described in our Data Retention Policy. If you want your Personal Data erased beyond that retention, use Settings → Delete My Data instead, which requires confirming your identity (current password, or re-authentication with your linked sign-in provider) before proceeding. See our Account Deletion Policy §7 and Data Retention Policy §5.2 for the full mechanism, including exactly which data categories are erased outright versus retained under statutory obligation.'),
       ],
     },
     {
@@ -648,10 +650,16 @@ export const dataRetentionDocument: LegalDocument = {
     {
       heading: '5. Deletion Procedures',
       blocks: [
+        p('5.1 Self-service account deletion (Settings → Delete Account) is a soft-delete: your account row is marked deleted and immediately excluded from all active queries and authentication, but is not instantly and irreversibly purged (this preserves the retained records above and supports fraud/dispute investigation).'),
+        p('5.2 Self-service data erasure (Settings → Delete My Data) goes further, exercising your erasure right under Section 12 of the Digital Personal Data Protection Act, 2023: we erase every category of Personal Data that has no independent statutory retention basis, immediately, upon a verified request. Because this Act permits (and Indian tax/financial recordkeeping law requires) us to retain certain records even after an erasure request, this feature works as follows:'),
         bullets([
-          'Self-service account deletion is a soft-delete: your account row is marked deleted and immediately excluded from all active queries and authentication, but is not instantly and irreversibly purged (this preserves the retained records above and supports fraud/dispute investigation).',
-          'Where full erasure of retained data is legally required or requested and no statutory retention obligation applies, we will honor that request — contact us via our Contact & Grievance Policy.',
+          'Identity verification first — you must confirm your current password, or re-authenticate with the social sign-in provider linked to your account, before anything is erased.',
+          'Erased outright: your profile (name, email, phone, date of birth, bio, location, profile picture, password), interests, saved/favorited events, organizer follows, waitlist entries, registered devices, active login sessions, and linked social sign-in identities.',
+          'Pseudonymized, not erased: your account record itself is not deleted, because the statutorily-retained records below still need a valid reference to it — its identifying fields are instead replaced with generic, non-identifying values.',
+          'Retained, per §2 above: booking, payment, refund, and payout records; organizer KYC documents where applicable; and administrative audit logs — remaining linked to your now-pseudonymized account record, not your real name, email, or phone number.',
+          'Logged — that an erasure occurred, when, and what was erased versus retained, is itself recorded in our internal audit log, as evidence of compliance.',
         ]),
+        p('This is processed immediately once your identity is verified — it is not a manual or best-effort process. See our Account Deletion Policy §7 for the user-facing walkthrough of this feature.'),
       ],
     },
     {
@@ -860,7 +868,22 @@ export const accountDeletionDocument: LegalDocument = {
       ],
     },
     {
-      heading: '6. Contact',
+      heading: '6. Deleting Your Account vs. Deleting Your Data',
+      blocks: [
+        p('The steps above (Delete Account) deactivate your account: you\'re signed out, it can\'t be logged into, and your profile is hidden — but your account row and its associated records are only soft-deleted, not erased. If you specifically want your personal data erased (not just your account deactivated), use Delete My Data instead — see §7.'),
+      ],
+    },
+    {
+      heading: '7. Delete My Data (Full Data Erasure)',
+      blocks: [
+        p('7.1 Open the App, go to Settings → Delete My Data. Unlike Delete Account, this requires you to confirm your identity first — enter your current password, or, if you signed up with Google/Apple/Facebook and have no password, re-authenticate with that same provider. This step exists because an erasure request must be provably from you, not just from whoever is holding your current session.'),
+        p('7.2 Once verified, erasure happens immediately: your profile, interests, saved events, follows, waitlist entries, registered devices, active sessions, and linked sign-in methods are erased outright. Records we are legally required to keep — completed bookings, payments, refunds, payouts, organizer KYC documents where applicable, and administrative audit logs — are retained as described in our Data Retention Policy §5.2, but with your name, email, and phone number stripped from the account they\'re linked to.'),
+        p('7.3 This action is logged (that an erasure occurred, and what was erased versus retained) as part of our own compliance record-keeping — see our Data Retention Policy §5.2 for the full technical description of this mechanism.'),
+        p('7.4 Delete My Data is more thorough than Delete Account and cannot be undone once processed — there is no recovery window for this action, unlike the best-effort exception described in §5 for a plain account deletion.'),
+      ],
+    },
+    {
+      heading: '8. Contact',
       blocks: [
         bullets([`Support Email: ${SUPPORT_EMAIL}`]),
         p('For anything unresolved through support, see our Contact & Grievance Policy.'),

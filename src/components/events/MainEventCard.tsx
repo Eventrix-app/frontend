@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MockEvent } from '../../data/mockEvents';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../common/Text';
 import { EventBusyIcon, LocationPin, PersonIcon, CalendarIcon, ClockIcon } from '../common/Icons';
+import { FallbackImage } from '../common/FallbackImage';
 
 type MainEventCardProps = {
   event: MockEvent;
@@ -43,9 +44,9 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
             </View>
           </View>
           {typeof event.image === 'string' && event.image.startsWith('http') ? (
-            <Image source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
+            <FallbackImage source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
           ) : typeof event.image !== 'string' ? (
-            <Image source={event.image} style={styles.cardImage} resizeMode="cover" />
+            <FallbackImage source={event.image} style={styles.cardImage} resizeMode="cover" />
           ) : (
             <EventBusyIcon color={colors.textSecondary} size={48} />
           )}

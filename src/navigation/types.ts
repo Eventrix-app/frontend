@@ -51,10 +51,14 @@ export type AuthStackParamList = {
   UpdatePassword: { email: string };
 };
 
+// MyEvents is NOT a tab — MainNavigator only registers Home/Explore/Shorts/Bookings.
+// It's a separate top-level RootStackParamList screen (see above), reached by pushing
+// onto the root stack, not by tab-switching within Main. A phantom `MyEvents: undefined`
+// entry here previously type-checked `navigate('Main', { screen: 'MyEvents' })` as valid
+// even though react-navigation has no matching registered route for it.
 export type MainTabParamList = {
   Home: undefined;
   Explore: undefined;
   Shorts: undefined;
-  MyEvents: undefined;
   Bookings: undefined;
 };

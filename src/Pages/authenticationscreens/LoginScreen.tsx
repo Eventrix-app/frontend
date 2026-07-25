@@ -49,7 +49,11 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       setErrorMessage(null);
-      const result = await login({ email, password, deviceLabel: getDeviceLabel() }).unwrap();
+      // isFormValid checks email.trim() below, but previously sent the raw value — a
+      // pasted email with trailing/leading whitespace passed validation (button enabled)
+      // but then failed an exact-match backend lookup with a confusing "invalid email or
+      // password" error.
+      const result = await login({ email: email.trim(), password, deviceLabel: getDeviceLabel() }).unwrap();
       // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
       registerForPushNotifications(dispatch);

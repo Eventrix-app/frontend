@@ -1,33 +1,32 @@
 import React, { useMemo } from 'react';
-import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useTheme } from '../../theme/ThemeContext';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { spacing } from '../../theme/spacing';
-import { RightArrow } from '../common/Icons';
-import { Text } from '../common/Text';
-
-// These ship as real PNGs, not SVGs — the original .svg files in this folder are actually
-// a base64-embedded PNG wrapped in an <svg> shell (a Figma export artifact), which isn't a
-// real vector image and isn't decodable by RN's Image on Android/iOS (only a browser's
-// native <img> renders that wrapper, which is why these were invisible on-device). require()
-// rather than an ES import, matching every other image asset in this app — there's no
-// `declare module '*.png'` ambient type for the import form to type-check against.
-const MusicIcon = require('../../../assets/home-screen-categories/music.png');
-const TechIcon = require('../../../assets/home-screen-categories/tech.png');
-const SportsIcon = require('../../../assets/home-screen-categories/sport.png');
-const HealthIcon = require('../../../assets/home-screen-categories/health.png');
+import {
+  MUSIC_CATEGORY_SVG,
+  TECH_CATEGORY_SVG,
+  SPORTS_CATEGORY_SVG,
+  HEALTH_CATEGORY_SVG,
+  EDUCATION_CATEGORY_SVG,
+  BUSINESS_CATEGORY_SVG,
+  VIEW_ALL_CATEGORY_SVG,
+} from '../../assets/homeScreenCategorySvgs.generated';
 
 export interface CategoryItem {
   key: string;
-  label: string;
-  Icon: any; // now an image source object, not a component
-  backgroundColor: string;
+  // Raw SVG source (rendered via SvgXml) — each already bakes in its own icon
+  // illustration, background color, and drop-shadow accent as a single graphic, unlike
+  // the flat single-color PNGs this replaces.
+  svg: string;
 }
 
 export const CATEGORIES: CategoryItem[] = [
-  { key: 'music', label: 'Music', Icon: MusicIcon, backgroundColor: '#F3E8FF' },
-  { key: 'tech', label: 'Tech', Icon: TechIcon, backgroundColor: '#E0F2FE' },
-  { key: 'sports', label: 'Sports', Icon: SportsIcon, backgroundColor: '#DCFCE7' },
-  { key: 'health', label: 'Health', Icon: HealthIcon, backgroundColor: '#FFE4E6' },
+  { key: 'music', svg: MUSIC_CATEGORY_SVG },
+  { key: 'tech', svg: TECH_CATEGORY_SVG },
+  { key: 'sports', svg: SPORTS_CATEGORY_SVG },
+  { key: 'health', svg: HEALTH_CATEGORY_SVG },
+  { key: 'education', svg: EDUCATION_CATEGORY_SVG },
+  { key: 'business', svg: BUSINESS_CATEGORY_SVG },
 ];
 
 interface Props {
@@ -36,18 +35,16 @@ interface Props {
 }
 
 export const CategoryIconCard: React.FC<Props> = ({ item, onPress }) => {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
   return (
     <TouchableOpacity
       style={styles.wrap}
       activeOpacity={0.8}
       onPress={() => onPress?.(item.key)}
     >
-      <View style={[styles.iconBox, { backgroundColor: item.backgroundColor }]}>
-          <Image source={item.Icon} style={{ width: 48, height: 48,marginBottom: -3 }} resizeMode="contain" />
+      <View style={styles.iconBox}>
+        <SvgXml xml={item.svg} width={150} height={150} />
       </View>
-      <Text style={styles.label}>{item.label}</Text>
     </TouchableOpacity>
   );
 };
@@ -58,66 +55,28 @@ type ViewAllProps = {
 };
 
 export const ViewAllCategoryIconCard: React.FC<ViewAllProps> = ({ onPress }) => {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.8} onPress={onPress}>
-      <View style={[styles.iconBox, styles.viewAllIconBox]}>
-        <View style={styles.viewAllGlass}>
-          <View style={styles.viewAllContent}>
-            <RightArrow color={colors.brandPink} size={18} />
-          </View>
-        </View>
+      <View style={styles.iconBox}>
+        <SvgXml xml={VIEW_ALL_CATEGORY_SVG} width={150} height={150} />
       </View>
-      <Text style={styles.label}>View All</Text>
     </TouchableOpacity>
   );
 };
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
  wrap: {
     alignItems: 'center',
     width: 80,
     marginRight: spacing.md,
   },
  iconBox: {
-  width: 64,
-  height: 64,
-  borderRadius: 18,
+  width: 100,
+  height: 100,
   alignItems: 'center',
-  justifyContent: 'flex-end',   // was 'center'
-  overflow: 'visible',          // lets the icon bleed slightly past the bottom edge, matching the reference
+  justifyContent: 'center',
+  overflow: 'visible',
   marginBottom: spacing.xs ?? 6,
 },
-  viewAllIconBox: {
-    backgroundColor: '#FFF1F5',
-    overflow: 'hidden',
-  },
-  viewAllGlass: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      android: { elevation: 6 },
-      default: {
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.14,
-        shadowRadius: 18,
-      },
-    }),
-  },
-  viewAllContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text,
-  },
 });

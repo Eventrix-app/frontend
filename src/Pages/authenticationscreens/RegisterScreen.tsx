@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { AuthActions, OutlineButtonRow } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
-import { AuthStackParamList } from '../../navigation/types';
+import { AuthStackParamList, RootStackParamList } from '../../navigation/types';
 import { spacing } from '../../theme/spacing';
 import { useRegisterMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
@@ -26,6 +26,10 @@ const MIN_AGE = 18;
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
+  // Register lives inside the Auth child navigator — LegalDocument is a RootStack screen,
+  // so opening it (from the checkbox's inline links below) goes through the parent, same
+  // as LegalFooter's own links.
+  const rootNavigation = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,10 +42,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [register, { isLoading }] = useRegisterMutation();
 
   const isOldEnough = !!dateOfBirth && isAtLeastAge(dateOfBirth, MIN_AGE);
+  // Matches ForgotPasswordScreen's isEmailValid check — previously only checked
+  // non-empty, so a syntactically invalid string (no "@") could pass client-side
+  // validation and rely entirely on the backend to reject it.
+  const isEmailValid = email.trim() !== '' && email.includes('@');
   const canSubmit =
     firstName.trim() &&
     lastName.trim() &&
-    email.trim() &&
+    isEmailValid &&
     password.length >= 8 &&
     password === confirm &&
     isOldEnough &&
@@ -54,7 +62,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setErrorMessage(null);
       const result = await register({
-        email,
+        email: email.trim(),
         password,
         firstName,
         lastName,
@@ -143,7 +151,21 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         <View style={[styles.checkbox, agreedToTerms && { backgroundColor: colors.brandPink, borderColor: colors.brandPink }]}>
           {agreedToTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
         </View>
-        <Text style={styles.agreeText}>I agree to the Terms of Use and Privacy Policy</Text>
+        {/* "Terms of Use"/"Privacy Policy" are separately tappable (nested Text onPress
+            wins over the outer TouchableOpacity's, standard RN touch-responder behavior),
+            so a user can actually open and read what they're agreeing to from here, not
+            only from LegalFooter below. Tapping elsewhere in the row still toggles the
+            checkbox as before. */}
+        <Text style={styles.agreeText}>
+          I agree to the{' '}
+          <Text style={styles.agreeLink} onPress={() => rootNavigation?.navigate('LegalDocument', { doc: 'terms' })}>
+            Terms of Use
+          </Text>
+          {' '}and{' '}
+          <Text style={styles.agreeLink} onPress={() => rootNavigation?.navigate('LegalDocument', { doc: 'privacy' })}>
+            Privacy Policy
+          </Text>
+        </Text>
       </TouchableOpacity>
 
       {errorMessage ? (
@@ -209,6 +231,11 @@ const styles = StyleSheet.create({
   agreeText: {
     flex: 1,
     fontSize: 13,
+  },
+  agreeLink: {
+    color: '#FF3366', // colors.brandPink — matches LegalFooter's link color
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   errorRow: {
     flexDirection: 'row',

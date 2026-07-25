@@ -31,6 +31,13 @@ export interface CurrentUser {
   phoneNumber: string | null;
   profilePictureUrl: string | null;
   isEmailVerified: boolean;
+  // Whether this account has a password set — false for a social-only (Google/Apple/
+  // Facebook) sign-in. Settings → Delete My Data uses this to decide whether to collect a
+  // password confirmation or trigger re-authentication with the linked provider instead.
+  hasPassword: boolean;
+  // Linked social sign-in providers (e.g. ['google']) — used by Delete My Data to know
+  // which provider to re-authenticate with when hasPassword is false.
+  authProviders: string[];
   location: string | null;
   city: string;
   latitude: number | null;
@@ -67,14 +74,22 @@ export const userApi = createApi({
       query: () => 'users/me',
       providesTags: ['Me'],
     }),
+    // These three onboarding-adjacent mutations previously had no invalidatesTags, so the
+    // cached getMe result kept showing pre-onboarding location/interests until whatever
+    // screen happened to remount/refocus — dispatched right after login/register via
+    // syncOnboardingDraft.ts, at which point Home/Explore/Bookings/Profile/Settings are all
+    // about to render from the (now stale) cached 'Me' data.
     updateInterests: builder.mutation<void, UpdateInterestsBody>({
       query: (body) => ({ url: 'users/me/interests', method: 'PUT', body }),
+      invalidatesTags: ['Me'],
     }),
     updateLocation: builder.mutation<void, UpdateLocationBody>({
       query: (body) => ({ url: 'users/me/location', method: 'PATCH', body }),
+      invalidatesTags: ['Me'],
     }),
     updateNotificationPreferences: builder.mutation<void, UpdateNotificationPrefsBody>({
       query: (body) => ({ url: 'users/me/notification-preferences', method: 'PATCH', body }),
+      invalidatesTags: ['Me'],
     }),
     updateNotificationChannels: builder.mutation<void, UpdateNotificationChannelsBody>({
       query: (body) => ({ url: 'users/me/notification-channels', method: 'PATCH', body }),
@@ -85,6 +100,7 @@ export const userApi = createApi({
     // straight to Main instead of replaying Onboarding/InterestSelection/etc.
     completeOnboarding: builder.mutation<void, void>({
       query: () => ({ url: 'users/me/complete-onboarding', method: 'PATCH' }),
+      invalidatesTags: ['Me'],
     }),
     updateParticipant: builder.mutation<void, { id: string; body: UpdateParticipantBody }>({
       query: ({ id, body }) => ({ url: `participants/${id}`, method: 'PATCH', body }),
@@ -114,6 +130,13 @@ export const userApi = createApi({
     exportMyData: builder.mutation<void, void>({
       query: () => ({ url: 'users/me/export', method: 'POST' }),
     }),
+    // Self-service DPDP-Act hard data erasure (Settings → Delete My Data) — distinct from
+    // deleteAccount above, which only deactivates the account. Requires proof of identity:
+    // a password account passes currentPassword, a social-only account passes a freshly
+    // obtained provider token instead. See Backend's UsersService.eraseMyData.
+    eraseMyData: builder.mutation<void, { currentPassword?: string; reauth?: { provider: 'google' | 'apple' | 'facebook'; token: string } }>({
+      query: (body) => ({ url: 'users/me/data', method: 'DELETE', body }),
+    }),
   }),
 });
 
@@ -130,4 +153,5 @@ export const {
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useExportMyDataMutation,
+  useEraseMyDataMutation,
 } = userApi;

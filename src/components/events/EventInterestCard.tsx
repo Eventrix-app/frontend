@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -9,6 +9,7 @@ import { extractErrorMessage } from '../../utils/apiError';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { FallbackImage } from '../common/FallbackImage';
 
 // Extend your real event type/mock data with these optional fields as the
 // API/schema fills them in. Falls back to placeholder copy until then.
@@ -114,7 +115,7 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress, onRe
       onPress={onPress}
     >
       <View style={styles.imageWrap}>
-        <Image source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />
+        <FallbackImage source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />
 
         <View style={styles.topLeftCol}>
           {event.attendeesAvailable != null && (

@@ -38,6 +38,11 @@ const FAQ_SECTIONS: FaqSection[] = [
         answer:
           'Go to Settings → Delete Account. This deactivates your account and signs you out immediately. Some records, such as booking and payment history, may be retained where required by law. See our Account Deletion Policy for details.',
       },
+      {
+        question: 'How do I permanently erase my personal data?',
+        answer:
+          "Go to Settings → Delete My Data. Unlike Delete Account, this erases your profile, interests, saved events, follows, and linked sign-in methods outright, not just deactivates them. You'll be asked to confirm your current password (or re-authenticate with Google/Apple/Facebook if you signed up that way) before anything is erased. Records we're legally required to keep, like completed bookings and payments, are kept but with your personal details removed from them. See our Account Deletion Policy and Data Retention Policy for the full details.",
+      },
     ],
   },
   {

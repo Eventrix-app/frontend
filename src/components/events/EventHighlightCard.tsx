@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { FallbackImage } from '../common/FallbackImage';
 
 export interface HighlightItem {
   id: string;
@@ -23,7 +24,7 @@ export const EventHighlightCard: React.FC<Props> = ({ item, onPress }) => {
   return (
     <TouchableOpacity style={styles.wrap} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.thumbWrap}>
-        <Image source={item.thumbnail} style={styles.thumb} resizeMode="cover" />
+        <FallbackImage source={item.thumbnail} style={styles.thumb} resizeMode="cover" />
 
         <View style={styles.playOverlay}>
           <Text style={styles.playIcon}>▶</Text>

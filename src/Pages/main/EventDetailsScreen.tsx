@@ -31,6 +31,9 @@ import {
   useGetMyFavoritesQuery,
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
+  useGetMyEnrollmentsQuery,
+  useGetMyWaitlistQuery,
+  useCancelEnrollmentMutation,
   isWaitlistResult,
   TicketTypeRecord,
   AnnouncementRecord,
@@ -609,7 +612,11 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
     try {
       await sendMessage(trimmed);
     } catch {
-      setDraft(trimmed);
+      // Only restore the failed text if the user hasn't already started typing something
+      // new in the meantime — using the functional updater to read the actual current
+      // value at catch-time (not the stale `draft` from this closure) avoids clobbering a
+      // newer, unsent draft with the older failed message.
+      setDraft((current) => (current === '' ? trimmed : current));
       showAlert('Message not sent', 'Please check your connection and try again.');
     }
   };
@@ -953,6 +960,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
   const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
   const [cancelEvent, { isLoading: isCancelling }] = useCancelEventMutation();
+  const { data: myEnrollments = [] } = useGetMyEnrollmentsQuery(undefined, { skip: !authUser });
+  const { data: myWaitlist = [] } = useGetMyWaitlistQuery(undefined, { skip: !authUser });
+  const [cancelEnrollment, { isLoading: isCancellingEnrollment }] = useCancelEnrollmentMutation();
   const { data: organizerProfile } = useGetOrganizerProfileQuery(
     event?.organizer?.id ?? '',
     { skip: !event?.organizer?.id },
@@ -1164,25 +1174,85 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const notApprovedYet = event.isPaid && event.approvalStatus !== 'approved';
   const selectedAvailability = selectedTier ? tierAvailability(selectedTier) : null;
-  const footerLabel = notApprovedYet
-    ? 'Not Available'
-    : ticketTypes.length === 0
-      ? 'Not Available'
-      : !selectedTier
-        ? 'Select a Ticket'
-        : selectedAvailability === 'not_started'
-          ? 'Not on Sale Yet'
-          : selectedAvailability === 'ended'
-            ? 'Sales Closed'
-            : selectedAvailability === 'sold_out'
-              ? 'Join Waitlist'
-              : 'Book Now';
-  const footerDisabled =
-    notApprovedYet ||
-    ticketTypes.length === 0 ||
-    !selectedTier ||
-    selectedAvailability === 'not_started' ||
-    selectedAvailability === 'ended';
+
+  // A user with an active (non-cancelled, non-refunded) booking for this event can't
+  // re-enroll — the backend already 409s on a second enroll() — so the CTA becomes a
+  // way to manage the existing booking instead of a disabled dead end. Waitlist state is
+  // checked only when there's no active enrollment, since a promoted waitlist entry
+  // always has a corresponding Enrollment row by the time it matters here.
+  const myActiveEnrollment = myEnrollments.find(
+    (e) => e.eventId === event.id && e.status !== 'cancelled' && e.status !== 'refunded',
+  );
+  const myActiveWaitlistEntry = !myActiveEnrollment
+    ? myWaitlist.find((w) => w.eventId === event.id && w.status === 'waiting')
+    : undefined;
+  // Both conditions matter: totalAmount > 0 alone isn't enough, since a paid ticket type
+  // sits at paymentStatus 'pending' from enroll() until checkout actually completes (no
+  // in-app payment flow exists yet) — requestRefund() 400s on anything that isn't
+  // 'paid'. Only route through the refund flow once money has actually been collected;
+  // otherwise a direct, no-refund-needed cancel is both correct and necessary.
+  const isMyEnrollmentPaid =
+    !!myActiveEnrollment && Number(myActiveEnrollment.totalAmount) > 0 && myActiveEnrollment.paymentStatus === 'paid';
+
+  const handleCancelMyEnrollment = () => {
+    if (!myActiveEnrollment) return;
+    showConfirm(
+      'Cancel this booking?',
+      "This ticket will no longer be valid and your spot will be released. This can't be undone.",
+      async () => {
+        try {
+          await cancelEnrollment(myActiveEnrollment.id).unwrap();
+        } catch (e: any) {
+          showAlert('Could not cancel booking', extractErrorMessage(e, 'Please try again.'));
+        }
+      },
+      'Cancel Booking',
+    );
+  };
+
+  // Paid bookings can only be unwound through the refund-request flow (it's the only
+  // path that actually reverses payment) — hand off to Ticket Details, which already has
+  // that form, rather than duplicating it here.
+  const handleFooterPress = () => {
+    if (myActiveEnrollment) {
+      if (isMyEnrollmentPaid) {
+        navigation.navigate('TicketDetails', { bookingId: myActiveEnrollment.id });
+      } else {
+        handleCancelMyEnrollment();
+      }
+      return;
+    }
+    handleEnroll();
+  };
+
+  const footerLabel = myActiveEnrollment
+    ? isMyEnrollmentPaid
+      ? 'Cancel Enrollment / Request Refund'
+      : 'Cancel Enrollment'
+    : myActiveWaitlistEntry
+      ? `On Waitlist (#${myActiveWaitlistEntry.position})`
+      : notApprovedYet
+        ? 'Not Available'
+        : ticketTypes.length === 0
+          ? 'Not Available'
+          : !selectedTier
+            ? 'Select a Ticket'
+            : selectedAvailability === 'not_started'
+              ? 'Not on Sale Yet'
+              : selectedAvailability === 'ended'
+                ? 'Sales Closed'
+                : selectedAvailability === 'sold_out'
+                  ? 'Join Waitlist'
+                  : 'Book Now';
+  const footerDisabled = myActiveEnrollment
+    ? isCancellingEnrollment
+    : myActiveWaitlistEntry
+      ? true
+      : notApprovedYet ||
+        ticketTypes.length === 0 ||
+        !selectedTier ||
+        selectedAvailability === 'not_started' ||
+        selectedAvailability === 'ended';
 
   const badges: string[] = [];
   const daysToGo = daysToGoLabel(event.eventDate);
@@ -1614,10 +1684,10 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.footerContent}>
             <TouchableOpacity
               style={[styles.bookBtn, footerDisabled ? styles.disabledBtn : {}]}
-              onPress={handleEnroll}
-              disabled={isEnrolling || footerDisabled}
+              onPress={handleFooterPress}
+              disabled={isEnrolling || isCancellingEnrollment || footerDisabled}
             >
-              {isEnrolling ? (
+              {isEnrolling || isCancellingEnrollment ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.bookText}>{footerLabel}</Text>

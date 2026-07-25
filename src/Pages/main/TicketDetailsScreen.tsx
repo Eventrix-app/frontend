@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -7,9 +8,10 @@ import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { useGetEnrollmentByIdQuery } from '../../store/services/eventsApi';
+import { useGetEnrollmentByIdQuery, useCancelEnrollmentMutation } from '../../store/services/eventsApi';
 import { useRequestRefundMutation } from '../../store/services/paymentsApi';
-import { showAlert } from '../../utils/crossPlatformAlert';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { extractErrorMessage } from '../../utils/apiError';
 import { Text } from '../../components/common/Text';
 import TicketDetailsSkeleton from '../../components/common/TicketDetailsSkeleton';
 import { TicketIcon } from '../../components/common/Icons';
@@ -29,6 +31,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const enrollmentId = route.params.bookingId;
   const { data: enrollment, isLoading, isError } = useGetEnrollmentByIdQuery(enrollmentId);
   const [requestRefund, { isLoading: isRequestingRefund }] = useRequestRefundMutation();
+  const [cancelEnrollment, { isLoading: isCancellingEnrollment }] = useCancelEnrollmentMutation();
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundRequested, setRefundRequested] = useState(false);
@@ -72,6 +75,21 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const handleCancelEnrollment = () => {
+    showConfirm(
+      'Cancel this booking?',
+      "This ticket will no longer be valid and your spot will be released. This can't be undone.",
+      async () => {
+        try {
+          await cancelEnrollment(enrollmentId).unwrap();
+        } catch (e: any) {
+          showAlert('Could not cancel booking', extractErrorMessage(e, 'Please try again.'));
+        }
+      },
+      'Cancel Booking',
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -94,6 +112,12 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const statusStyle = STATUS_LABELS[enrollment.status] ?? STATUS_LABELS.confirmed;
   const isCancelled = enrollment.status === 'cancelled';
+  // Both conditions matter: totalAmount > 0 alone isn't enough, since a paid ticket type
+  // sits at paymentStatus 'pending' from enroll() until checkout actually completes (no
+  // in-app payment flow exists yet) — requestRefund() 400s on anything that isn't
+  // 'paid'. Only route through the refund flow once money has actually been collected;
+  // otherwise a direct, no-refund-needed cancel is both correct and necessary.
+  const isPaidBooking = Number(enrollment.totalAmount) > 0 && enrollment.paymentStatus === 'paid';
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -135,9 +159,13 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {!isCancelled && enrollment.ticketCode ? (
             <View style={styles.qrSection}>
-              {/* TODO: replace with react-native-qrcode-svg once added as dependency */}
               <View style={styles.qrBox}>
-                <Text style={styles.qrPattern}>◦◦◦◦◦{'\n'}◦◦◦◦◦{'\n'}◦◦◦◦◦</Text>
+                {/* Value is the same signed ticketCode EventsService.checkIn() already
+                    verifies server-side — nothing new needed on the backend, this screen
+                    was the only place still showing a fake placeholder pattern instead of
+                    an actual scannable code. White background regardless of theme, since a
+                    QR code needs light-on-dark contrast to scan reliably either way. */}
+                <QRCode value={enrollment.ticketCode} size={124} backgroundColor="white" color="black" />
               </View>
               <Text style={styles.qrCode} numberOfLines={1} ellipsizeMode="middle">
                 {enrollment.ticketCode}
@@ -203,16 +231,30 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text style={styles.shareText}>View Event</Text>
                 </TouchableOpacity>
                 {enrollment.status === 'confirmed' ? (
-                  refundRequested ? (
-                    <View style={[styles.footerBtnFlex, styles.refundPendingBadge]}>
-                      <Text style={styles.refundPendingText}>Refund Requested</Text>
-                    </View>
+                  isPaidBooking ? (
+                    refundRequested ? (
+                      <View style={[styles.footerBtnFlex, styles.refundPendingBadge]}>
+                        <Text style={styles.refundPendingText}>Refund Requested</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.refundBtn, styles.footerBtnFlex]}
+                        onPress={() => setShowRefundForm(true)}
+                      >
+                        <Text style={styles.refundText}>Request Refund</Text>
+                      </TouchableOpacity>
+                    )
                   ) : (
                     <TouchableOpacity
                       style={[styles.refundBtn, styles.footerBtnFlex]}
-                      onPress={() => setShowRefundForm(true)}
+                      onPress={handleCancelEnrollment}
+                      disabled={isCancellingEnrollment}
                     >
-                      <Text style={styles.refundText}>Request Refund</Text>
+                      {isCancellingEnrollment ? (
+                        <ActivityIndicator color="#991B1B" size="small" />
+                      ) : (
+                        <Text style={styles.refundText}>Cancel Enrollment</Text>
+                      )}
                     </TouchableOpacity>
                   )
                 ) : null}
@@ -292,12 +334,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: 140,
     height: 140,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.muted,
+    // Fixed white, not colors.muted — a QR code needs light-on-dark contrast to scan
+    // reliably regardless of app theme, so the box behind it must stay white too.
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  qrPattern: { fontSize: 24, lineHeight: 28, color: colors.text, textAlign: 'center' },
   qrCode: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: 1, maxWidth: 260 },
   qrHint: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
   cancelledBanner: {

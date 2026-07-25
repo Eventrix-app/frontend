@@ -16,6 +16,8 @@ const categoryAssets: Record<string, any> = {
   tech: require('../../../assets/home-screen-categories/tech category.svg'),
   sports: require('../../../assets/home-screen-categories/sport category.svg'),
   health: require('../../../assets/home-screen-categories/health category.svg'),
+  business: require('../../../assets/home-screen-categories/business category.svg'),
+  education: require('../../../assets/home-screen-categories/education category.svg'),
 };
 
 export const CategoryScroller: React.FC<CategoryScrollerProps> = ({
