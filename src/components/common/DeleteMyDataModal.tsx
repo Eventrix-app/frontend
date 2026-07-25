@@ -57,7 +57,7 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
     webClientId: GOOGLE_WEB_CLIENT_ID,
   });
   const [, facebookResponse, promptFacebookAsync] = AuthSession.useAuthRequest(
-    { clientId: FACEBOOK_APP_ID, scopes: ['public_profile', 'email'], redirectUri: AuthSession.makeRedirectUri(), responseType: AuthSession.ResponseType.Token },
+    { clientId: FACEBOOK_APP_ID, scopes: ['public_profile', 'email'], redirectUri: 'https://auth.expo.io/@aarish34/frontend', responseType: AuthSession.ResponseType.Token },
     FACEBOOK_DISCOVERY,
   );
   const [, appleResponse, promptAppleAsync] = AuthSession.useAuthRequest(

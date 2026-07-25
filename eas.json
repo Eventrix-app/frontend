@@ -10,7 +10,11 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "990228259919-22kmeslsea1qvkdklhie30po86f68fj6.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "990228259919-ifq4na1hke80aarq6l6b4iv38bp768dl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "990228259919-lv011cu7qp0i44i59gf05otbctqb8ul8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
       },
       "android": {
         "buildType": "apk"
@@ -22,7 +26,11 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "990228259919-22kmeslsea1qvkdklhie30po86f68fj6.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "990228259919-ifq4na1hke80aarq6l6b4iv38bp768dl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "990228259919-lv011cu7qp0i44i59gf05otbctqb8ul8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
       },
       "android": {
         "buildType": "apk"
@@ -33,7 +41,11 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok"
+        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "990228259919-22kmeslsea1qvkdklhie30po86f68fj6.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "990228259919-ifq4na1hke80aarq6l6b4iv38bp768dl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "990228259919-lv011cu7qp0i44i59gf05otbctqb8ul8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
       },
       "android": {
         "buildType": "app-bundle"

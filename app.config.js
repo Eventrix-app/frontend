@@ -49,6 +49,22 @@ module.exports = {
         'android.permission.READ_CALENDAR',
         'android.permission.WRITE_CALENDAR',
       ],
+      // Register the Google reverse-client-ID URL scheme so Android knows to redirect
+      // back into this app after the Google OAuth browser flow completes.
+      // The scheme is the dot-reversed form of the Android OAuth client ID — without this,
+      // the OS cannot intercept the redirect and the auth flow silently fails.
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: false,
+          data: [
+            {
+              scheme: 'com.googleusercontent.apps.990228259919-ifq4na1hke80aarq6l6b4iv38bp768dl',
+            },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
       // Native Maps SDK key for tile rendering (LocationPickerModal) — restrict this key
       // in Google Cloud Console to the app's package name + release/debug SHA-1
       // fingerprints, and to the Maps SDK for Android only. Distinct from the server-side

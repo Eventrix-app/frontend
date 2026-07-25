@@ -53,10 +53,11 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
   const appleIconXml = wantsDarkVariant ? APPLE_DARK_SVG : APPLE_LIGHT_SVG;
   const iconSize = compact ? 72 : 104;
 
-  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
   });
 
   // Facebook — email is required: the backend rejects a Facebook login that doesn't
@@ -68,7 +69,7 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
     {
       clientId: FACEBOOK_APP_ID,
       scopes: ['public_profile', 'email'],
-      redirectUri: AuthSession.makeRedirectUri(),
+      redirectUri: 'https://auth.expo.io/@aarish34/frontend',
       responseType: AuthSession.ResponseType.Token,
     },
     FACEBOOK_DISCOVERY,
