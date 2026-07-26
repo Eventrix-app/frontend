@@ -69,14 +69,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         dateOfBirth,
         deviceLabel: getDeviceLabel(),
       }).unwrap();
-      // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
+      // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
-      registerForPushNotifications(dispatch);
       if (!result.hasCompletedOnboarding) {
-        // A brand-new account always needs the onboarding chain now, since it runs after
-        // registration instead of before it.
+        // Push notification permission is requested at the end of onboarding
+        // (NotificationPreferencesScreen), not here.
         navigation.navigate('Onboarding');
       } else {
+        registerForPushNotifications(dispatch);
         navigation.getParent()?.navigate('Main' as never);
       }
     } catch (err: any) {

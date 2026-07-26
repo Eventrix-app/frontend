@@ -90,6 +90,10 @@ const RootNavigator = () => {
   const isAdmin = isAuthenticated && (user?.roles ?? []).includes('admin');
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const wasAuthenticated = useRef(isAuthenticated);
+  // Always-current mirror of isAuthenticated used inside async callbacks and
+  // event listeners (which close over the mount-time value and would otherwise
+  // see a stale false even after the user has logged in).
+  const isAuthenticatedRef = useRef(isAuthenticated);
 
   // Without this, NavigationContainer defaults to react-navigation's own DefaultTheme
   // (background #fff) regardless of our app's dark/light mode — its native-stack and
@@ -116,6 +120,11 @@ const RootNavigator = () => {
     };
   }, [appTheme, appColors]);
 
+  // Keep the ref in sync so async callbacks always see the current auth state.
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
   // initialRouteName below only applies on the Navigator's first mount — it does not
   // re-route on its own if isAuthenticated flips to false later (e.g. the 2-day inactivity
   // logout, or a live ban). Without this, a user logged out mid-session (anywhere other
@@ -128,30 +137,35 @@ const RootNavigator = () => {
     wasAuthenticated.current = isAuthenticated;
   }, [isAuthenticated]);
 
-  // Cold start: the app was launched by tapping a notification (not already running) —
-  // checked once, here, at the true app root. Warm: the app was already running
-  // (foreground or backgrounded) when the notification was tapped. Either way, deep-link
-  // using the push's own data payload rather than round-tripping through GET /notifications.
+  // Cold start: the app was launched by tapping a notification (not already running).
+  // Warm: the app was already running when the notification was tapped.
+  // In both cases, only navigate when the user is authenticated — a stale cold-start
+  // notification must not route into authenticated screens after a fresh login.
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (!response) return;
-      if (navigationRef.current) {
-        navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
-      }
-      // Without this, Expo keeps returning the same "last tapped" response on every
-      // subsequent cold start (not just the one that followed the actual tap), which
-      // would otherwise re-trigger this navigation on every future app launch.
+      // Clear immediately so the same notification doesn't re-trigger on the next
+      // cold start.
       Notifications.clearLastNotificationResponseAsync().catch(() => {});
-    });
-
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      if (navigationRef.current) {
+      // Only navigate if already authenticated at the time this resolves.
+      // If the user is mid-login (not yet authenticated), discard — we must not
+      // push Notifications on top of Onboarding/Main after the login navigation
+      // has already completed.
+      if (isAuthenticatedRef.current && navigationRef.current) {
         navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
       }
     });
 
-    // A push arrived while the app is in the foreground — refresh the in-app notifications
-    // list so it shows up without the user needing to reopen the screen.
+    // Warm: only navigate when authenticated so a tapped notification can't
+    // deep-link into authenticated screens while the user is on the Auth stack.
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (navigationRef.current && isAuthenticatedRef.current) {
+        navigateForPushData(navigationRef.current, response.notification.request.content.data as Record<string, unknown>);
+      }
+    });
+
+    // A push arrived while the app is in the foreground — refresh the in-app
+    // notifications list so it shows up without the user needing to reopen the screen.
     const receivedSub = Notifications.addNotificationReceivedListener(() => {
       dispatch(notificationsApi.util.invalidateTags(['Notifications']));
     });

@@ -54,16 +54,17 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       // but then failed an exact-match backend lookup with a confusing "invalid email or
       // password" error.
       const result = await login({ email: email.trim(), password, deviceLabel: getDeviceLabel() }).unwrap();
-      // Fire-and-forget: sync onboarding draft + register for push in background, navigate immediately
+      // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
-      registerForPushNotifications(dispatch);
       if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
       } else if (!result.hasCompletedOnboarding) {
-        // First time this account has ever logged in (or an admin-created account that
-        // skipped it) — walk the onboarding chain now, before landing on Main.
+        // Push notification permission is requested at the end of onboarding
+        // (NotificationPreferencesScreen), not here, so the OS dialog doesn't
+        // interrupt the user before the first onboarding slide.
         navigation.navigate('Onboarding');
       } else {
+        registerForPushNotifications(dispatch);
         navigation.getParent()?.navigate('Main' as never);
       }
     } catch (err: any) {

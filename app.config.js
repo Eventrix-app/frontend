@@ -49,17 +49,17 @@ module.exports = {
         'android.permission.READ_CALENDAR',
         'android.permission.WRITE_CALENDAR',
       ],
-      // Register the Google reverse-client-ID URL scheme so Android knows to redirect
-      // back into this app after the Google OAuth browser flow completes.
-      // The scheme is the dot-reversed form of the Android OAuth client ID — without this,
-      // the OS cannot intercept the redirect and the auth flow silently fails.
+      // Register the app's package-name URI scheme so Android redirects back here after
+      // Google OAuth completes. expo-auth-session/providers/google generates the redirect
+      // URI as `${Application.applicationId}:/oauthredirect` (= com.eventrix.app:/oauthredirect)
+      // rather than the Google reverse-client-ID scheme, so this is what needs intercepting.
       intentFilters: [
         {
           action: 'VIEW',
           autoVerify: false,
           data: [
             {
-              scheme: 'com.googleusercontent.apps.990228259919-ifq4na1hke80aarq6l6b4iv38bp768dl',
+              scheme: 'com.eventrix.app',
             },
           ],
           category: ['BROWSABLE', 'DEFAULT'],

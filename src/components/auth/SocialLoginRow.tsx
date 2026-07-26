@@ -88,12 +88,17 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
 
   const handlePostLogin = (result: { roles?: string[]; hasCompletedOnboarding: boolean }) => {
     syncOnboardingDraft(dispatch, store.getState);
-    registerForPushNotifications(dispatch);
     if ((result?.roles ?? []).includes('admin')) {
       navigation.getParent()?.navigate('AdminRedirect' as never);
     } else if (!result.hasCompletedOnboarding) {
+      // User hasn't completed onboarding — go to the carousel. Push notification
+      // permission will be requested at the end of the onboarding chain
+      // (NotificationPreferencesScreen.handleContinue), not here, so the OS dialog
+      // doesn't pop up before the user even sees the first onboarding slide.
       navigation.navigate('Onboarding');
     } else {
+      // Already onboarded — register for push now and land on Main.
+      registerForPushNotifications(dispatch);
       navigation.getParent()?.navigate('Main' as never);
     }
   };
@@ -114,6 +119,11 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
       const result = await socialLogin({ provider, token, deviceLabel: getDeviceLabel() }).unwrap();
       handlePostLogin(result);
     } catch (err: any) {
+      // AbortError is thrown when React 18 Strict Mode double-mounts the effect and
+      // RTK Query cancels the first in-flight mutation during the simulated unmount.
+      // The second invocation (the real one) still completes successfully — silently
+      // ignore this so the spurious cancellation doesn't show a false "sign in failed".
+      if (err?.name === 'AbortError') return;
       // Backend rejects Facebook logins that don't return an email (declined permission)
       // instead of fabricating a placeholder address — surface that reason specifically
       // rather than a generic failure message.

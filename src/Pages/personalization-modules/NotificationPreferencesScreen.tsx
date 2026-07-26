@@ -21,6 +21,7 @@ import { setNotificationPrefs } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState, store } from '../../store';
 import { Text } from '../../components/common/Text';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 
 type Pref = 'eventReminders' | 'nearbyEvents' | 'reelsAndCommunity' | 'specialOffers';
 
@@ -229,6 +230,9 @@ export const NotificationPreferencesScreen: React.FC<ScreenProps> = () => {
   const handleContinue = async () => {
     setVisible(false);
     await syncOnboardingDraft(dispatch, store.getState);
+    // Request OS push notification permission at the natural end of onboarding
+    // (after the user has set their in-app preferences) rather than right after login.
+    registerForPushNotifications(dispatch);
     navigation.getParent()?.navigate('Main' as never);
   };
 

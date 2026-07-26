@@ -6,7 +6,7 @@ import type { RootState } from '../../store';
 // Was hardcoded to localhost, so this health check always reported the server as
 // unreachable in any non-local build. Read the same source of truth as baseQuery.ts.
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/';
-const CHECK_INTERVAL = 10000; // re-check every 10s while down
+const CHECK_INTERVAL = 15000; // re-check every 15s while down
 
 // A single failed/slow check is common right at cold start (device network stack still
 // warming up, or a serverless backend's first request taking a moment) and used to be
@@ -15,8 +15,8 @@ const CHECK_INTERVAL = 10000; // re-check every 10s while down
 // there by default for unrecognized push-deep-link data) with the full-screen error,
 // right after that screen had just rendered correctly. Require confirmation before
 // declaring the server down; recovery still only needs a single success.
-const FAILURE_THRESHOLD = 2;
-const RETRY_DELAY = 2000;
+const FAILURE_THRESHOLD = 3; // require 3 consecutive failures before showing error (tolerates Vercel cold starts)
+const RETRY_DELAY = 4000;  // wait 4s between retries — Vercel cold starts can take 8-12s
 
 // Same rationale as NetworkGate's exemption set: CheckIn must stay usable even when the
 // backend is briefly unreachable, since it caches attendees locally and queues scans.
@@ -33,7 +33,7 @@ const ServerGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const checkServer = useCallback(async () => {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 12000); // 12s — enough for a Vercel cold start
       const res = await fetch(API_BASE_URL, { signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok || res.status < 500) {
