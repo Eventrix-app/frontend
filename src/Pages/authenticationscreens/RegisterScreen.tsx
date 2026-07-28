@@ -140,6 +140,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onChange={setDateOfBirth}
         placeholder="Date of Birth"
         maximumDate={latestDateOfBirthForMinAge(MIN_AGE)}
+        variant="auth"
       />
       {dateOfBirth && !isOldEnough ? (
         <Text style={styles.ageHint}>You must be at least {MIN_AGE} to create an account.</Text>
