@@ -17,7 +17,10 @@ type MainEventCardProps = {
   onMenuPress?: () => void;
 };
 
-export const MainEventCard: React.FC<MainEventCardProps> = ({
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const MainEventCard: React.FC<MainEventCardProps> = React.memo(({
   event,
   onPress,
   width,
@@ -87,7 +90,8 @@ export const MainEventCard: React.FC<MainEventCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
+MainEventCard.displayName = 'MainEventCard';
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {

@@ -18,7 +18,10 @@ interface Props {
   onPress: () => void;
 }
 
-export const EventHighlightCard: React.FC<Props> = ({ item, onPress }) => {
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const EventHighlightCard: React.FC<Props> = React.memo(({ item, onPress }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -42,7 +45,8 @@ export const EventHighlightCard: React.FC<Props> = ({ item, onPress }) => {
       </Text>
     </TouchableOpacity>
   );
-};
+});
+EventHighlightCard.displayName = 'EventHighlightCard';
 
 const CARD_WIDTH = 110;
 

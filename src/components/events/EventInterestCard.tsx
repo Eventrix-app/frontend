@@ -61,7 +61,10 @@ const ORGANIZER_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="non
 const BOOKMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#9CA3AF"><path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 const BOOKMARK_CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#F43362"><path d="m438-400 198-198-57-56-141 141-57-57-57 57 114 113ZM200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 
-export const EventInterestCard: React.FC<Props> = ({ event, width, onPress, onRequireAuth }) => {
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, onPress, onRequireAuth }) => {
   const authUser = useSelector((state: RootState) => state.auth.user);
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
   const [addFavorite] = useAddFavoriteMutation();
@@ -169,7 +172,8 @@ export const EventInterestCard: React.FC<Props> = ({ event, width, onPress, onRe
       </View>
     </TouchableOpacity>
   );
-};
+});
+EventInterestCard.displayName = 'EventInterestCard';
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -89,14 +89,23 @@ const HomeScreen: React.FC = () => {
 
   const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents();
   const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
-  const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
+  // toCardEvent runs over every loaded event and does distance maths per item, so it is
+  // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
+  // change, a notifications poll landing, a theme toggle).
+  const cardEvents = useMemo(
+    () => events.map((event) => toCardEvent(event, me?.latitude, me?.longitude)),
+    [events, me?.latitude, me?.longitude],
+  );
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
   // blow out this carousel.
-  const featured = cardEvents.filter((event) => event.featured).slice(0, 5);
+  const featured = useMemo(
+    () => cardEvents.filter((event) => event.featured).slice(0, 5),
+    [cardEvents],
+  );
   // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
   // lives on the Explore screen via "View All Events" below.
-  const recommended = cardEvents.slice(0, 15);
+  const recommended = useMemo(() => cardEvents.slice(0, 15), [cardEvents]);
 
   // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
   // down together (via pullDistance below) and reveals a random health quote behind
@@ -133,14 +142,14 @@ const HomeScreen: React.FC = () => {
 
   // Picks the quote as the drag begins so it's already in place behind the header by the
   // time the pull reveals it.
-  const handlePullStart = () => {
+  const handlePullStart = useCallback(() => {
     setPullQuote(randomHealthQuote());
-  };
+  }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     refetch();
     refetchMe();
-  };
+  }, [refetch, refetchMe]);
 
   const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
   // Shared with ProfileScreen (useDisplayAddress) so both show the exact same resolved
@@ -151,22 +160,40 @@ const HomeScreen: React.FC = () => {
   const { data: notifications = [] } = useGetNotificationsQuery();
   const hasUnread = notifications.some((n) => !n.readAt);
 
-  const openEvent = (eventId: string) => {
+  const openEvent = useCallback((eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
-  };
+  }, [navigation]);
 
-  const openCategory = (categoryKey: string) => {
+  const openCategory = useCallback((categoryKey: string) => {
     navigation.navigate('Search', { category: categoryKey });
-  };
+  }, [navigation]);
 
   // "View All Events" (bottom of the events sections) goes to the full Explore screen.
-  const openExplore = () => {
+  const openExplore = useCallback(() => {
     navigation.navigate('Explore' as never);
-  };
+  }, [navigation]);
 
   // "View All" on categories opens the half-screen interest-selection popup.
-  const openInterestSheet = () => setShowInterestSheet(true);
-  const closeInterestSheet = () => setShowInterestSheet(false);
+  const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
+  const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+
+  // Built once per data change rather than per render. `pullQuote` updates on every
+  // pull-to-refresh drag, which would otherwise rebuild every card element in both lists.
+  const topInterestCards = useMemo(
+    () => recommended.slice(0, 1).map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
+  const allInterestCards = useMemo(
+    () => recommended.map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
 
   return (
     <View style={styles.root}>
@@ -320,9 +347,7 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="Based on Interest" />
         {isLoadingEvents && <InterestCardSkeleton />}
-        {!isLoadingEvents && recommended.slice(0, 1).map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
-        ))}
+        {!isLoadingEvents && topInterestCards}
 
         <SectionHeader title="Event Highlights" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -342,9 +367,7 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="You Might Also Like" />
         {isLoadingEvents && <InterestCardSkeleton count={2} />}
-        {!isLoadingEvents && recommended.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
-        ))}
+        {!isLoadingEvents && allInterestCards}
 
         <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
           <Text style={styles.viewAllText}>View All Events</Text>

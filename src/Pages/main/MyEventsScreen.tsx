@@ -31,7 +31,10 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const filtered = events.filter((e) => {
+  // Re-filtering the whole list on every render meant each keystroke elsewhere on the
+  // screen walked every event again; scoped to the inputs that actually change it.
+  const filtered = useMemo(
+    () => events.filter((e) => {
     if (activeFilter === 'All') return true;
     const map: Record<StatusFilter, string> = {
       All: '',
@@ -41,7 +44,9 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
       Rejected: 'rejected',
     };
     return e.approvalStatus === map[activeFilter];
-  });
+    }),
+    [events, activeFilter],
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

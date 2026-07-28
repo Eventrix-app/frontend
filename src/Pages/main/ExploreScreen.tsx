@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -69,20 +69,25 @@ const ExploreScreen: React.FC = () => {
   // isFetching, not isLoading — isLoading only goes true on the first cache-empty load, so a
   // spinner bound to it would never appear on any pull after the screen's first visit.
   const isRefreshing = followingOnly ? isFetchingFollowed : isRefreshingAll;
-  let cardEvents = (followingOnly ? followedEvents : events).map((event) =>
-    toCardEvent(event, me?.latitude, me?.longitude),
-  );
-  // Distance has no backend param yet (event lat/lng is barely populated until the map
-  // picker from #3 ships) — filtered client-side over whatever's already been fetched, so it
-  // organically starts covering the full catalog as more events get real coordinates.
-  if (filters.radiusKm !== undefined && me?.latitude != null && me?.longitude != null) {
+  // Was rebuilt on every render — including every filter-chip tap and every notifications
+  // poll — running toCardEvent plus a haversine distance over the whole list each time.
+  const cardEvents = useMemo(() => {
+    const source = followingOnly ? followedEvents : events;
+    const mapped = source.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
+    // Distance has no backend param yet (event lat/lng is barely populated until the map
+    // picker ships) — filtered client-side over whatever's already been fetched, so it
+    // organically starts covering the full catalog as more events get real coordinates.
+    if (filters.radiusKm === undefined || me?.latitude == null || me?.longitude == null) {
+      return mapped;
+    }
     const radiusKm = filters.radiusKm;
-    cardEvents = cardEvents.filter((event) => {
-      const backendEvent = (followingOnly ? followedEvents : events).find((e) => e.id === event.id);
+    return mapped.filter((event) => {
+      const backendEvent = source.find((e) => e.id === event.id);
       if (!backendEvent?.latitude || !backendEvent?.longitude) return false;
       return calculateDistanceKm(me.latitude!, me.longitude!, backendEvent.latitude, backendEvent.longitude) <= radiusKm;
     });
-  }
+  }, [followingOnly, followedEvents, events, me?.latitude, me?.longitude, filters.radiusKm]);
+
   const [showInterestSheet, setShowInterestSheet] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const { colors } = useTheme();
@@ -95,16 +100,16 @@ const ExploreScreen: React.FC = () => {
     return false;
   };
 
-  const openEvent = (eventId: string) => {
+  const openEvent = useCallback((eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
-  };
+  }, [navigation]);
 
-  const openCategory = (categoryKey: string) => {
+  const openCategory = useCallback((categoryKey: string) => {
     navigation.navigate('Search', { category: categoryKey });
-  };
+  }, [navigation]);
 
-  const openInterestSheet = () => setShowInterestSheet(true);
-  const closeInterestSheet = () => setShowInterestSheet(false);
+  const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
+  const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

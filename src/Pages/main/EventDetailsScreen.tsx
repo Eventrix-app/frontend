@@ -166,8 +166,8 @@ const GalleryTab: React.FC<{ gallery: GalleryItem[] }> = ({ gallery: realGallery
   const gallery = realGallery;
 
   const heroVideo = gallery.find((g) => g.type === 'video');
-  const images = gallery.filter((g) => g.type === 'image');
-  const visibleImages = images.slice(0, visibleCount);
+  const images = useMemo(() => gallery.filter((g) => g.type === 'image'), [gallery]);
+  const visibleImages = useMemo(() => images.slice(0, visibleCount), [images, visibleCount]);
   const hasMore = visibleCount < images.length;
 
   if (gallery.length === 0) {

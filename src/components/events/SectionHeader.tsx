@@ -10,7 +10,10 @@ type SectionHeaderProps = {
   hideLine?: boolean;
 };
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light, hideLine }) => {
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const SectionHeader: React.FC<SectionHeaderProps> = React.memo(({ title, light, hideLine }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -19,7 +22,8 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light, hide
       {!hideLine && <View style={[styles.line, light && styles.lineLight]} />}
     </View>
   );
-};
+});
+SectionHeader.displayName = 'SectionHeader';
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
