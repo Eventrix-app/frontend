@@ -14,6 +14,7 @@ import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { getDeviceLabel } from '../../utils/getDeviceLabel';
+import { prefetchPostLoginData } from '../../utils/prefetchPostLoginData';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
@@ -71,6 +72,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       }).unwrap();
       // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
+      prefetchPostLoginData(dispatch);
       if (!result.hasCompletedOnboarding) {
         // Push notification permission is requested at the end of onboarding
         // (NotificationPreferencesScreen), not here.

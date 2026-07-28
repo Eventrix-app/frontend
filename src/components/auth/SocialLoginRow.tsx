@@ -16,6 +16,7 @@ import { useSocialLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { prefetchPostLoginData } from '../../utils/prefetchPostLoginData';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { getDeviceLabel } from '../../utils/getDeviceLabel';
 import { showAlert } from '../../utils/crossPlatformAlert';
