@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -41,6 +41,7 @@ const ExploreScreen: React.FC = () => {
     loadMore,
     isLoading: isLoadingAll,
     isFetchingMore,
+    isRefreshing: isRefreshingAll,
     isError: isErrorAll,
     refetch: refetchAll,
   } = usePaginatedEvents({
@@ -54,6 +55,7 @@ const ExploreScreen: React.FC = () => {
     data: followedEvents = [],
     isLoading: isLoadingFollowed,
     isError: isErrorFollowed,
+    isFetching: isFetchingFollowed,
     refetch: refetchFollowed,
   } = useGetFollowedEventsQuery(undefined, { skip: !followingOnly });
   const { data: me } = useGetMeQuery();
@@ -64,6 +66,9 @@ const ExploreScreen: React.FC = () => {
   const isLoading = followingOnly ? isLoadingFollowed : isLoadingAll;
   const isError = followingOnly ? isErrorFollowed : isErrorAll;
   const refetch = followingOnly ? refetchFollowed : refetchAll;
+  // isFetching, not isLoading — isLoading only goes true on the first cache-empty load, so a
+  // spinner bound to it would never appear on any pull after the screen's first visit.
+  const isRefreshing = followingOnly ? isFetchingFollowed : isRefreshingAll;
   let cardEvents = (followingOnly ? followedEvents : events).map((event) =>
     toCardEvent(event, me?.latitude, me?.longitude),
   );
@@ -194,6 +199,9 @@ const ExploreScreen: React.FC = () => {
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={refetch} tintColor={colors.brandPink} />
+          }
           onEndReached={followingOnly ? undefined : loadMore}
           onEndReachedThreshold={0.4}
           ListHeaderComponent={
@@ -239,15 +247,22 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     flex: 1,
     backgroundColor: colors.white,
   },
+  // ScreenHeader centres its title on the *screen*, reserving a fixed 16+40+8 = 64px on
+  // each side (see titleGlass there). This cluster used to measure 36+8+36+8+34 = 122px, far
+  // past that reservation, so the centred title pill ran underneath the search icon on
+  // narrower phones — ~12px of overlap at 360dp, and worse because titleContent carries
+  // elevation 6 while these buttons carry none, so on Android the pill painted on top.
+  // At 32px buttons with a 4px gap the cluster is 32+4+32+4+30 = 102px, which clears the
+  // centred pill while leaving the title exactly where it is: dead centre.
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -271,14 +286,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderColor: colors.white,
   },
   avatarImg: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
   },
   avatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.brandPink,
     alignItems: 'center',
     justifyContent: 'center',

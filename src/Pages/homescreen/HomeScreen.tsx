@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, AppStateStatus, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -55,10 +55,6 @@ function randomHealthQuote(): string {
   return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
 }
 
-// How far (in negative content-offset px) the user needs to pull before releasing
-// triggers a refresh — mirrors a typical native RefreshControl's trigger distance.
-const PULL_REFRESH_TRIGGER_DISTANCE = 90;
-
 // TODO: pull from a real "shorts"/highlights endpoint once available
 const HIGHLIGHTS: HighlightItem[] = [
   { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
@@ -89,7 +85,7 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, refetch } = usePaginatedEvents();
+  const { events, refetch, isRefreshing } = usePaginatedEvents();
   const { data: me, refetch: refetchMe } = useGetMeQuery();
   const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
@@ -107,7 +103,6 @@ const HomeScreen: React.FC = () => {
   // over-scroll physics instead of fighting them.
   const scrollY = useRef(new Animated.Value(0)).current;
   const [pullQuote, setPullQuote] = useState(randomHealthQuote);
-  const hasCrossedPullTriggerRef = useRef(false);
 
   // A fast fling-to-top can make the native scroll view overshoot a few px past 0 on its
   // own (pure momentum/rubber-band settle, finger already lifted) — with no dead zone, that
@@ -126,32 +121,21 @@ const HomeScreen: React.FC = () => {
     extrapolate: 'clamp',
   });
 
-  // Home shows a fixed latest-15 feed (see `recommended` above), so scroll only needs to
-  // watch for the pull-to-refresh threshold — no lazy-loading trigger here anymore.
+  // Home shows a fixed latest-15 feed (see `recommended` above), so this only feeds scrollY
+  // to the quote-reveal interpolations — the refresh itself is triggered by the
+  // RefreshControl on the ScrollView below, not from here.
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    {
-      useNativeDriver: true,
-      listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const { contentOffset } = e.nativeEvent;
-        if (contentOffset.y <= -PULL_REFRESH_TRIGGER_DISTANCE) {
-          hasCrossedPullTriggerRef.current = true;
-        }
-      },
-    },
+    { useNativeDriver: true },
   );
 
+  // Picks the quote as the drag begins so it's already in place behind the header by the
+  // time the pull reveals it.
   const handlePullStart = () => {
     setPullQuote(randomHealthQuote());
-    hasCrossedPullTriggerRef.current = false;
   };
 
-  // Fires on release ("drops the refresh icon") — the ScrollView's own bounce-back
-  // animation already repositions the header/feed and hides the quote (both are driven
-  // off the same scrollY value), this just needs to kick off the actual data refresh.
-  const handlePullEnd = () => {
-    if (!hasCrossedPullTriggerRef.current) return;
-    hasCrossedPullTriggerRef.current = false;
+  const handleRefresh = () => {
     refetch();
     refetchMe();
   };
@@ -270,10 +254,18 @@ const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.scroll}
         onScroll={handleScroll}
         onScrollBeginDrag={handlePullStart}
-        onScrollEndDrag={handlePullEnd}
         scrollEventThrottle={16}
         bounces
         overScrollMode="always"
+        // The actual refresh trigger. The quote-reveal animation above is driven off
+        // contentOffset.y going negative, which only ever happens on iOS — Android's
+        // overscroll is an EdgeEffect (glow/stretch) rendered without the scroll position
+        // ever leaving 0, so the old release handler's threshold check could never pass and
+        // pulling down on Android refreshed nothing at all. RefreshControl is the platform's
+        // own gesture on both, so it fires regardless of whether the bounce exists.
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.brandPink} />
+        }
       >
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}

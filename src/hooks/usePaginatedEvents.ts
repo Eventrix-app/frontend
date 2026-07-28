@@ -72,6 +72,10 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
     loadMore,
     isLoading: isFetching && pagesById.size === 0,
     isFetchingMore: isFetching && page > 1,
+    // Drives a RefreshControl's spinner. Deliberately `isFetching` (not `isLoading`, which
+    // is only ever true on the very first cache-empty load) and scoped to page 1, so it
+    // reflects a pull-to-refresh rather than an infinite-scroll page append.
+    isRefreshing: isFetching && page === 1,
     isError,
     refetch: () => {
       setPage(1);
