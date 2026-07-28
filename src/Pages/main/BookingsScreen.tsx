@@ -483,7 +483,7 @@ notchLeft: {
   },
   infoBox: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
     padding: spacing.sm,
   },
