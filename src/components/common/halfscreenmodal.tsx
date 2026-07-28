@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Keyboard, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -33,6 +34,15 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
   // Keeps the Modal mounted just long enough to play the close animation —
   // Modal's own `visible` prop unmounts instantly otherwise, cutting it off.
   const [mounted, setMounted] = useState(visible);
+  // The sheet is pinned to bottom:0, i.e. the very edge of the window — which on Android is
+  // *behind* the navigation bar. Anything the sheet anchors to its own bottom (a comment
+  // composer, a Done button) ends up underneath it and cannot be tapped.
+  //
+  // Only applied while the keyboard is down. Once it opens the sheet has lifted clear of the
+  // bottom of the screen entirely, so reserving space for a nav bar that is no longer under
+  // the sheet would just leave a gap between the content and the keyboard.
+  const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -55,6 +65,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const onShow = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardVisible(true);
       Animated.timing(keyboardShift, {
         toValue: -e.endCoordinates.height,
         duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 180,
@@ -62,6 +73,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
       }).start();
     });
     const onHide = Keyboard.addListener(hideEvent, (e) => {
+      setKeyboardVisible(false);
       Animated.timing(keyboardShift, {
         toValue: 0,
         duration: Platform.OS === 'ios' ? ((e as any)?.duration ?? 250) : 180,
@@ -98,6 +110,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
             styles.sheet,
             {
               height: sheetHeight,
+              paddingBottom: keyboardVisible ? 0 : insets.bottom,
               // Open/close animation and keyboard shift composed into one transform. Both
               // are native-driven, so Animated.add stays on the UI thread.
               transform: [{ translateY: Animated.add(translateY, keyboardShift) }],

@@ -58,26 +58,6 @@ function randomHealthQuote(): string {
   return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
 }
 
-// Compact counts ("14k views") the way the highlights strip displays them.
-function formatViews(count: number): string {
-  if (count >= 1000) return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k views`;
-  return `${count} view${count === 1 ? '' : 's'}`;
-}
-
-// Coarse relative time — the strip only has room for one short token, and a reel's exact
-// posting minute is not information anyone acts on.
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}
-
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -118,9 +98,8 @@ const HomeScreen: React.FC = () => {
           : short.event?.coverImageUrl
             ? { uri: short.event.coverImageUrl }
             : undefined,
+        // Not rendered on the tile — used only as its accessibility label.
         title: short.caption?.trim() || short.event?.title || 'Event highlight',
-        views: formatViews(short.viewCount),
-        postedAgo: timeAgo(short.createdAt),
       })),
     [shortsFeed],
   );
