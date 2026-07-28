@@ -1,6 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   LayoutChangeEvent,
   StyleSheet,
@@ -9,21 +8,36 @@ import {
   ViewToken,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, {
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { OVERLAY_BASE_TOP_RATIO, OVERLAY_BASE_SIDE_RATIO } from './EditReelScreen';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
 import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon, ShareArrowIcon } from '../../components/common/Icons';
 import { CreateReelSheet } from '../../components/events/CreateReelSheet';
+import ShortsFeedSkeleton from '../../components/common/ShortsFeedSkeleton';
 import {
   FeedShort,
+  ShortOverlay,
   useGetShortsFeedQuery,
   useGetMyLikedShortIdsQuery,
   useLikeShortMutation,
   useUnlikeShortMutation,
+  useRecordShortViewMutation,
 } from '../../store/services/shortsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
@@ -40,10 +54,28 @@ const ReelVideo: React.FC<{ uri: string; active: boolean }> = ({ uri, active }) 
     p.muted = false;
   });
 
+  // `active` already accounts for screen focus (see ShortsScreen's isFocused below), so a
+  // reel keeps playing only while it is both the visible slide *and* the Shorts tab is on
+  // screen. Navigating to Home used to leave the audio running underneath the feed, because
+  // nothing told the player the screen had gone away — a FlatList item is not unmounted by
+  // a tab change.
   React.useEffect(() => {
     if (active) player.play();
     else player.pause();
   }, [active, player]);
+
+  // Belt and braces: releases playback when the slide is genuinely unmounted (scrolled out
+  // of the render window, or the tab torn down), which the effect above cannot catch
+  // because it never runs again after unmount.
+  React.useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+      } catch {
+        // The native player may already be released; nothing to do.
+      }
+    };
+  }, [player]);
 
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 };
@@ -57,6 +89,211 @@ const captionWithoutTags = (caption?: string): string =>
 const formatCount = (n: number): string =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 
+// Draws the creator's text back over the video.
+//
+// Everything stored is a ratio of the video's rendered size, so it is multiplied back out
+// against *this* device's slide dimensions — that is what makes a composition made on one
+// phone land in the same place on every other. The base position and side inset are imported
+// from the edit screen rather than duplicated, since the two must agree exactly or every
+// overlay drifts.
+//
+// pointerEvents none: this is decoration painted over the video, and it must never
+// intercept the swipe that moves to the next reel.
+const ReelOverlayText: React.FC<{ overlay: ShortOverlay; width: number; height: number }> = ({
+  overlay,
+  width,
+  height,
+}) => (
+  <View
+    pointerEvents="none"
+    style={[
+      styles.overlayWrap,
+      {
+        top: height * OVERLAY_BASE_TOP_RATIO,
+        left: width * OVERLAY_BASE_SIDE_RATIO,
+        right: width * OVERLAY_BASE_SIDE_RATIO,
+        transform: [
+          { translateX: overlay.xRatio * width },
+          { translateY: overlay.yRatio * height },
+        ],
+      },
+    ]}
+  >
+    <Text
+      style={[
+        styles.overlayText,
+        {
+          color: overlay.color,
+          fontFamily: overlay.fontFamily,
+          fontSize: overlay.fontSizeRatio * width,
+        },
+      ]}
+    >
+      {overlay.text}
+    </Text>
+  </View>
+);
+
+
+// The burst that appears when a reel is double-tapped.
+//
+// Driven entirely on the UI thread: the gesture that triggers it is already a worklet, so
+// routing the animation through React state would hand a 60fps sequence to the JS thread
+// for no reason. Scale springs out and settles, opacity fades, and the whole thing clears
+// itself — the caller never has to hide it.
+const HEART_VISIBLE_MS = 1000;
+
+const HeartBurst: React.FC<{ trigger: SharedValue<number> }> = ({ trigger }) => {
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useAnimatedReaction(
+    () => trigger.value,
+    (current, previous) => {
+      if (previous === null || current === previous || current === 0) return;
+      // Overshoot then settle, which is what gives it the "pop". Damping is low enough to
+      // read as playful without wobbling.
+      scale.value = withSequence(
+        withSpring(1.15, { damping: 9, stiffness: 180 }),
+        withSpring(1, { damping: 14, stiffness: 160 }),
+      );
+      // Snaps in, holds, then fades — so it is fully opaque for most of its life rather
+      // than spending the whole second dissolving.
+      opacity.value = withSequence(
+        withTiming(1, { duration: 120 }),
+        withTiming(1, { duration: HEART_VISIBLE_MS - 420 }),
+        withTiming(0, { duration: 300 }),
+      );
+    },
+  );
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Reanimated.View pointerEvents="none" style={[styles.heartBurst, style]}>
+      <HeartIcon color="#FF3366" size={110} />
+    </Reanimated.View>
+  );
+};
+
+interface SlideProps {
+  item: FeedShort;
+  active: boolean;
+  width: number;
+  height: number;
+  insetTop: number;
+  liked: boolean;
+  onToggleLike: (id: string, liked: boolean) => void;
+  onLikeByDoubleTap: (id: string, liked: boolean) => void;
+  onOpenEvent: (eventId: string) => void;
+  onCreate: () => void;
+}
+
+// Memoized, and this matters more here than in a typical list: every slide owns a video
+// player, so re-rendering one is expensive. renderItem's identity necessarily changes on
+// each swipe (it closes over the active id), which re-renders every mounted row — without
+// this boundary that meant re-rendering all live players on every swipe, which is what
+// VirtualizedList's "large list that is slow to update" warning was reporting.
+//
+// For it to hold, every callback below must be referentially stable, which is why liked is
+// passed as a plain boolean and the toggle takes (id, liked) rather than closing over the
+// liked-id set.
+const ReelSlide = React.memo<SlideProps>(({
+  item,
+  active,
+  width,
+  height,
+  insetTop,
+  liked,
+  onToggleLike,
+  onLikeByDoubleTap,
+  onOpenEvent,
+  onCreate,
+}) => {
+  const heartTrigger = useSharedValue(0);
+
+  // Double tap to like, the gesture everyone already expects from a reel feed. Always
+  // bursts the heart, even when the reel is already liked — the animation acknowledges the
+  // gesture, and a double tap that appeared to do nothing would read as a dropped input.
+  // Unliking stays deliberate: only the heart button removes a like.
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    // maxDelay a touch above the default so a slightly slow double tap still registers
+    // rather than being read as two separate taps.
+    .maxDelay(300)
+    .onEnd(() => {
+      heartTrigger.value = heartTrigger.value + 1;
+      runOnJS(onLikeByDoubleTap)(item.id, liked);
+    });
+  const tags = extractTags(item.caption);
+  const rawBody = captionWithoutTags(item.caption);
+  // The overlay text seeds the caption on the share screen, so by default the two are
+  // identical — printing both would show the same sentence twice on one slide. The caption
+  // line is dropped only when it adds nothing; if the user edited it, both are shown.
+  const body = item.overlay && item.overlay.text.trim() === rawBody ? '' : rawBody;
+
+  return (
+    <GestureDetector gesture={doubleTap}>
+      <View style={[styles.slide, { height }]}>
+      <ReelVideo uri={item.mediaUrl} active={active} />
+      {item.overlay ? <ReelOverlayText overlay={item.overlay} width={width} height={height} /> : null}
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.bottomFade} />
+
+      <View style={[styles.topBar, { paddingTop: insetTop + spacing.sm }]}>
+        <Text style={styles.topTitle}>Shorts</Text>
+        <View style={styles.topActions}>
+          <TouchableOpacity onPress={onCreate} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create a reel">
+            <Text style={styles.createIcon}>＋</Text>
+          </TouchableOpacity>
+          <SearchIcon color="#FFFFFF" size={22} />
+        </View>
+      </View>
+
+      <View style={styles.bottom}>
+        <View style={styles.creator}>
+          <View style={styles.creatorRow}>
+            <View style={styles.avatar}>
+              <PersonIcon color="#000000" size={16} />
+            </View>
+            <Text style={styles.userName}>{item.uploader?.fullName ?? 'Eventrix user'}</Text>
+          </View>
+          {body ? <Text style={styles.caption}>{body}</Text> : null}
+          {tags.length > 0 ? <Text style={styles.tags}>{tags.join(' ')}</Text> : null}
+          {item.event ? (
+            <TouchableOpacity style={styles.eventChip} onPress={() => onOpenEvent(item.event!.id)}>
+              <MusicNoteIcon color="#FFFFFF" size={12} />
+              <Text style={styles.eventChipText} numberOfLines={1}>{item.event.title}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => onToggleLike(item.id, liked)}>
+            <HeartIcon color={liked ? '#FF3366' : '#FFFFFF'} size={24} />
+            <Text style={styles.actionLabel}>{formatCount(item.likeCount)}</Text>
+          </TouchableOpacity>
+          {/* Comments are not implemented server-side yet (see the shorts entity's own
+              note), so these stay non-interactive affordances rather than buttons that
+              silently do nothing. */}
+          <View style={styles.actionBtn}>
+            <ChatIcon color="rgba(255,255,255,0.5)" size={24} />
+          </View>
+          <View style={styles.actionBtn}>
+            <ShareArrowIcon color="rgba(255,255,255,0.5)" size={24} />
+          </View>
+        </View>
+      </View>
+
+        <HeartBurst trigger={heartTrigger} />
+      </View>
+    </GestureDetector>
+  );
+});
+ReelSlide.displayName = 'ReelSlide';
+
 const ShortsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -64,6 +301,9 @@ const ShortsScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  // Tab navigation keeps this screen mounted, so nothing else would tell a player that the
+  // user has walked away — which is why audio kept running over the Home feed.
+  const isFocused = useIsFocused();
 
   const { data, isLoading, isFetching, isError, refetch } = useGetShortsFeedQuery({ page, limit: PAGE_SIZE });
   // Accumulated across pages: the query itself is keyed per page, so without this the feed
@@ -85,11 +325,29 @@ const ShortsScreen: React.FC = () => {
   const likedSet = useMemo(() => new Set(likedIds), [likedIds]);
   const [likeShort] = useLikeShortMutation();
   const [unlikeShort] = useUnlikeShortMutation();
+  const [recordShortView] = useRecordShortViewMutation();
+
+  // One view per reel per visit to this screen. Held in a ref rather than state because
+  // nothing renders from it and it must not trigger a re-render of the feed.
+  const viewedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeId || !isFocused) return;
+    if (viewedRef.current.has(activeId)) return;
+    viewedRef.current.add(activeId);
+    // Fire and forget — a view is a soft metric and a failed count must never surface to
+    // the viewer or interrupt playback.
+    recordShortView(activeId);
+  }, [activeId, isFocused, recordShortView]);
 
   const [slideHeight, setSlideHeight] = useState<number | null>(null);
+  // Width is measured alongside height because stored overlays are ratios of both — using
+  // Dimensions.get('window') instead would be wrong on any device where the list does not
+  // span the full window.
+  const [slideWidth, setSlideWidth] = useState(0);
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
-    const h = e.nativeEvent.layout.height;
+    const { height: h, width: w } = e.nativeEvent.layout;
     setSlideHeight((prev) => (prev === h ? prev : h));
+    setSlideWidth((prev) => (prev === w ? prev : w));
   }, []);
 
   // 60% visible before a slide counts as current, so the player only switches once a swipe
@@ -110,13 +368,31 @@ const ShortsScreen: React.FC = () => {
     [navigation],
   );
 
+  // Takes the liked flag as an argument rather than reading likedSet, so its identity does
+  // not change every time a like lands — ReelSlide's memoization depends on that.
   const handleToggleLike = useCallback(
-    (short: FeedShort) => {
+    (id: string, liked: boolean) => {
       if (!isAuthenticated) return;
-      if (likedSet.has(short.id)) unlikeShort(short.id);
-      else likeShort(short.id);
+      if (liked) unlikeShort(id);
+      else likeShort(id);
     },
-    [isAuthenticated, likeShort, likedSet, unlikeShort],
+    [isAuthenticated, likeShort, unlikeShort],
+  );
+
+  // Double tap only ever adds a like, never removes one — the heart button is the way to
+  // unlike. Re-liking something already liked is a no-op request the server would reject
+  // on its unique constraint anyway, so it is skipped here.
+  const handleLikeByDoubleTap = useCallback(
+    (id: string, liked: boolean) => {
+      if (!isAuthenticated || liked) return;
+      likeShort(id);
+    },
+    [isAuthenticated, likeShort],
+  );
+
+  const handleOpenEvent = useCallback(
+    (eventId: string) => navigation.navigate('EventDetails', { eventId }),
+    [navigation],
   );
 
   const handleEndReached = useCallback(() => {
@@ -128,66 +404,33 @@ const ShortsScreen: React.FC = () => {
   const renderItem = useCallback(
     ({ item }: { item: FeedShort }) => {
       if (slideHeight === null) return null;
-      const tags = extractTags(item.caption);
-      const body = captionWithoutTags(item.caption);
-      const liked = likedSet.has(item.id);
-
       return (
-        <View style={[styles.slide, { height: slideHeight }]}>
-          <ReelVideo uri={item.mediaUrl} active={item.id === activeId} />
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.bottomFade} />
-
-          <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-            <Text style={styles.topTitle}>Shorts</Text>
-            <View style={styles.topActions}>
-              <TouchableOpacity onPress={openCreate} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create a reel">
-                <Text style={styles.createIcon}>＋</Text>
-              </TouchableOpacity>
-              <SearchIcon color="#FFFFFF" size={22} />
-            </View>
-          </View>
-
-          <View style={styles.bottom}>
-            <View style={styles.creator}>
-              <View style={styles.creatorRow}>
-                <View style={styles.avatar}>
-                  <PersonIcon color="#000000" size={16} />
-                </View>
-                <Text style={styles.userName}>{item.uploader?.fullName ?? 'Eventrix user'}</Text>
-              </View>
-              {body ? <Text style={styles.caption}>{body}</Text> : null}
-              {tags.length > 0 ? <Text style={styles.tags}>{tags.join(' ')}</Text> : null}
-              {item.event ? (
-                <TouchableOpacity
-                  style={styles.eventChip}
-                  onPress={() => navigation.navigate('EventDetails', { eventId: item.event!.id })}
-                >
-                  <MusicNoteIcon color="#FFFFFF" size={12} />
-                  <Text style={styles.eventChipText} numberOfLines={1}>{item.event.title}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => handleToggleLike(item)}>
-                <HeartIcon color={liked ? '#FF3366' : '#FFFFFF'} size={24} />
-                <Text style={styles.actionLabel}>{formatCount(item.likeCount)}</Text>
-              </TouchableOpacity>
-              {/* Comments are not implemented server-side yet (see the shorts entity's own
-                  note), so this stays a non-interactive affordance rather than a button
-                  that silently does nothing. */}
-              <View style={styles.actionBtn}>
-                <ChatIcon color="rgba(255,255,255,0.5)" size={24} />
-              </View>
-              <View style={styles.actionBtn}>
-                <ShareArrowIcon color="rgba(255,255,255,0.5)" size={24} />
-              </View>
-            </View>
-          </View>
-        </View>
+        <ReelSlide
+          item={item}
+          active={item.id === activeId && isFocused}
+          width={slideWidth}
+          height={slideHeight}
+          insetTop={insets.top}
+          liked={likedSet.has(item.id)}
+          onToggleLike={handleToggleLike}
+          onLikeByDoubleTap={handleLikeByDoubleTap}
+          onOpenEvent={handleOpenEvent}
+          onCreate={openCreate}
+        />
       );
     },
-    [activeId, handleToggleLike, insets.top, likedSet, navigation, openCreate, slideHeight],
+    [activeId, isFocused, handleLikeByDoubleTap, handleOpenEvent, handleToggleLike, insets.top, likedSet, openCreate, slideHeight, slideWidth],
+  );
+
+  // Every slide is exactly the viewport height, so measurement can be skipped entirely —
+  // this also lets the pager compute offsets without laying rows out first.
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: slideHeight ?? 0,
+      offset: (slideHeight ?? 0) * index,
+      index,
+    }),
+    [slideHeight],
   );
 
   const showEmpty = !isLoading && !isError && loaded.length === 0;
@@ -195,9 +438,7 @@ const ShortsScreen: React.FC = () => {
   return (
     <View style={styles.root} onLayout={handleLayout}>
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color="#FFFFFF" />
-        </View>
+        <ShortsFeedSkeleton />
       ) : isError ? (
         <View style={styles.centered}>
           <Text style={styles.emptyTitle}>Couldn't load reels</Text>
@@ -224,6 +465,7 @@ const ShortsScreen: React.FC = () => {
           // edge-to-edge, so window height includes the system bars, and pagingEnabled snaps
           // to the FlatList's own height — any disagreement compounds on every swipe.
           renderItem={renderItem}
+          getItemLayout={getItemLayout}
           onViewableItemsChanged={handleViewableChanged}
           viewabilityConfig={viewabilityConfig}
           onEndReached={handleEndReached}
@@ -248,6 +490,25 @@ const styles = StyleSheet.create({
   },
   slide: {
     width: '100%',
+  },
+  heartBurst: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -55,
+    marginLeft: -55,
+    zIndex: 3,
+  },
+  viewCount: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
+  overlayWrap: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  overlayText: {
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   centered: {
     flex: 1,

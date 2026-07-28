@@ -2,12 +2,18 @@ import type { AppDispatch } from '../store';
 import { eventsApi } from '../store/services/eventsApi';
 import { userApi } from '../store/services/userApi';
 import { notificationsApi } from '../store/services/notificationsApi';
+import { shortsApi } from '../store/services/shortsApi';
 
 // Kept in sync with PAGE_SIZE in hooks/usePaginatedEvents. The prefetch has to issue the
 // *identical* query args to the ones that hook will subscribe with, or RTK Query keys it
 // under a different cache entry and the screen refetches anyway — a wasted request rather
 // than a warm cache. Any change to PAGE_SIZE has to be mirrored here.
 const EVENTS_PAGE_SIZE = 20;
+
+// Kept in sync with PAGE_SIZE in Pages/main/ShortsScreen — same cache-key requirement as
+// EVENTS_PAGE_SIZE above. Different args mean a different cache entry, so a mismatch here
+// makes the prefetch a wasted request rather than a warm feed.
+const SHORTS_PAGE_SIZE = 10;
 
 /**
  * Warms the queries the first post-login screens subscribe to, so they render with data
@@ -54,4 +60,10 @@ export function prefetchPostLoginData(dispatch: AppDispatch): void {
   // Bookings tab — cheap, and it is one of the most common first destinations for a
   // returning user.
   dispatch(eventsApi.util.prefetch('getMyEnrollments', undefined, { force: false }));
+
+  // First page of the reel feed, newest first (the server orders by createdAt DESC), so
+  // opening Shorts starts on video rather than a skeleton. Also warms Home's "Event
+  // Highlights" strip, which reads the same endpoint — though at a different limit, so
+  // that one is a separate cache entry and still loads on its own.
+  dispatch(shortsApi.util.prefetch('getShortsFeed', { page: 1, limit: SHORTS_PAGE_SIZE }, { force: false }));
 }

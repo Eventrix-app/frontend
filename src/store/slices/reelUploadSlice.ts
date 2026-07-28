@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { UploadContentType } from '../services/eventsApi';
+import type { ShortOverlay } from '../services/shortsApi';
 
 export type ReelUploadStatus =
   // Bytes are moving to storage — this is the only state with meaningful progress.
@@ -24,6 +25,7 @@ export interface ReelUploadJob {
   mediaUri: string;
   contentType: UploadContentType;
   caption?: string;
+  overlay?: ShortOverlay;
   locationName?: string;
   latitude?: number;
   longitude?: number;

@@ -51,7 +51,7 @@ const CoverPreview: React.FC<{ uri: string }> = ({ uri }) => {
 };
 
 const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, mediaUri, contentType, overlayText } = route.params;
+  const { eventId, mediaUri, contentType, overlayText, overlay } = route.params;
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const dispatch = useDispatch<AppDispatch>();
@@ -186,6 +186,7 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
       mediaUri,
       contentType,
       caption: finalCaption,
+      overlay,
       locationName,
       latitude: coords?.latitude,
       longitude: coords?.longitude,
@@ -195,7 +196,7 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
     // the whole record → edit → share stack is torn down: backing up into a share screen
     // whose upload is already running would let the user submit the same reel twice.
     navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Home' } }] });
-  }, [caption, contentType, coords, dispatch, event?.title, eventId, locationName, mediaUri, navigation, tagDraft]);
+  }, [caption, contentType, coords, dispatch, event?.title, eventId, locationName, mediaUri, navigation, overlay, tagDraft]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.neutralBg, paddingTop: insets.top }]}>

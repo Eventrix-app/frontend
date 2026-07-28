@@ -13,6 +13,7 @@ import { SpringPressable } from '../../components/common/SpringPressable';
 import { CameraIcon, PhotoIcon, CloseIcon } from '../../components/common/Icons';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType } from '../../store/services/eventsApi';
+import { MAX_REEL_BYTES } from '../../utils/reelUploadManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecordReel'>;
 
@@ -88,7 +89,17 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
     }
     setIsRecording(true);
     try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
+      // maxFileSize as well as maxDuration: 60 seconds of 1080p is routinely well past the
+      // storage limit, so a duration cap alone reliably produces a file that cannot be
+      // uploaded. The camera stops on whichever ceiling it reaches first, which means a
+      // recording is always uploadable — a short clip still gets its full 60s.
+      //
+      // Slightly under the limit, because the ceiling is enforced on the finished file and
+      // the recorder writes container metadata after it stops.
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+        maxFileSize: Math.floor(MAX_REEL_BYTES * 0.95),
+      });
       if (!video) throw new Error('Recording returned no file');
       navigation.replace('EditReel', {
         eventId,

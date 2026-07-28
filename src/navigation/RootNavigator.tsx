@@ -70,6 +70,12 @@ function navigateForPushData(
     navRef.navigate('Main', { screen: 'Shorts' });
     return;
   }
+  // Someone liked one of your reels. Opens the Shorts tab — there is no single-reel route
+  // to deep-link to yet, so this is the closest honest destination.
+  if (type === 'short_liked') {
+    navRef.navigate('Main', { screen: 'Shorts' });
+    return;
+  }
   if (
     (type === 'event_changed' || type === 'announcement' || type === 'event_approved' || type === 'event_rejected') &&
     typeof data?.eventId === 'string'

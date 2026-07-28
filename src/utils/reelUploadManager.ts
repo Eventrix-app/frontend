@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import type { AppDispatch } from '../store';
 import { eventsApi, UploadContentType } from '../store/services/eventsApi';
-import { shortsApi } from '../store/services/shortsApi';
+import { shortsApi, ShortOverlay } from '../store/services/shortsApi';
 import {
   reelUploadQueued,
   reelUploadProgress,
@@ -21,6 +21,7 @@ export interface StartReelUploadInput {
   mediaUri: string;
   contentType: UploadContentType;
   caption?: string;
+  overlay?: ShortOverlay;
   locationName?: string;
   latitude?: number;
   longitude?: number;
@@ -36,6 +37,18 @@ export const REEL_UPLOAD_CHANNEL_ID = 'reel-upload-progress-v1';
 // so RootNavigator's tap handler can ignore them (they aren't server notifications and
 // have no Notifications-screen entry to open).
 export const REEL_UPLOAD_NOTIFICATION_TYPE = 'reel-upload';
+
+/**
+ * The largest reel the storage bucket will accept.
+ *
+ * Must match MAX_VIDEO_BYTES in Backend/src/uploads/uploads.service.ts, which is itself
+ * pinned to the Supabase project's global file size limit — a bucket cannot exceed it.
+ * Checked here so an oversized file fails instantly with a clear message instead of after
+ * uploading tens of megabytes on someone's mobile data only to be rejected at the end.
+ */
+export const MAX_REEL_BYTES = 50 * 1024 * 1024;
+
+const formatMb = (bytes: number) => `${Math.round(bytes / (1024 * 1024))}MB`;
 
 // A live XHR per job, keyed by job id. Module scope, not React state — the request has to
 // outlive the screen that started it, which is the entire point of this module.
@@ -112,6 +125,36 @@ async function dismissNotification(jobId: string): Promise<void> {
  * a native file handle rather than a JS-side byte array, so a 60-second video does not get
  * copied into the JS heap.
  */
+/**
+ * Turns a failed storage PUT into something that names the actual cause.
+ *
+ * Supabase Storage answers with JSON like
+ *   {"statusCode":"400","error":"InvalidMimeType","message":"mime type video/mp4 is not supported"}
+ * and that message is the whole diagnosis — bucket MIME allow-list, size limit, an already
+ * consumed one-shot upload token, a duplicate object. Without it every one of those reads
+ * identically as "HTTP 400".
+ */
+function describeStorageFailure(xhr: XMLHttpRequest): string {
+  const status = xhr.status;
+  const raw = typeof xhr.responseText === 'string' ? xhr.responseText.trim() : '';
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const detail = parsed?.message ?? parsed?.error;
+      if (typeof detail === 'string' && detail) return `${detail} (HTTP ${status})`;
+    } catch {
+      // Not JSON — fall through and show the raw body, capped so an HTML error page cannot
+      // become the entire notification.
+    }
+    return `${raw.slice(0, 200)} (HTTP ${status})`;
+  }
+
+  // No body at all. The status alone still separates the two most likely causes.
+  if (status === 413) return `the file is larger than the storage bucket allows (HTTP 413)`;
+  return `HTTP ${status}`;
+}
+
 function putWithProgress(
   jobId: string,
   uploadUrl: string,
@@ -141,9 +184,11 @@ function putWithProgress(
         resolve();
         return;
       }
-      // Surfacing the status makes the two failure modes distinguishable at a glance:
-      // 413 means the file exceeded the bucket's size limit, 400 a MIME mismatch.
-      reject(new Error(`Storage rejected the upload (HTTP ${xhr.status}).`));
+      // Supabase Storage explains every rejection in the response body — which MIME type was
+      // refused, that the object already exists, that the token was consumed. Reporting only
+      // the status code threw that away and left "HTTP 400" meaning any of a dozen things,
+      // so the body is parsed out and shown instead.
+      reject(new Error(`Storage rejected the upload: ${describeStorageFailure(xhr)}`));
     };
     xhr.onerror = () => {
       inFlight.delete(jobId);
@@ -177,6 +222,27 @@ function describeUploadError(err: unknown): string {
   return extractErrorMessage(err, 'Please try again.');
 }
 
+// How long a finished job lingers in the store before clearing itself.
+const TERMINAL_LINGER_MS = 4000;
+
+/**
+ * Clears a finished job from the store.
+ *
+ * This used to be a timer inside ReelUploadProgressBar's row. That component is no longer
+ * mounted anywhere, so nothing was left to run it and every completed or failed upload
+ * stayed in `state.reelUpload.jobs` for the lifetime of the process — an unbounded list
+ * holding a media URI per entry. Clearing belongs to whatever owns the job's lifecycle,
+ * which is this module, not a view that may or may not exist.
+ *
+ * The linger is kept rather than dismissing instantly so that if a progress UI is mounted
+ * again later, a finished row is still visible long enough to read.
+ */
+function scheduleCleanup(dispatch: AppDispatch, jobId: string): void {
+  setTimeout(() => {
+    dispatch(reelUploadDismissed({ id: jobId }));
+  }, TERMINAL_LINGER_MS);
+}
+
 /**
  * Queues a reel upload and returns immediately.
  *
@@ -199,6 +265,7 @@ export function startReelUpload(dispatch: AppDispatch, input: StartReelUploadInp
     mediaUri: input.mediaUri,
     contentType: input.contentType,
     caption: input.caption,
+    overlay: input.overlay,
     locationName: input.locationName,
     latitude: input.latitude,
     longitude: input.longitude,
@@ -240,6 +307,14 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
     if (blob.size === 0) {
       throw new Error('The selected video could not be read from your device.');
     }
+    // Checked before a single byte goes out. Storage would reject this anyway, but only
+    // after the whole file had been transferred — an expensive way to find out on mobile
+    // data, and the rejection gives no hint about how much smaller it needs to be.
+    if (blob.size > MAX_REEL_BYTES) {
+      throw new Error(
+        `This video is ${formatMb(blob.size)}. Reels can be up to ${formatMb(MAX_REEL_BYTES)} — try a shorter clip.`,
+      );
+    }
 
     await putWithProgress(job.id, uploadUrl, blob, job.contentType, (fraction) => {
       const percent = Math.floor(fraction * 100);
@@ -264,6 +339,7 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
       shortsApi.endpoints.createShort.initiate({
         mediaUrl: publicUrl,
         caption: job.caption?.trim() || undefined,
+        overlay: job.overlay,
         eventId: job.eventId,
         locationName: job.locationName,
         latitude: job.latitude,
@@ -286,6 +362,7 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
 
     dispatch(reelUploadSucceeded({ id: job.id }));
     await postNotification(job.id, 'Reel shared', job.eventTitle ? `Your reel from ${job.eventTitle} is live.` : 'Your reel is live.');
+    scheduleCleanup(dispatch, job.id);
   } catch (err) {
     if (isCancellation(err)) {
       dispatch(reelUploadCancelled({ id: job.id }));
@@ -297,6 +374,7 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
     const message = describeUploadError(err);
     dispatch(reelUploadFailed({ id: job.id, error: message }));
     await postNotification(job.id, "Reel didn't upload", message);
+    scheduleCleanup(dispatch, job.id);
   } finally {
     pendingMutations.forEach((request) => request.reset());
     cancelRequested.delete(job.id);
