@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ImageBackground,
   KeyboardAvoidingView,
@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Calendar from 'expo-calendar';
 import { SvgXml } from 'react-native-svg';
 import { RootStackParamList } from '../../navigation/types';
@@ -158,10 +159,23 @@ const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, styl
   );
 };
 
-const GalleryTab: React.FC<{ gallery: GalleryItem[] }> = ({ gallery: realGallery }) => {
+const GalleryTab: React.FC<{ gallery: GalleryItem[]; eventId: string }> = ({ gallery: realGallery, eventId }) => {
   const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // useNavigation rather than a prop: GalleryTab is rendered several levels below the
+  // screen's own props, and threading navigation down would mean touching every tab.
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // Entry point into the reel creation flow (RecordReel -> EditReel -> ShareReel). The
+  // gallery is where an event's media already lives, so it is where a user looks to add
+  // more. eventId is required by the flow — every reel is scoped to an event — which is
+  // why the entry point lives on a screen that has one rather than on the Shorts tab,
+  // where the user would first have to pick an event.
+  const createReel = useCallback(
+    () => navigation.navigate('RecordReel', { eventId }),
+    [navigation, eventId],
+  );
 
   const gallery = realGallery;
 
@@ -173,13 +187,20 @@ const GalleryTab: React.FC<{ gallery: GalleryItem[] }> = ({ gallery: realGallery
   if (gallery.length === 0) {
     return (
       <View style={styles.tabContent}>
-        <Text style={styles.emptyTabText}>Gallery coming soon.</Text>
+        <Text style={styles.emptyTabText}>No photos or videos yet.</Text>
+        <TouchableOpacity style={styles.createReelBtn} onPress={createReel} activeOpacity={0.85}>
+          <Text style={styles.createReelText}>＋  Create a reel</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.tabContent}>
+      <TouchableOpacity style={styles.createReelBtn} onPress={createReel} activeOpacity={0.85}>
+        <Text style={styles.createReelText}>＋  Create a reel</Text>
+      </TouchableOpacity>
+
       {heroVideo && (
         <TouchableOpacity activeOpacity={0.9} style={styles.galleryHero}>
           <GalleryThumb item={heroVideo} style={StyleSheet.absoluteFillObject} />
@@ -1673,7 +1694,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'announcements' && <AnnouncementsTab eventId={event.id} isOwner={isOwner} />}
 
-        {activeTab === 'gallery' && <GalleryTab gallery={mediaItems} />}
+        {activeTab === 'gallery' && <GalleryTab gallery={mediaItems} eventId={route.params.eventId} />}
       </ScrollView>
 
       {!isOwner && (
@@ -2191,6 +2212,20 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: 6,
   },
 
+  createReelBtn: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 46,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.brandPink,
+    marginBottom: spacing.md,
+  },
+  createReelText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   galleryHero: {
     height: 180,
     borderRadius: borderRadius.md,

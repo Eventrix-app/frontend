@@ -32,6 +32,9 @@ import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScre
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
+import RecordReelScreen from '../Pages/main/RecordReelScreen';
+import EditReelScreen from '../Pages/main/EditReelScreen';
+import ShareReelScreen from '../Pages/main/ShareReelScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
@@ -214,6 +217,21 @@ const RootNavigator = () => {
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />
+        {/* Reel creation flow. Record and Edit are full-bleed black camera/preview surfaces,
+            so they slide up as a modal group rather than pushing sideways like the rest of
+            the stack — and Record replaces itself with Edit (navigation.replace) so the back
+            gesture from Edit returns to wherever the flow was entered, not to the camera. */}
+        <Stack.Screen
+          name="RecordReel"
+          component={RecordReelScreen}
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="EditReel"
+          component={EditReelScreen}
+          options={{ presentation: 'fullScreenModal' }}
+        />
+        <Stack.Screen name="ShareReel" component={ShareReelScreen} />
         <Stack.Screen name="OrganizerProfile" component={ProfileScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />

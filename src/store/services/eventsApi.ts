@@ -159,7 +159,12 @@ export type UploadPurpose =
   // not the public ones the other purposes above use. See uploads.service.ts.
   | 'identity-proof'
   | 'address-proof'
-  | 'pan-or-aadhaar';
+  | 'pan-or-aadhaar'
+  // Reel/short media. Unlike every purpose above, any authenticated user may request this
+  // one (UploadsService.PURPOSE_CONFIG gives it allowedRoles: null) rather than just
+  // organizers/admins, because reel uploaders are attendees. Mirrors UploadPurpose.REEL_VIDEO
+  // in Backend/src/uploads/dto/create-signed-url.dto.ts.
+  | 'reel-video';
 export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
 export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
 
