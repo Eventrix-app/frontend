@@ -493,10 +493,7 @@ notchLeft: {
   },
   infoBox: {
     flex: 1,
-    // The panel behind infoLabel/infoValue. Hardcoded #F3F4F6 meant near-white text
-    // (colors.text) on a near-white box in dark mode — the values were invisible, which is
-    // the most visible half of "the font colour doesn't follow the theme".
-    backgroundColor: colors.muted,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.md,
     padding: spacing.sm,
   },
