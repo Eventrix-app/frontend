@@ -23,6 +23,23 @@ export interface ShortOverlay {
   yRatio: number;
 }
 
+
+export interface ShortComment {
+  id: string;
+  shortId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  user?: { id: string; fullName?: string; profilePictureUrl?: string };
+}
+
+export interface ShortCommentsResponse {
+  comments: ShortComment[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export interface ShortRecord {
   id: string;
   uploaderUserId: string;
@@ -39,6 +56,7 @@ export interface ShortRecord {
   flagReason?: string;
   viewCount: number;
   likeCount: number;
+  commentCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,7 +96,7 @@ export interface CreateShortPayload {
 export const shortsApi = createApi({
   reducerPath: 'shortsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['MyShorts', 'MyShortLikes', 'ShortsFeed'],
+  tagTypes: ['MyShorts', 'MyShortLikes', 'ShortsFeed', 'ShortComments'],
   endpoints: (builder) => ({
     // The public reel feed. Invalidated by createShort/deleteMyShort below so a reel you
     // just uploaded appears without a manual refresh.
@@ -139,6 +157,57 @@ export const shortsApi = createApi({
           patchFeedEverywhere(api, id, (short) => {
             short.likeCount = data.likeCount;
           });
+        } catch {
+          patch.forEach((p) => p.undo());
+        }
+      },
+    }),
+    getShortsByUploader: builder.query<ShortsFeedResponse, { userId: string; page?: number }>({
+      query: ({ userId, page }) => ({
+        url: `shorts/user/${userId}`,
+        params: { page: page ?? 1, limit: 18 },
+      }),
+      providesTags: ['ShortsFeed'],
+    }),
+    getShortComments: builder.query<ShortCommentsResponse, { shortId: string; page?: number }>({
+      query: ({ shortId, page }) => ({
+        url: `shorts/${shortId}/comments`,
+        params: { page: page ?? 1, limit: 20 },
+      }),
+      providesTags: (result, error, { shortId }) => [{ type: 'ShortComments', id: shortId }],
+    }),
+    addShortComment: builder.mutation<ShortComment, { shortId: string; body: string }>({
+      query: ({ shortId, body }) => ({
+        url: `shorts/${shortId}/comments`,
+        method: 'POST',
+        body: { body },
+      }),
+      invalidatesTags: (result, error, { shortId }) => [{ type: 'ShortComments', id: shortId }],
+      // The feed row's counter is patched directly rather than by invalidating 'ShortsFeed',
+      // for the same reason as likes: refetching the feed would re-mount the video players
+      // mid-scroll to change one number.
+      async onQueryStarted({ shortId }, api) {
+        const { queryFulfilled } = api;
+        const patch = patchFeedEverywhere(api, shortId, (short) => {
+          short.commentCount += 1;
+        });
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.forEach((p) => p.undo());
+        }
+      },
+    }),
+    deleteShortComment: builder.mutation<void, { commentId: string; shortId: string }>({
+      query: ({ commentId }) => ({ url: `shorts/comments/${commentId}`, method: 'DELETE' }),
+      invalidatesTags: (result, error, { shortId }) => [{ type: 'ShortComments', id: shortId }],
+      async onQueryStarted({ shortId }, api) {
+        const { queryFulfilled } = api;
+        const patch = patchFeedEverywhere(api, shortId, (short) => {
+          short.commentCount = Math.max(0, short.commentCount - 1);
+        });
+        try {
+          await queryFulfilled;
         } catch {
           patch.forEach((p) => p.undo());
         }
@@ -212,6 +281,10 @@ function patchFeedEverywhere(
 
 export const {
   useGetShortsFeedQuery,
+  useGetShortsByUploaderQuery,
+  useGetShortCommentsQuery,
+  useAddShortCommentMutation,
+  useDeleteShortCommentMutation,
   useRecordShortViewMutation,
   useCreateShortMutation,
   useGetMyShortsQuery,

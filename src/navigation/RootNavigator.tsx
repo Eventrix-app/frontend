@@ -35,6 +35,7 @@ import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
 import RecordReelScreen from '../Pages/main/RecordReelScreen';
 import EditReelScreen from '../Pages/main/EditReelScreen';
 import ShareReelScreen from '../Pages/main/ShareReelScreen';
+import UserProfileScreen from '../Pages/main/UserProfileScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
@@ -225,6 +226,7 @@ const RootNavigator = () => {
         <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
         <Stack.Screen name="OrganizerVerification" component={OrganizerVerificationScreen} />

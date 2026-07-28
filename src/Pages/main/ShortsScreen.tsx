@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
   LayoutChangeEvent,
   StyleSheet,
   TouchableOpacity,
@@ -9,16 +10,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  runOnJS,
-  useAnimatedReaction,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import type { SharedValue } from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
+import LottieView from 'lottie-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -27,9 +20,14 @@ import { RootStackParamList } from '../../navigation/types';
 import { OVERLAY_BASE_TOP_RATIO, OVERLAY_BASE_SIDE_RATIO } from './EditReelScreen';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
-import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon, ShareArrowIcon } from '../../components/common/Icons';
+import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon } from '../../components/common/Icons';
+
+// Required at module scope: Metro resolves require() at build time, so it cannot sit
+// inside the component.
+const HEART_ANIMATION = require('../../../assets/animations/heart-like.json');
 import { CreateReelSheet } from '../../components/events/CreateReelSheet';
 import ShortsFeedSkeleton from '../../components/common/ShortsFeedSkeleton';
+import ReelCommentsSheet from '../../components/events/ReelCommentsSheet';
 import {
   FeedShort,
   ShortOverlay,
@@ -137,47 +135,28 @@ const ReelOverlayText: React.FC<{ overlay: ShortOverlay; width: number; height: 
 
 // The burst that appears when a reel is double-tapped.
 //
-// Driven entirely on the UI thread: the gesture that triggers it is already a worklet, so
-// routing the animation through React state would hand a 60fps sequence to the JS thread
-// for no reason. Scale springs out and settles, opacity fades, and the whole thing clears
-// itself — the caller never has to hide it.
-const HEART_VISIBLE_MS = 1000;
+// A Lottie composition rather than a hand-rolled Reanimated sequence: the motion is
+// authored as data (assets/animations/heart-like.json), so its timing can be revised
+// without touching this file, and it plays identically on both platforms rather than
+// depending on each one's spring solver.
+//
+// Kept permanently mounted and simply replayed. The composition begins and ends at scale 0
+// / opacity 0, so an idle instance renders nothing — there is no visibility state to track
+// and no mount/unmount churn on every tap.
+const HEART_SIZE = 220;
 
-const HeartBurst: React.FC<{ trigger: SharedValue<number> }> = ({ trigger }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
-
-  useAnimatedReaction(
-    () => trigger.value,
-    (current, previous) => {
-      if (previous === null || current === previous || current === 0) return;
-      // Overshoot then settle, which is what gives it the "pop". Damping is low enough to
-      // read as playful without wobbling.
-      scale.value = withSequence(
-        withSpring(1.15, { damping: 9, stiffness: 180 }),
-        withSpring(1, { damping: 14, stiffness: 160 }),
-      );
-      // Snaps in, holds, then fades — so it is fully opaque for most of its life rather
-      // than spending the whole second dissolving.
-      opacity.value = withSequence(
-        withTiming(1, { duration: 120 }),
-        withTiming(1, { duration: HEART_VISIBLE_MS - 420 }),
-        withTiming(0, { duration: 300 }),
-      );
-    },
-  );
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Reanimated.View pointerEvents="none" style={[styles.heartBurst, style]}>
-      <HeartIcon color="#FF3366" size={110} />
-    </Reanimated.View>
-  );
-};
+const HeartBurst = React.forwardRef<LottieView>((_props, ref) => (
+  <View pointerEvents="none" style={styles.heartBurst}>
+    <LottieView
+      ref={ref}
+      source={HEART_ANIMATION}
+      autoPlay={false}
+      loop={false}
+      style={styles.heartLottie}
+    />
+  </View>
+));
+HeartBurst.displayName = 'HeartBurst';
 
 interface SlideProps {
   item: FeedShort;
@@ -189,6 +168,8 @@ interface SlideProps {
   onToggleLike: (id: string, liked: boolean) => void;
   onLikeByDoubleTap: (id: string, liked: boolean) => void;
   onOpenEvent: (eventId: string) => void;
+  onOpenComments: (short: FeedShort) => void;
+  onOpenUploader: (uploaderId: string) => void;
   onCreate: () => void;
 }
 
@@ -211,9 +192,18 @@ const ReelSlide = React.memo<SlideProps>(({
   onToggleLike,
   onLikeByDoubleTap,
   onOpenEvent,
+  onOpenComments,
+  onOpenUploader,
   onCreate,
 }) => {
-  const heartTrigger = useSharedValue(0);
+  const heartRef = useRef<LottieView>(null);
+
+  // reset() before play() so a second double tap restarts the burst from frame 0 rather
+  // than being ignored while the first is still running.
+  const playHeart = useCallback(() => {
+    heartRef.current?.reset();
+    heartRef.current?.play();
+  }, []);
 
   // Double tap to like, the gesture everyone already expects from a reel feed. Always
   // bursts the heart, even when the reel is already liked — the animation acknowledges the
@@ -225,7 +215,9 @@ const ReelSlide = React.memo<SlideProps>(({
     // rather than being read as two separate taps.
     .maxDelay(300)
     .onEnd(() => {
-      heartTrigger.value = heartTrigger.value + 1;
+      // Both hop to the JS thread: a gesture callback body is a worklet, and neither the
+      // Lottie ref nor the mutation hook exists on the UI thread.
+      runOnJS(playHeart)();
       runOnJS(onLikeByDoubleTap)(item.id, liked);
     });
   const tags = extractTags(item.caption);
@@ -254,12 +246,24 @@ const ReelSlide = React.memo<SlideProps>(({
 
       <View style={styles.bottom}>
         <View style={styles.creator}>
-          <View style={styles.creatorRow}>
-            <View style={styles.avatar}>
-              <PersonIcon color="#000000" size={16} />
-            </View>
+          {/* The whole author row is the target, not just the 32px avatar — a tap that
+              small over a video is easy to miss and easy to mistake for a double tap. */}
+          <TouchableOpacity
+            style={styles.creatorRow}
+            onPress={() => item.uploader?.id && onOpenUploader(item.uploader.id)}
+            disabled={!item.uploader?.id}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.uploader?.fullName ?? 'uploader'}'s profile`}
+          >
+            {item.uploader?.profilePictureUrl ? (
+              <Image source={{ uri: item.uploader.profilePictureUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <PersonIcon color="#000000" size={16} />
+              </View>
+            )}
             <Text style={styles.userName}>{item.uploader?.fullName ?? 'Eventrix user'}</Text>
-          </View>
+          </TouchableOpacity>
           {body ? <Text style={styles.caption}>{body}</Text> : null}
           {tags.length > 0 ? <Text style={styles.tags}>{tags.join(' ')}</Text> : null}
           {item.event ? (
@@ -275,19 +279,17 @@ const ReelSlide = React.memo<SlideProps>(({
             <HeartIcon color={liked ? '#FF3366' : '#FFFFFF'} size={24} />
             <Text style={styles.actionLabel}>{formatCount(item.likeCount)}</Text>
           </TouchableOpacity>
-          {/* Comments are not implemented server-side yet (see the shorts entity's own
-              note), so these stay non-interactive affordances rather than buttons that
-              silently do nothing. */}
-          <View style={styles.actionBtn}>
-            <ChatIcon color="rgba(255,255,255,0.5)" size={24} />
-          </View>
-          <View style={styles.actionBtn}>
-            <ShareArrowIcon color="rgba(255,255,255,0.5)" size={24} />
-          </View>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => onOpenComments(item)}>
+            <ChatIcon color="#FFFFFF" size={24} />
+            <Text style={styles.actionLabel}>{formatCount(item.commentCount)}</Text>
+          </TouchableOpacity>
+          {/* Share was a placeholder that did nothing — nothing performs or records a share,
+              so it is removed rather than left as a dead control. */}
+          <Text style={styles.viewCount}>{formatCount(item.viewCount)} views</Text>
         </View>
       </View>
 
-        <HeartBurst trigger={heartTrigger} />
+        <HeartBurst ref={heartRef} />
       </View>
     </GestureDetector>
   );
@@ -298,6 +300,9 @@ const ShortsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [createOpen, setCreateOpen] = useState(false);
+  // The reel whose comments are open. Held as the whole record, not just an id, so the sheet
+  // knows the uploader and can offer them deletion of anyone's comment on their own reel.
+  const [commentsFor, setCommentsFor] = useState<FeedShort | null>(null);
   const [page, setPage] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -395,6 +400,14 @@ const ShortsScreen: React.FC = () => {
     [navigation],
   );
 
+  const handleOpenComments = useCallback((short: FeedShort) => setCommentsFor(short), []);
+  const handleCloseComments = useCallback(() => setCommentsFor(null), []);
+
+  const handleOpenUploader = useCallback(
+    (uploaderId: string) => navigation.navigate('UserProfile', { userId: uploaderId }),
+    [navigation],
+  );
+
   const handleEndReached = useCallback(() => {
     if (isFetching || !data) return;
     if (data.page >= data.totalPages) return;
@@ -415,11 +428,13 @@ const ShortsScreen: React.FC = () => {
           onToggleLike={handleToggleLike}
           onLikeByDoubleTap={handleLikeByDoubleTap}
           onOpenEvent={handleOpenEvent}
+          onOpenComments={handleOpenComments}
+          onOpenUploader={handleOpenUploader}
           onCreate={openCreate}
         />
       );
     },
-    [activeId, isFocused, handleLikeByDoubleTap, handleOpenEvent, handleToggleLike, insets.top, likedSet, openCreate, slideHeight, slideWidth],
+    [activeId, isFocused, handleLikeByDoubleTap, handleOpenComments, handleOpenEvent, handleOpenUploader, handleToggleLike, insets.top, likedSet, openCreate, slideHeight, slideWidth],
   );
 
   // Every slide is exactly the viewport height, so measurement can be skipped entirely —
@@ -479,6 +494,13 @@ const ShortsScreen: React.FC = () => {
       )}
 
       <CreateReelSheet visible={createOpen} onClose={closeCreate} onSelectEvent={startReel} />
+
+      <ReelCommentsSheet
+        visible={commentsFor !== null}
+        shortId={commentsFor?.id ?? null}
+        uploaderUserId={commentsFor?.uploaderUserId}
+        onClose={handleCloseComments}
+      />
     </View>
   );
 };
@@ -495,10 +517,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginTop: -55,
-    marginLeft: -55,
+    marginTop: -HEART_SIZE / 2,
+    marginLeft: -HEART_SIZE / 2,
     zIndex: 3,
   },
+  heartLottie: { width: HEART_SIZE, height: HEART_SIZE },
   viewCount: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
   overlayWrap: {
     position: 'absolute',
@@ -580,6 +603,8 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
+  },
+  avatarFallback: {
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',

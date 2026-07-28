@@ -66,6 +66,15 @@ export const userApi = createApi({
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Categories', 'Me'],
   endpoints: (builder) => ({
+    // Public slice of another user's account — backs tapping a reel's author. Distinct from
+    // getMe, which returns PII the server must never expose to a third party.
+    getPublicProfile: builder.query<
+      { id: string; fullName: string | null; profilePictureUrl: string | null; memberSince: string },
+      string
+    >({
+      query: (userId) => `users/${userId}/public`,
+    }),
+
     getCategories: builder.query<Category[], void>({
       query: () => 'categories',
       providesTags: ['Categories'],
@@ -141,6 +150,7 @@ export const userApi = createApi({
 });
 
 export const {
+  useGetPublicProfileQuery,
   useGetCategoriesQuery,
   useGetMeQuery,
   useUpdateInterestsMutation,

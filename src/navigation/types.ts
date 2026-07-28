@@ -38,6 +38,9 @@ export type RootStackParamList = {
   CheckIn: { eventId: string };
   RefundApproval: undefined;
   OrganizerProfile: { organizerId: string };
+  // Another user's public profile — their name, avatar and reels. Distinct from
+  // OrganizerProfile, which needs an organizer record most reel uploaders do not have.
+  UserProfile: { userId: string };
   // Reel creation flow: RecordReel (capture or pick) -> EditReel (text overlay) ->
   // ShareReel (caption + upload). Each step carries the media forward rather than holding it
   // in a store, so backing out of the flow leaves nothing behind to clean up.

@@ -48,7 +48,10 @@ export const EventHighlightCard: React.FC<Props> = React.memo(({ item, onPress }
 });
 EventHighlightCard.displayName = 'EventHighlightCard';
 
-const CARD_WIDTH = 110;
+// Sized to a portrait 9:16 crop, which is the shape reels are actually shot in — the
+// previous 110x150 was landscape-ish and letterboxed every thumbnail it showed.
+const CARD_WIDTH = 150;
+const CARD_HEIGHT = 220;
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
@@ -57,7 +60,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   thumbWrap: {
     width: CARD_WIDTH,
-    height: 150,
+    height: CARD_HEIGHT,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: colors.backgroundSecondary,
