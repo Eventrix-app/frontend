@@ -55,9 +55,9 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
         onBack={() => navigation.goBack()}
         rightAction={
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.refundsBtn} onPress={() => navigation.navigate('RefundApproval')}>
+            {/* <TouchableOpacity style={styles.refundsBtn} onPress={() => navigation.navigate('RefundApproval')}>
               <Text style={styles.refundsBtnText}>Refunds</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
             <TouchableOpacity style={styles.createBtn} onPress={() => navigation.navigate('CreateEvent', {})}>
               <Text style={styles.createBtnText}>+ Create</Text>
             </TouchableOpacity>

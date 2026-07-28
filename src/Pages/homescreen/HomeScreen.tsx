@@ -22,6 +22,7 @@ import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
+import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin } from '../../components/common/Icons';
@@ -58,12 +59,25 @@ function randomHealthQuote(): string {
   return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
 }
 
-// TODO: pull from a real "shorts"/highlights endpoint once available
-const HIGHLIGHTS: HighlightItem[] = [
-  { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
-  { id: 'h2', thumbnail: require('../../../assets/highlights/h2.jpg'), title: 'Event highlight title...', views: '9k views', postedAgo: '2h ago' },
-  { id: 'h3', thumbnail: require('../../../assets/highlights/h3.jpg'), title: 'Event highlight title...', views: '3k views', postedAgo: '1d ago' },
-];
+// Compact counts ("14k views") the way the highlights strip displays them.
+function formatViews(count: number): string {
+  if (count >= 1000) return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k views`;
+  return `${count} view${count === 1 ? '' : 's'}`;
+}
+
+// Coarse relative time — the strip only has room for one short token, and a reel's exact
+// posting minute is not information anyone acts on.
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
 
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -89,6 +103,28 @@ const HomeScreen: React.FC = () => {
   }, [dispatch, isAuthenticated, isSynced]);
 
   const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents();
+  // Real reels for the "Event Highlights" strip, replacing three bundled jpgs with invented
+  // titles and view counts. Only the newest few — this is a teaser row into the Shorts tab,
+  // not a feed.
+  const { data: shortsFeed } = useGetShortsFeedQuery({ page: 1, limit: 6 });
+  const highlights = useMemo<HighlightItem[]>(
+    () =>
+      (shortsFeed?.shorts ?? []).map((short) => ({
+        id: short.id,
+        // A reel has no generated thumbnail (no client-side video thumbnailing in this app),
+        // so it falls back to the event's cover image and then to FallbackImage's own
+        // skeleton if neither exists.
+        thumbnail: short.thumbnailUrl
+          ? { uri: short.thumbnailUrl }
+          : short.event?.coverImageUrl
+            ? { uri: short.event.coverImageUrl }
+            : undefined,
+        title: short.caption?.trim() || short.event?.title || 'Event highlight',
+        views: formatViews(short.viewCount),
+        postedAgo: timeAgo(short.createdAt),
+      })),
+    [shortsFeed],
+  );
   const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
   // toCardEvent runs over every loaded event and does distance maths per item, so it is
   // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
@@ -356,9 +392,11 @@ const HomeScreen: React.FC = () => {
         {isLoadingEvents && <InterestCardSkeleton />}
         {!isLoadingEvents && topInterestCards}
 
-        <SectionHeader title="Event Highlights" />
+        {/* Hidden entirely when nobody has posted a reel yet, rather than showing a header
+            above an empty rail. */}
+        {highlights.length > 0 && <SectionHeader title="Event Highlights" />}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {HIGHLIGHTS.map((item) => (
+          {highlights.map((item) => (
             <EventHighlightCard
               key={item.id}
               item={item}

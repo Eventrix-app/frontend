@@ -20,6 +20,22 @@ export interface ShortRecord {
   updatedAt: string;
 }
 
+// A reel as the public feed returns it: the record plus the two joined relations the feed
+// needs to render an author line and an event chip. The uploader is deliberately narrow —
+// GET /shorts/feed is a public route, so the server projects away email/phone/roles and
+// this type reflects exactly what actually arrives.
+export interface FeedShort extends ShortRecord {
+  uploader?: { id: string; fullName?: string; profilePictureUrl?: string };
+  event?: { id: string; title: string; coverImageUrl?: string };
+}
+
+export interface ShortsFeedResponse {
+  shorts: FeedShort[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export interface CreateShortPayload {
   mediaUrl: string;
   thumbnailUrl?: string;
@@ -38,11 +54,20 @@ export interface CreateShortPayload {
 export const shortsApi = createApi({
   reducerPath: 'shortsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['MyShorts', 'MyShortLikes'],
+  tagTypes: ['MyShorts', 'MyShortLikes', 'ShortsFeed'],
   endpoints: (builder) => ({
+    // The public reel feed. Invalidated by createShort/deleteMyShort below so a reel you
+    // just uploaded appears without a manual refresh.
+    getShortsFeed: builder.query<ShortsFeedResponse, { page?: number; limit?: number } | void>({
+      query: (args) => ({
+        url: 'shorts/feed',
+        params: { page: args?.page ?? 1, limit: args?.limit ?? 10 },
+      }),
+      providesTags: ['ShortsFeed'],
+    }),
     createShort: builder.mutation<ShortRecord, CreateShortPayload>({
       query: (body) => ({ url: 'shorts', method: 'POST', body }),
-      invalidatesTags: ['MyShorts'],
+      invalidatesTags: ['MyShorts', 'ShortsFeed'],
     }),
     getMyShorts: builder.query<ShortRecord[], void>({
       query: () => 'shorts/mine',
@@ -62,12 +87,13 @@ export const shortsApi = createApi({
     }),
     deleteMyShort: builder.mutation<void, string>({
       query: (id) => ({ url: `shorts/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['MyShorts'],
+      invalidatesTags: ['MyShorts', 'ShortsFeed'],
     }),
   }),
 });
 
 export const {
+  useGetShortsFeedQuery,
   useCreateShortMutation,
   useGetMyShortsQuery,
   useGetMyLikedShortIdsQuery,

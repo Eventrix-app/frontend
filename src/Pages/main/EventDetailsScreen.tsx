@@ -114,26 +114,6 @@ interface GalleryItem {
   thumbnailUrl?: string;
 }
 
-// Generic, non-factual filler content — used only when an organizer hasn't filled in the
-// real field yet, so the screen never looks bare. Never used for anything a buyer could
-// treat as a fact affecting their purchase (price, capacity, seats left, dates) — those
-// stay hidden rather than faked when the real value is missing.
-const MOCK_DESCRIPTION =
-  "Join us for an unforgettable experience filled with great energy, good company, and memories to last a lifetime. Whether you're a first-timer or a regular, there's something here for everyone.";
-
-const MOCK_HIGHLIGHTS = [
-  'Live performances and interactive experiences',
-  'Networking opportunities with fellow attendees',
-  'On-site food and beverage stalls',
-  'Professional photography and exclusive event merch',
-];
-
-const MOCK_WHO_SHOULD_ATTEND = [
-  'Anyone who loves a great time out',
-  'Fans of the category who want to connect with like-minded people',
-  'Groups, friends, and first-time explorers alike',
-];
-
 const GalleryThumb: React.FC<{ item: GalleryItem; style?: any }> = ({ item, style }) => {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -1291,12 +1271,16 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (earlyBirdTier) badges.push('Early Bird');
 
   const organizerName = event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer';
-  // Generic filler only when the organizer hasn't filled in the real field yet, so the
-  // About tab never looks bare — see MOCK_DESCRIPTION's own comment for why this is safe
-  // (never used for anything a buyer could treat as a purchase-affecting fact).
-  const aboutDescription = event.description || MOCK_DESCRIPTION;
-  const highlights: string[] = event.highlights?.length ? event.highlights : MOCK_HIGHLIGHTS;
-  const whoShouldAttend: string[] = event.whoShouldAttend?.length ? event.whoShouldAttend : MOCK_WHO_SHOULD_ATTEND;
+  // No invented filler. These previously fell back to generic blurbs when the organizer had
+  // left a field blank, which meant a real event displayed sentences its organizer never
+  // wrote, in their own voice, on their own listing - and a reader has no way to tell that
+  // apart from real copy. An absent section is honest; a fabricated one is not. Each label
+  // below is hidden when its content is empty (the .map() calls already render nothing),
+  // and the tab shows a short note when the organizer filled in none of the three.
+  const aboutDescription = event.description?.trim() ?? '';
+  const highlights: string[] = event.highlights ?? [];
+  const whoShouldAttend: string[] = event.whoShouldAttend ?? [];
+  const hasAboutContent = !!aboutDescription || highlights.length > 0 || whoShouldAttend.length > 0;
 
   return (
     <View style={styles.root}>
@@ -1521,7 +1505,14 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'about' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionLabel}>About This Event</Text>
+            {/* Says plainly that there is nothing here yet, rather than filling the space
+                with copy the organizer never wrote. */}
+            {!hasAboutContent ? (
+              <Text style={styles.bulletText}>
+                The organizer hasn't added a description for this event yet.
+              </Text>
+            ) : null}
+            {aboutDescription ? <Text style={styles.sectionLabel}>About This Event</Text> : null}
             {aboutDescription.split('\n').filter(Boolean).map((line, i) => (
               <View key={i} style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
@@ -1529,7 +1520,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ))}
 
-            <Text style={styles.sectionLabel}>Highlights</Text>
+            {highlights.length > 0 ? <Text style={styles.sectionLabel}>Highlights</Text> : null}
             {highlights.map((h, i) => (
               <View key={i} style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
@@ -1537,7 +1528,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ))}
 
-            <Text style={styles.sectionLabel}>Who Should Attend</Text>
+            {whoShouldAttend.length > 0 ? <Text style={styles.sectionLabel}>Who Should Attend</Text> : null}
             {whoShouldAttend.map((item, i) => (
               <View key={i} style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>

@@ -15,13 +15,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { CATEGORIES as CATEGORY_ICONS } from '../../components/events/CategoryIconCard';
-import { MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRecentSearches } from '../../hooks/useRecentSearches';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
@@ -80,6 +80,15 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
     categoryId: categoryId ?? undefined,
   });
   const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
+
+  // Real, device-local search history replacing the hardcoded sample terms.
+  const { recent, addRecentSearch, clearRecentSearches } = useRecentSearches();
+  // Recorded once the debounced term has actually been searched, not on every keystroke —
+  // otherwise every prefix along the way ("m", "mu", "mus"…) would be stored as its own
+  // entry and the list would fill with fragments of a single search.
+  useEffect(() => {
+    if (debouncedQuery) addRecentSearch(debouncedQuery);
+  }, [debouncedQuery, addRecentSearch]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -173,11 +182,16 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           onEndReachedThreshold={0.4}
           ListHeaderComponent={
             <>
-              {!query && !categoryId ? (
+              {!query && !categoryId && recent.length > 0 ? (
                 <>
-                  <Text style={styles.sectionTitle}>Recent searches</Text>
+                  <View style={styles.recentHeaderRow}>
+                    <Text style={styles.sectionTitle}>Recent searches</Text>
+                    <TouchableOpacity onPress={clearRecentSearches} hitSlop={8}>
+                      <Text style={styles.clearRecentText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.recentRow}>
-                    {MOCK_RECENT_SEARCHES.map((term) => (
+                    {recent.map((term) => (
                       <TouchableOpacity
                         key={term}
                         style={styles.recentChipWrap}
@@ -326,6 +340,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.sm,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },
+  // Puts "Clear" on the same baseline as the section title, so the row keeps the title's
+  // own vertical rhythm instead of adding a second stacked line above the chips.
+  recentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearRecentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.brandPink,
+  },
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
