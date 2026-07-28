@@ -13,6 +13,7 @@ import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import { RootState } from '../../store';
 import { useGetMeQuery, useUpdateParticipantMutation } from '../../store/services/userApi';
+import EditProfileSkeleton from '../../components/common/EditProfileSkeleton';
 import { useGetUploadUrlMutation, ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType } from '../../store/services/eventsApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
@@ -22,7 +23,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const userId = useSelector((state: RootState) => state.auth.user?.id);
-  const { data: me } = useGetMeQuery();
+  const { data: me, isLoading: isLoadingMe } = useGetMeQuery();
   const [updateParticipant, { isLoading: isSaving }] = useUpdateParticipantMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
 
@@ -39,8 +40,16 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   // Prefill once the real profile loads — a plain effect (not defaultValue) since the
   // query resolves after this component has already mounted with empty fields.
+  //
+  // Guarded to run exactly once. The dependency is `me`, and getMe refetches on its own
+  // (focus, reconnect, any invalidation), so without this guard a background refetch while
+  // someone was mid-edit would silently overwrite everything they had typed with the
+  // server's copy. Re-running is never desirable here: after the first prefill the form is
+  // the user's working draft, not a view of the server state.
+  const hasPrefilledRef = useRef(false);
   useEffect(() => {
-    if (!me) return;
+    if (!me || hasPrefilledRef.current) return;
+    hasPrefilledRef.current = true;
     setFirstName(me.firstName ?? '');
     setLastName(me.lastName ?? '');
     setPhone(me.phoneNumber ?? '');
@@ -118,6 +127,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Edit Profile" onBack={() => navigation.goBack()} />
 
+      {/* The form is only rendered once it can be prefilled. Showing it while getMe is in
+          flight would present empty, fully interactive inputs — and anything typed into
+          them would be replaced the moment the profile arrived. */}
+      {isLoadingMe ? (
+        <EditProfileSkeleton />
+      ) : (
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
         <TouchableOpacity style={styles.avatarSection} onPress={handlePickPhoto} disabled={isUploadingPhoto}>
           <View style={styles.avatar}>
@@ -161,6 +176,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.label}>City</Text>
         <AuthInput value={city} onChangeText={setCity} placeholder="City" />
       </ScrollView>
+      )}
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving || !me}>

@@ -10,6 +10,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import Skeleton from '../../components/common/Skeleton';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { LocationPin } from '../../components/common/Icons';
 import { LocationPickerModal } from '../../components/common/LocationPickerModal';
@@ -64,7 +65,7 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
 
-  const { data: event } = useGetEventByIdQuery(eventId);
+  const { data: event, isLoading: isLoadingEvent } = useGetEventByIdQuery(eventId);
   const { data: me } = useGetMeQuery();
 
   // ---- Location -----------------------------------------------------------------
@@ -209,7 +210,13 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
           <CoverPreview uri={mediaUri} />
         </View>
 
-        {event ? (
+        {/* A placeholder of the chip's own size, so the caption field and everything below it
+            do not jump down when the event resolves. */}
+        {isLoadingEvent ? (
+          <View style={styles.eventChipPlaceholder}>
+            <Skeleton width={180} height={36} />
+          </View>
+        ) : event ? (
           <TouchableOpacity
             style={[styles.eventChip, { backgroundColor: colors.white }]}
             onPress={() => navigation.navigate('EventDetails', { eventId })}
@@ -331,6 +338,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
+  eventChipPlaceholder: { alignSelf: 'center', marginBottom: spacing.md },
   eventChipThumb: { width: 24, height: 24, borderRadius: borderRadius.pill },
   eventChipTitle: { fontSize: 13, fontWeight: '600', maxWidth: 220 },
   captionInput: { fontSize: 15, minHeight: 60, marginBottom: spacing.sm },

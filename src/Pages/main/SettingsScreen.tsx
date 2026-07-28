@@ -21,6 +21,10 @@ import {
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
 import { DeleteMyDataModal } from '../../components/common/DeleteMyDataModal';
+import Skeleton from '../../components/common/Skeleton';
+import { authApi } from '../../store/services/authApi';
+import { moderationApi } from '../../store/services/moderationApi';
+import type { AppDispatch } from '../../store';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -52,8 +56,24 @@ const SETTINGS: SettingRow[] = [
 
 const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const dispatch = useDispatch();
-  const { data: me } = useGetMeQuery();
+  const dispatch = useDispatch<AppDispatch>();
+  const { data: me, isLoading: isLoadingMe } = useGetMeQuery();
+
+  // Warms the two screens reachable only from here (Active sessions, Blocked users). They
+  // are the app's only genuinely cold queries — everything else a user can reach is either
+  // already prefetched at login or derived from getMe.
+  //
+  // Prefetched on arriving *here* rather than at login on purpose: firing every screen's
+  // query at login would put ~30 requests in flight at once, competing for bandwidth with
+  // the screens the user is actually looking at and spending mobile data on screens most
+  // people never open. Doing it at the entry point costs two requests, only for someone who
+  // opened Settings, and gives the row they tap a warm cache by the time it mounts.
+  //
+  // force: false leaves an already-fresh entry alone instead of re-requesting it.
+  useEffect(() => {
+    dispatch(authApi.util.prefetch('listSessions', undefined, { force: false }));
+    dispatch(moderationApi.util.prefetch('listBlockedUsers', undefined, { force: false }));
+  }, [dispatch]);
   const [updateNotificationChannels] = useUpdateNotificationChannelsMutation();
   const [clearPushToken] = useClearPushTokenMutation();
   const [deleteAccount, { isLoading: isDeletingAccount }] = useDeleteAccountMutation();
@@ -159,7 +179,20 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.groupTitle}>Account</Text>
         <View style={styles.groupGlass}>
           <View style={styles.group}>
-            {me?.isEmailVerified ? (
+            {/* Only this row waits on getMe — everything else on this screen (theme, legal,
+                help, logout) is independent of it, and hiding all of it behind a skeleton
+                would make the screen slower to be useful for no gain. The row is skeletoned
+                specifically because both of its branches assert something about the user:
+                rendering the unverified branch first tells an already-verified user to go
+                and do something they do not need to do. */}
+            {isLoadingMe ? (
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <Skeleton width={110} height={15} />
+                  <Skeleton width={170} height={12} style={{ marginTop: 6 }} />
+                </View>
+              </View>
+            ) : me?.isEmailVerified ? (
               <View style={styles.row}>
                 <View style={styles.rowText}>
                   <Text style={styles.label}>Email address</Text>
