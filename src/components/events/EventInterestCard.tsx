@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SvgXml } from 'react-native-svg';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -140,8 +141,19 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
         </TouchableOpacity>
       </View>
 
-      <View style={styles.priceRow}>
-        <Text style={styles.priceText}>{event.price}</Text>
+      {/* Straddles the seam between the artwork and the description, half over each, so it
+          reads as a physical tag pinned to the card rather than a label inside either
+          panel. pointerEvents none so it never intercepts a tap meant for the card. */}
+      <View style={styles.priceBadgeWrap} pointerEvents="none">
+        <LinearGradient
+          colors={BADGE_GRADIENT}
+          locations={[0, 0.38, 0.72, 1]}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={styles.priceBadge}
+        >
+          <Text style={styles.priceBadgeText} numberOfLines={1}>{event.price}</Text>
+        </LinearGradient>
       </View>
 
       <View style={styles.info}>
@@ -149,31 +161,55 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
         </Text>
+        {/* Two fixed columns rather than space-between, so date lands under venue and time
+            under the organizer's name regardless of how long either string is. With
+            space-between the second column drifted with the first one's width. */}
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
+          <View style={styles.metaCol}>
             <SvgXml xml={VENUE_SVG} width={14} height={14} />
             <Text style={styles.metaText} numberOfLines={1}>{event.venue}</Text>
           </View>
-          <View style={styles.metaItem}>
+          <View style={styles.metaCol}>
             <SvgXml xml={ORGANIZER_SVG} width={14} height={14} />
             <Text style={styles.metaText} numberOfLines={1}>{event.organizer ?? 'Organizer name'}</Text>
           </View>
         </View>
-        {event.date ? (
-          <View style={styles.metaItem}>
-            <SvgXml xml={EVENT_DATE_SVG} width={14} height={14} />
-            <Text style={styles.timeText}>{event.date}</Text>
+
+        <View style={styles.metaRow}>
+          {/* An empty column when there is no date, so the time stays in the right-hand
+              column under the organizer instead of sliding across to the left. */}
+          {event.date ? (
+            <View style={styles.metaCol}>
+              <SvgXml xml={EVENT_DATE_SVG} width={14} height={14} />
+              <Text style={styles.timeText} numberOfLines={1}>{event.date}</Text>
+            </View>
+          ) : (
+            <View style={styles.metaCol} />
+          )}
+          <View style={styles.metaCol}>
+            <SvgXml xml={EVENT_TIME_SVG} width={14} height={14} />
+            <Text style={styles.timeText} numberOfLines={1}>{event.time ?? '1:30 - 14:30 (IST)'}</Text>
           </View>
-        ) : null}
-        <View style={styles.metaItem}>
-          <SvgXml xml={EVENT_TIME_SVG} width={14} height={14} />
-          <Text style={styles.timeText}>{event.time ?? '1:30 - 14:30 (IST)'}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 });
 EventInterestCard.displayName = 'EventInterestCard';
+
+// The badge is positioned against this, so it has to be a shared constant rather than a
+// literal repeated in two rules that could drift apart.
+const IMAGE_HEIGHT = 160;
+const BADGE_HEIGHT = 44;
+
+// A tint/shade ramp around brandPink (#FF3366), which is the app's locked accent and is
+// byte-identical in both themes — so the badge needs no theme-awareness and can be a module
+// constant rather than being rebuilt per render inside createStyles.
+//
+// The stops are literals because the palette has no tint/shade ramp to derive them from:
+// brandPinkDark is #FF3368, one digit off brandPink, so it cannot serve as a gradient's dark
+// end. The middle stop is brandPink exactly; the others are lightened and darkened from it.
+const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
@@ -190,7 +226,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   imageWrap: {
     width: '100%',
-    height: 160,
+    height: IMAGE_HEIGHT,
     position: 'relative',
   },
   image: {
@@ -232,19 +268,55 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     alignItems: 'center',
     justifyContent: 'center',
   },
-  priceRow: {
-    alignItems: 'flex-end',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+  priceBadgeWrap: {
+    position: 'absolute',
+    right: spacing.md,
+    // Centred on the seam: half the badge sits over the artwork, half over the description.
+    top: IMAGE_HEIGHT - BADGE_HEIGHT / 2,
+    zIndex: 3,
+    // Cast onto both panels it overlaps, which is what sells it as sitting *on* the card
+    // rather than being part of either one.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  priceText: {
-    color: colors.brandPink,
-    fontWeight: '700',
+  priceBadge: {
+    minWidth: 68,
+    height: BADGE_HEIGHT,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // The bevel. Per-side border colours are what make it read as a raised tag: a light
+    // top/left edge catching the light and a dark bottom/right edge in shadow. A single
+    // uniform border would look printed on instead of moulded. The shadow side is a deep
+    // pink rather than a neutral grey, so the darkening stays in the accent's own hue.
+    borderWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.9)',
+    borderLeftColor: 'rgba(255,255,255,0.55)',
+    borderRightColor: 'rgba(120,6,36,0.5)',
+    borderBottomColor: 'rgba(120,6,36,0.75)',
+  },
+  priceBadgeText: {
+    // White, which is how brandPink is paired everywhere else in the app (share, retry and
+    // primary buttons all put white on it). The shadow is not decoration: the gradient's
+    // top-left tint is light enough that plain white would lose contrast against it, and a
+    // soft dark shadow keeps the glyphs readable across the whole ramp.
+    color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(120,6,36,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   info: {
     padding: spacing.md,
-    paddingTop: spacing.xs,
+    // Clears the half of the badge that hangs into this panel.
+    paddingTop: BADGE_HEIGHT / 2 + spacing.xs,
   },
   category: {
     color: colors.brandPink,
@@ -252,6 +324,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     fontWeight: '700',
     textTransform: 'uppercase',
     marginBottom: 4,
+    // Keeps a long category name from running under the badge.
+    paddingRight: 84,
   },
   title: {
     fontSize: 15,
@@ -261,16 +335,16 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
 },
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 6,
     gap: spacing.sm,
   },
-  metaItem: {
+  // Equal halves, so the two rows line up as a grid instead of each row laying itself out
+  // independently.
+  metaCol: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 6,
-    flexShrink: 1,
   },
   metaText: {
     fontSize: 12,
