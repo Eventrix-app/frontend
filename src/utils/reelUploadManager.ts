@@ -157,6 +157,16 @@ class UploadCancelledError extends Error {
 
 const isCancellation = (err: unknown): boolean => err instanceof UploadCancelledError;
 
+// extractErrorMessage only reads an RTK Query error's `data.message`, so the plain Errors
+// thrown by putWithProgress (HTTP status, network failure, unreadable file) would all
+// collapse to the same generic fallback — which is precisely the detail worth showing here,
+// since it distinguishes "too large" from "no signal". Server errors still go through
+// extractErrorMessage so a NestJS validation message reaches the user unchanged.
+function describeUploadError(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  return extractErrorMessage(err, 'Please try again.');
+}
+
 /**
  * Queues a reel upload and returns immediately.
  *
@@ -259,7 +269,7 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
       dispatch(reelUploadDismissed({ id: job.id }));
       return;
     }
-    const message = extractErrorMessage(err, 'Please try again.');
+    const message = describeUploadError(err);
     dispatch(reelUploadFailed({ id: job.id, error: message }));
     await postNotification(job.id, "Reel didn't upload", message);
   } finally {
