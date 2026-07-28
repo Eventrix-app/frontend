@@ -8,6 +8,10 @@ export interface ShortRecord {
   mediaUrl: string;
   thumbnailUrl?: string;
   caption?: string;
+  // Where the *uploader* was, not where the event is — see CreateShortPayload below.
+  locationName?: string;
+  latitude?: number;
+  longitude?: number;
   moderationStatus: 'under_review' | 'published' | 'flagged' | 'removed';
   flagReason?: string;
   viewCount: number;
@@ -21,6 +25,14 @@ export interface CreateShortPayload {
   thumbnailUrl?: string;
   caption?: string;
   eventId: string;
+  // The reel's own location: seeded from the uploader's current position and re-pinnable
+  // on a map before sharing. Deliberately separate from the event's venue coordinates —
+  // a reel can be shot anywhere (outside the gate, at an afterparty, on the way home),
+  // and the event's venue is already reachable through eventId. All three are optional
+  // because a user can decline location permission and still post.
+  locationName?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export const shortsApi = createApi({

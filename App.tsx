@@ -63,13 +63,29 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // RootNavigator's notification listeners, which is where navigation + the notifications
 // cache are both reachable.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    // Reel-upload progress re-posts itself every few percent (see reelUploadManager). On the
+    // default treatment that would mean a sound and a heads-up banner a dozen times over a
+    // single upload, so it is presented silently and only in the tray/list. Everything else
+    // — real server pushes — keeps the alerting treatment below.
+    const isUploadProgress = notification.request.content.data?.type === 'reel-upload';
+    if (isUploadProgress) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: true,
+      };
+    }
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 // Only the logged-out flow (AuthNavigator) mounts the video Splash screen, which hides

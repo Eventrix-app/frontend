@@ -21,11 +21,13 @@ interface Props {
   visible: boolean;
   initialLatitude?: number;
   initialLongitude?: number;
+  /** Kept in sync with the native variant so callers can use either interchangeably. */
+  title?: string;
   onClose: () => void;
   onConfirm: (result: { latitude: number; longitude: number; address?: string }) => void;
 }
 
-export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude, initialLongitude, onClose, onConfirm }) => {
+export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude, initialLongitude, title = 'Pin event location', onClose, onConfirm }) => {
   const [latitude, setLatitude] = useState(initialLatitude ?? DEFAULT_LATITUDE);
   const [longitude, setLongitude] = useState(initialLongitude ?? DEFAULT_LONGITUDE);
   const [latText, setLatText] = useState(String(latitude));
@@ -97,7 +99,7 @@ export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude,
           <TouchableOpacity onPress={onClose} hitSlop={8}>
             <Feather name="x" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text variant="h3">Pin event location</Text>
+          <Text variant="h3">{title}</Text>
           <View style={{ width: 22 }} />
         </View>
 

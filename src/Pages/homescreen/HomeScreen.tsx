@@ -27,6 +27,7 @@ import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin } from '../../components/common/Icons';
 import Skeleton from '../../components/common/Skeleton';
 import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
+import { ReelUploadProgressBar } from '../../components/events/ReelUploadProgressBar';
 
 const bgImage = require('../../../assets/bg.png');
 
@@ -308,6 +309,12 @@ const HomeScreen: React.FC = () => {
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.brandPink} />
         }
       >
+        {/* Reel uploads run in the background and land the user back here, so this is where
+            their progress surfaces. Renders null when nothing is uploading. Placed above the
+            feed rather than pinned over it so it can't cover content or the tab bar — it is
+            status, not a blocking overlay. */}
+        <ReelUploadProgressBar />
+
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
         {isLoadingEvents && <FeaturedCarouselSkeleton />}

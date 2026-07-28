@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as Location from 'expo-location';
+import { useDispatch } from 'react-redux';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -10,10 +12,12 @@ import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { LocationPin } from '../../components/common/Icons';
-import { useGetEventByIdQuery, useGetUploadUrlMutation } from '../../store/services/eventsApi';
-import { useCreateShortMutation } from '../../store/services/shortsApi';
-import { showAlert } from '../../utils/crossPlatformAlert';
-import { extractErrorMessage } from '../../utils/apiError';
+import { LocationPickerModal } from '../../components/common/LocationPickerModal';
+import { useGetEventByIdQuery } from '../../store/services/eventsApi';
+import { useGetMeQuery } from '../../store/services/userApi';
+import { useLazyReverseGeocodeQuery } from '../../store/services/geocodeApi';
+import type { AppDispatch } from '../../store';
+import { startReelUpload } from '../../utils/reelUploadManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShareReel'>;
 
@@ -28,75 +32,180 @@ function suggestHashtags(eventTitle: string, categoryName?: string): string[] {
   return tags.filter((t) => t.length > 1);
 }
 
-const CoverPreview: React.FC<{ uri: string; mediaType: 'photo' | 'video' }> = ({ uri, mediaType }) => {
-  const player = useVideoPlayer(mediaType === 'video' ? uri : null, (p) => {
-    p.loop = true;
-    p.play();
+// Accepts what a user actually types — with or without the leading #, with stray spaces or
+// punctuation — and returns the canonical form, or null if nothing usable is left.
+function normalizeHashtag(raw: string): string | null {
+  const cleaned = raw.trim().replace(/^#+/, '').replace(/[^a-zA-Z0-9_]/g, '');
+  return cleaned.length > 0 ? `#${cleaned.toLowerCase()}` : null;
+}
+
+// A still first frame, not a playing clip: this screen is a review step, and an autoplaying
+// loop pulls attention away from the caption/location fields the user is here to fill in.
+// The player is created paused and never started.
+const CoverPreview: React.FC<{ uri: string }> = ({ uri }) => {
+  const player = useVideoPlayer(uri, (p) => {
+    p.muted = true;
+    p.pause();
   });
-  if (mediaType === 'video') {
-    return <VideoView player={player} style={styles.coverThumb} contentFit="cover" nativeControls={false} />;
-  }
-  return <Image source={{ uri }} style={styles.coverThumb} resizeMode="cover" />;
+  return <VideoView player={player} style={styles.coverThumb} contentFit="cover" nativeControls={false} />;
 };
 
 const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, mediaUri, mediaType, contentType, overlayText } = route.params;
+  const { eventId, mediaUri, contentType, overlayText } = route.params;
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const dispatch = useDispatch<AppDispatch>();
+
   // Seeded from the text added on EditReel. The caption is what actually persists with the
   // reel and what the Shorts feed renders over the video, so the overlay text arriving here
   // is what makes it survive the upload — it is not composited into the video itself.
   const [caption, setCaption] = useState(overlayText ?? '');
   const [aiLabel, setAiLabel] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
 
   const { data: event } = useGetEventByIdQuery(eventId);
-  const [getUploadUrl] = useGetUploadUrlMutation();
-  const [createShort] = useCreateShortMutation();
+  const { data: me } = useGetMeQuery();
 
-  const hashtags = useMemo(
+  // ---- Location -----------------------------------------------------------------
+  // This is where the *uploader* is, not where the event is. A reel gets filmed outside the
+  // gate, at an afterparty, on the way home — attributing it to the venue's pin would be a
+  // claim the user never made. Seeded from their position, and re-pinnable on a map below.
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationName, setLocationName] = useState<string | undefined>();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [triggerReverseGeocode] = useLazyReverseGeocodeQuery();
+
+  const resolveName = useCallback(
+    async (latitude: number, longitude: number) => {
+      try {
+        const result = await triggerReverseGeocode({ lat: latitude, lng: longitude }).unwrap();
+        setLocationName(result.address ?? undefined);
+      } catch {
+        // Coordinates without a name are still a usable location — the row falls back to
+        // showing the raw pair rather than blocking the share.
+        setLocationName(undefined);
+      }
+    },
+    [triggerReverseGeocode],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Only reads a position the user has already agreed to share. getForegroundPermissions
+      // rather than requestForegroundPermissions: opening the share screen is not the moment
+      // to spring a permission dialog, and the account coordinates below usually cover it.
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        try {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (cancelled) return;
+          setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+          void resolveName(pos.coords.latitude, pos.coords.longitude);
+          return;
+        } catch {
+          // Fall through to the account coordinates below.
+        }
+      }
+      // Fallback: the coordinates captured during onboarding's location step. Coarser than a
+      // live fix, but it is the user's own location and needs no prompt. If neither exists,
+      // the row invites them to pin one manually.
+      if (!cancelled && me?.latitude != null && me?.longitude != null) {
+        setCoords({ latitude: Number(me.latitude), longitude: Number(me.longitude) });
+        void resolveName(Number(me.latitude), Number(me.longitude));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [me?.latitude, me?.longitude, resolveName]);
+
+  const handleConfirmLocation = useCallback(
+    (result: { latitude: number; longitude: number; address?: string }) => {
+      setCoords({ latitude: result.latitude, longitude: result.longitude });
+      setLocationName(result.address);
+      setPickerOpen(false);
+      // The picker resolves its own address as you pan; only re-resolve if it came back
+      // without one, so a confirmed pin never briefly shows a stale name.
+      if (!result.address) void resolveName(result.latitude, result.longitude);
+    },
+    [resolveName],
+  );
+
+  const locationLabel = locationName
+    ?? (coords ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : 'Add a location');
+
+  // ---- Hashtags -----------------------------------------------------------------
+  const suggested = useMemo(
     () => (event ? suggestHashtags(event.title, event.category?.name) : []),
     [event],
   );
 
-  const addHashtag = (tag: string) => {
-    if (caption.includes(tag)) return;
-    setCaption((prev) => (prev.trim().length ? `${prev.trim()} ${tag}` : tag));
-  };
+  // Suggestions the user hasn't used yet, plus everything they typed themselves. Tags
+  // already present in the caption drop out of the row, so the chips always represent
+  // "things you could still add" rather than a list that silently does nothing when tapped.
+  const captionTags = useMemo(() => {
+    const matches = caption.toLowerCase().match(/#[a-z0-9_]+/g);
+    return new Set(matches ?? []);
+  }, [caption]);
 
-  const handleShare = async () => {
-    if (isSharing) return;
-    setIsSharing(true);
-    try {
-      const { uploadUrl, publicUrl } = await getUploadUrl({ purpose: 'reel-video', contentType: contentType as any }).unwrap();
-      const fileBlob = await (await fetch(mediaUri)).blob();
-      const putResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: fileBlob,
-        headers: { 'Content-Type': contentType },
-      });
-      if (!putResponse.ok) throw new Error('Upload to storage failed.');
+  const chips = useMemo(() => {
+    const all = [...suggested, ...customTags];
+    return [...new Set(all)].filter((tag) => !captionTags.has(tag));
+  }, [suggested, customTags, captionTags]);
 
-      await createShort({
-        mediaUrl: publicUrl,
-        caption: caption.trim() || undefined,
-        eventId,
-      }).unwrap();
+  const addHashtag = useCallback((tag: string) => {
+    setCaption((prev) => {
+      if (prev.toLowerCase().includes(tag)) return prev;
+      return prev.trim().length ? `${prev.trim()} ${tag}` : tag;
+    });
+  }, []);
 
-      showAlert('Reel shared!', undefined, () => navigation.navigate('Main', { screen: 'Shorts' }));
-    } catch (e) {
-      showAlert("Couldn't share reel", extractErrorMessage(e, 'Please try again.'));
-    } finally {
-      setIsSharing(false);
-    }
-  };
+  // Committing a typed tag both records it and appends it, so a user who types one and taps
+  // Share never loses it to an uncommitted input.
+  const commitTagDraft = useCallback(() => {
+    const normalized = normalizeHashtag(tagDraft);
+    setTagDraft('');
+    if (!normalized) return;
+    setCustomTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+    addHashtag(normalized);
+  }, [addHashtag, tagDraft]);
+
+  // ---- Share --------------------------------------------------------------------
+  const handleShare = useCallback(() => {
+    // Anything still sitting in the tag input counts as intended, not abandoned.
+    const pendingTag = normalizeHashtag(tagDraft);
+    const finalCaption = pendingTag && !caption.toLowerCase().includes(pendingTag)
+      ? `${caption.trim()} ${pendingTag}`.trim()
+      : caption;
+
+    startReelUpload(dispatch, {
+      eventId,
+      eventTitle: event?.title,
+      mediaUri,
+      contentType,
+      caption: finalCaption,
+      locationName,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    });
+
+    // Straight to Home, without waiting for the upload. reset() rather than navigate() so
+    // the whole record → edit → share stack is torn down: backing up into a share screen
+    // whose upload is already running would let the user submit the same reel twice.
+    navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Home' } }] });
+  }, [caption, contentType, coords, dispatch, event?.title, eventId, locationName, mediaUri, navigation, tagDraft]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.neutralBg, paddingTop: insets.top }]}>
       <ScreenHeader title="New Reel" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.coverContainer}>
-          <CoverPreview uri={mediaUri} mediaType={mediaType} />
+          <CoverPreview uri={mediaUri} />
         </View>
 
         {event ? (
@@ -124,9 +233,36 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
           onChangeText={setCaption}
         />
 
-        {hashtags.length > 0 && (
+        <View style={[styles.tagInputRow, { backgroundColor: colors.white, borderColor: colors.borderLight }]}>
+          <Text style={[styles.tagHash, { color: colors.textSecondary }]}>#</Text>
+          <TextInput
+            style={[styles.tagInput, { color: colors.text }]}
+            placeholder="Add a hashtag"
+            placeholderTextColor={colors.placeholder}
+            value={tagDraft}
+            onChangeText={setTagDraft}
+            onSubmitEditing={commitTagDraft}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            // blurOnSubmit={false} keeps the keyboard up so several tags can be added in a
+            // row without re-tapping the field each time.
+            blurOnSubmit={false}
+          />
+          <TouchableOpacity
+            onPress={commitTagDraft}
+            disabled={!normalizeHashtag(tagDraft)}
+            style={[styles.tagAddBtn, !normalizeHashtag(tagDraft) && styles.tagAddBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel="Add hashtag"
+          >
+            <Text style={styles.tagAddLabel}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {chips.length > 0 && (
           <View style={styles.chipsRow}>
-            {hashtags.map((tag) => (
+            {chips.map((tag) => (
               <TouchableOpacity key={tag} style={[styles.chip, { backgroundColor: colors.muted }]} onPress={() => addHashtag(tag)}>
                 <Text style={[styles.chipText, { color: colors.text }]}>{tag}</Text>
               </TouchableOpacity>
@@ -134,14 +270,18 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {event ? (
-          <View style={[styles.row, { borderTopColor: colors.borderLight }]}>
-            <LocationPin color={colors.textSecondary} size={16} />
-            <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={1}>
-              {event.venueName}
-            </Text>
-          </View>
-        ) : null}
+        <TouchableOpacity
+          style={[styles.row, { borderTopColor: colors.borderLight }]}
+          onPress={() => setPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Change reel location"
+        >
+          <LocationPin color={colors.textSecondary} size={16} />
+          <Text style={[styles.rowLabel, { color: coords ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+            {locationLabel}
+          </Text>
+          <Text style={[styles.rowAction, { color: colors.brandPink }]}>{coords ? 'Change' : 'Pin'}</Text>
+        </TouchableOpacity>
 
         <View style={[styles.aiRow, { borderTopColor: colors.borderLight, borderBottomColor: colors.borderLight }]}>
           <View style={{ flex: 1 }}>
@@ -155,14 +295,22 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.white, paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity
-          style={[styles.shareBtn, isSharing && styles.shareBtnDisabled]}
-          onPress={handleShare}
-          disabled={isSharing}
-        >
-          {isSharing ? <ActivityIndicator color={colors.white} /> : <Text style={styles.shareText}>Share</Text>}
+        {/* Never disabled or spinner-bound: the upload runs in the background, so this button
+            only has to queue it and leave. The progress bar on Home is where the transfer is
+            reported from here on. */}
+        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+          <Text style={styles.shareText}>Share</Text>
         </TouchableOpacity>
       </View>
+
+      <LocationPickerModal
+        visible={pickerOpen}
+        title="Pin reel location"
+        initialLatitude={coords?.latitude}
+        initialLongitude={coords?.longitude}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={handleConfirmLocation}
+      />
     </View>
   );
 };
@@ -185,6 +333,27 @@ const styles = StyleSheet.create({
   eventChipThumb: { width: 24, height: 24, borderRadius: borderRadius.pill },
   eventChipTitle: { fontSize: 13, fontWeight: '600', maxWidth: 220 },
   captionInput: { fontSize: 15, minHeight: 60, marginBottom: spacing.sm },
+  tagInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderRadius: borderRadius.pill,
+    paddingLeft: spacing.md,
+    paddingRight: 6,
+    paddingVertical: 4,
+    marginBottom: spacing.sm,
+  },
+  tagHash: { fontSize: 15, fontWeight: '600' },
+  tagInput: { flex: 1, fontSize: 14, paddingVertical: 6 },
+  tagAddBtn: {
+    backgroundColor: '#FF3366',
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  tagAddBtnDisabled: { opacity: 0.4 },
+  tagAddLabel: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: borderRadius.pill },
   chipText: { fontSize: 13, fontWeight: '500' },
@@ -196,6 +365,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
   },
   rowLabel: { fontSize: 15, flex: 1 },
+  rowAction: { fontSize: 13, fontWeight: '600' },
   aiRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -215,7 +385,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
     alignItems: 'center',
   },
-  shareBtnDisabled: { opacity: 0.7 },
   shareText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
 });
 

@@ -38,6 +38,7 @@ import ShareReelScreen from '../Pages/main/ShareReelScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
+import { REEL_UPLOAD_NOTIFICATION_TYPE } from '../utils/reelUploadManager';
 import { useTheme } from '../theme/ThemeContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -62,6 +63,13 @@ function navigateForPushData(
   data: Record<string, unknown> | undefined,
 ): void {
   const type = data?.type;
+  // Locally-posted reel upload progress/result, not a server push — it has no row in the
+  // Notifications list, so the catch-all below would open an empty screen. Tapping it takes
+  // the user to the Shorts feed, where the reel they just uploaded actually lives.
+  if (type === REEL_UPLOAD_NOTIFICATION_TYPE) {
+    navRef.navigate('Main', { screen: 'Shorts' });
+    return;
+  }
   if (
     (type === 'event_changed' || type === 'announcement' || type === 'event_approved' || type === 'event_rejected') &&
     typeof data?.eventId === 'string'
