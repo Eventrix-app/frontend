@@ -40,10 +40,13 @@ const CoverPreview: React.FC<{ uri: string; mediaType: 'photo' | 'video' }> = ({
 };
 
 const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { eventId, mediaUri, mediaType, contentType } = route.params;
+  const { eventId, mediaUri, mediaType, contentType, overlayText } = route.params;
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const [caption, setCaption] = useState('');
+  // Seeded from the text added on EditReel. The caption is what actually persists with the
+  // reel and what the Shorts feed renders over the video, so the overlay text arriving here
+  // is what makes it survive the upload — it is not composited into the video itself.
+  const [caption, setCaption] = useState(overlayText ?? '');
   const [aiLabel, setAiLabel] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 

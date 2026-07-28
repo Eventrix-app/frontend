@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Image, StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -124,7 +124,23 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
         </SpringPressable>
 
         <SpringPressable
-          onPress={() => navigation.navigate('ShareReel', { eventId, mediaUri, mediaType, contentType })}
+          onPress={() =>
+            navigation.navigate('ShareReel', {
+              eventId,
+              mediaUri,
+              mediaType,
+              contentType,
+              // Carried forward so it can seed the caption on the next screen. It was being
+              // dropped here, which is why text added with "Done" showed in the preview and
+              // then vanished from the uploaded reel.
+              //
+              // The text is NOT burned into the video pixels — doing that needs server-side
+              // compositing (FFmpeg), since there is no reliable client-side way to re-encode
+              // a video with an overlay across devices. Becoming the caption means it still
+              // renders over the video in the Shorts feed, which is where captions display.
+              overlayText: overlayText ?? undefined,
+            })
+          }
           style={styles.nextBtn}
         >
           <Text style={styles.nextText}>Next →</Text>
@@ -132,6 +148,15 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <HalfScreenModal visible={editorOpen} onClose={() => setEditorOpen(false)} heightPercent={0.35}>
+        {/* The sheet sits at the bottom of the screen, so an autofocused input inside it is
+            covered by the keyboard the moment it opens — the user was typing blind. Padding
+            on Android and height on iOS is the pairing that behaves for a bottom sheet:
+            'height' on Android fights the manifest's adjustResize (which already shrinks the
+            window) and double-counts the inset. */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'height' : 'padding'}
+          style={styles.editorAvoider}
+        >
         <View style={styles.editorSheet}>
           <Text style={[styles.editorLabel, { color: colors.text }]}>Text overlay</Text>
           <TextInput
@@ -147,6 +172,7 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.editorSaveText}>Done</Text>
           </SpringPressable>
         </View>
+        </KeyboardAvoidingView>
       </HalfScreenModal>
     </View>
   );
@@ -210,6 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   nextText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  editorAvoider: { flex: 1 },
   editorSheet: { padding: spacing.md, gap: spacing.md },
   editorLabel: { fontSize: 13, fontWeight: '600' },
   editorInput: {

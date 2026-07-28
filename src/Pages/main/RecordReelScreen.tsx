@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -36,11 +36,20 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
   const [mode, setMode] = useState<'menu' | 'camera'>('menu');
   const [isRecording, setIsRecording] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  // recordAsync() captures audio as well as video, so Android needs RECORD_AUDIO granted at
+  // *runtime* — declaring it in the manifest is not enough. Without it the promise rejects
+  // almost immediately, which surfaced as "Recording failed" a second after tapping record.
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  // recordAsync() also throws if the native camera session hasn't finished starting. The
+  // record button is only enabled once onCameraReady fires, so a fast tap right after the
+  // camera view mounts can't race it.
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   const handleClose = () => {
     if (mode === 'camera') {
       setMode('menu');
+      setIsCameraReady(false);
       return;
     }
     navigation.goBack();
@@ -54,29 +63,45 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
     }
+    if (!micPermission?.granted) {
+      const result = await requestMicPermission();
+      if (!result.granted) {
+        showAlert(
+          'Microphone access needed',
+          'Reels record sound as well as video. Allow microphone access in your device settings to record one.',
+        );
+        return;
+      }
+    }
+    setIsCameraReady(false);
     setMode('camera');
   };
 
   const handleToggleRecording = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !isCameraReady) return;
     if (isRecording) {
+      // stopRecording() resolves the pending recordAsync() promise below rather than
+      // returning the file itself, so navigation happens there, not here.
       setIsRecording(false);
-      await cameraRef.current.stopRecording();
+      cameraRef.current.stopRecording();
       return;
     }
     setIsRecording(true);
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
-      if (!video) throw new Error('No video returned');
+      if (!video) throw new Error('Recording returned no file');
       navigation.replace('EditReel', {
         eventId,
         mediaUri: video.uri,
         mediaType: 'video',
         contentType: contentTypeForRecordedUri(video.uri),
       });
-    } catch {
+    } catch (err) {
       setIsRecording(false);
-      showAlert('Recording failed', 'Please try again.');
+      // Surfacing the real reason rather than a blanket "try again" — the original blanket
+      // message hid a permission failure behind advice that could never fix it.
+      const detail = err instanceof Error ? err.message : String(err);
+      showAlert('Recording failed', detail || 'Please try again.');
     }
   };
 
@@ -102,7 +127,13 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.root}>
       {mode === 'camera' && permission?.granted && (
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} mode="video" facing="back" />
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          mode="video"
+          facing="back"
+          onCameraReady={() => setIsCameraReady(true)}
+        />
       )}
 
       <BlurView intensity={45} tint="dark" style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
@@ -133,8 +164,14 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       ) : (
         <View style={[styles.recordControls, { paddingBottom: insets.bottom + spacing.xl }]}>
-          <SpringPressable onPress={handleToggleRecording} scaleTo={0.88}>
-            <View style={[styles.recordBtnOuter, isRecording && styles.recordBtnOuterActive]}>
+          <SpringPressable onPress={handleToggleRecording} scaleTo={0.88} disabled={!isCameraReady}>
+            <View
+              style={[
+                styles.recordBtnOuter,
+                isRecording && styles.recordBtnOuterActive,
+                !isCameraReady && styles.recordBtnDisabled,
+              ]}
+            >
               <View style={[styles.recordBtnInner, isRecording && styles.recordBtnInnerActive]} />
             </View>
           </SpringPressable>
@@ -212,6 +249,9 @@ const styles = StyleSheet.create({
   },
   recordBtnOuterActive: {
     borderColor: '#FF3366',
+  },
+  recordBtnDisabled: {
+    opacity: 0.4,
   },
   recordBtnInner: {
     width: 60,

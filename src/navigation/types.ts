@@ -58,6 +58,11 @@ export type RootStackParamList = {
     mediaUri: string;
     mediaType: 'video';
     contentType: UploadContentType;
+    // Text the user added on EditReel. Seeds the caption rather than being burned into the
+    // video — client-side re-encoding with an overlay is not reliable across devices, so
+    // true burn-in would need server-side compositing. The Shorts feed renders the caption
+    // over the video anyway, so the end result reads the same.
+    overlayText?: string;
   };
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
