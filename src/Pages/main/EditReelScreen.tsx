@@ -68,10 +68,14 @@ const DraggableCaption: React.FC<{ text: string; onTap: () => void; reduceMotion
   );
 };
 
+// A still first frame, not a playing loop. Nothing between picking a reel and sharing it
+// plays the video: this screen is where text is positioned over the frame, and a moving
+// background makes placing it a guessing game — you'd be aiming at whatever happens to be
+// on screen that instant. Muted as well as paused so seeking never leaks audio.
 const VideoPreview: React.FC<{ uri: string }> = ({ uri }) => {
   const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
-    p.play();
+    p.muted = true;
+    p.pause();
   });
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 };

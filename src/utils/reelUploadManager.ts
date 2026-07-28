@@ -41,6 +41,12 @@ export const REEL_UPLOAD_NOTIFICATION_TYPE = 'reel-upload';
 // outlive the screen that started it, which is the entire point of this module.
 const inFlight = new Map<string, XMLHttpRequest>();
 
+// Jobs cancelled after the bytes finished transferring but before (or during) the POST that
+// turns them into a reel. There is no XHR left to abort in that window, so cancellation is
+// recorded here and honoured by runUpload instead — otherwise the X would clear the row
+// while the reel quietly got created anyway, which is the opposite of what it promises.
+const cancelRequested = new Set<string>();
+
 // Terminal notifications survive as history; progress ones are replaced in place by
 // reusing the identifier, so the tray never accumulates one row per percent.
 const notificationIdFor = (jobId: string) => `reel-upload-${jobId}`;
@@ -246,6 +252,10 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
     dispatch(reelUploadFinalizing({ id: job.id }));
     await postNotification(job.id, 'Uploading reel', 'Finishing up…');
 
+    // Cancelled while the last chunk was landing — stop before the reel exists at all,
+    // which is cheaper and cleaner than creating one and deleting it below.
+    if (cancelRequested.has(job.id)) throw new UploadCancelledError();
+
     const createRequest = dispatch(
       shortsApi.endpoints.createShort.initiate({
         mediaUrl: publicUrl,
@@ -257,7 +267,18 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
       }),
     );
     pendingMutations.push(createRequest);
-    await createRequest.unwrap();
+    const created = await createRequest.unwrap();
+
+    // Cancelled while POST /shorts was in flight. The request could not be recalled, so the
+    // reel briefly exists — undo it rather than leaving behind something the user explicitly
+    // cancelled. Best-effort: if the delete fails the reel stays, which is recoverable from
+    // My Shorts, whereas throwing here would report a failure that did not happen.
+    if (cancelRequested.has(job.id)) {
+      const deleteRequest = dispatch(shortsApi.endpoints.deleteMyShort.initiate(created.id));
+      pendingMutations.push(deleteRequest);
+      await deleteRequest.unwrap().catch(() => {});
+      throw new UploadCancelledError();
+    }
 
     dispatch(reelUploadSucceeded({ id: job.id }));
     await postNotification(job.id, 'Reel shared', job.eventTitle ? `Your reel from ${job.eventTitle} is live.` : 'Your reel is live.');
@@ -274,15 +295,24 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
     await postNotification(job.id, "Reel didn't upload", message);
   } finally {
     pendingMutations.forEach((request) => request.reset());
+    cancelRequested.delete(job.id);
+    inFlight.delete(job.id);
   }
 }
 
 /**
- * Aborts an in-flight upload. Safe to call for a job that has already finished or was never
- * started — the row is dismissed either way, so the X button behaves the same whichever
- * side of the finish line the upload happens to be on when it is tapped.
+ * Cancels an upload, at whichever stage it has reached.
+ *
+ * While bytes are transferring that means aborting the request. Once they have landed there
+ * is nothing left to abort, so the intent is recorded and runUpload honours it — stopping
+ * before the reel is created, or deleting it if the create had already gone out. Either way
+ * the outcome matches what the button says: no reel.
  */
 export function cancelReelUpload(dispatch: AppDispatch, jobId: string): void {
+  // Recorded first, so a cancel landing in the gap between the transfer completing and the
+  // create being issued is still seen by runUpload's checks.
+  cancelRequested.add(jobId);
+
   const xhr = inFlight.get(jobId);
   if (xhr) {
     // Resolves through xhr.onabort above, which is what dispatches the cancelled/dismissed
