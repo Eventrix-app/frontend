@@ -25,6 +25,8 @@ import { useGetNotificationsQuery } from '../../store/services/notificationsApi'
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin } from '../../components/common/Icons';
+import Skeleton from '../../components/common/Skeleton';
+import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
 const bgImage = require('../../../assets/bg.png');
 
@@ -85,8 +87,8 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, refetch, isRefreshing } = usePaginatedEvents();
-  const { data: me, refetch: refetchMe } = useGetMeQuery();
+  const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents();
+  const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
   const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
@@ -194,13 +196,25 @@ const HomeScreen: React.FC = () => {
         {/* Row 1: greeting + address on the left, avatar on the right */}
         <View style={styles.headerTop}>
           <View style={styles.greetingCol}>
-            <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
-            <View style={styles.locationRow}>
-              <LocationPin size={12} color="rgba(255,255,255,0.88)" />
-              <Text style={styles.location} numberOfLines={1}>
-                {displayAddress}
-              </Text>
-            </View>
+            {isLoadingMe ? (
+              // Placeholder rather than the real Text: displayName falls back to "there" and
+              // displayAddress to a placeholder while /me is in flight, so without this the
+              // header renders plausible-but-wrong copy and then visibly rewrites itself.
+              <View style={styles.greetingSkeleton}>
+                <Skeleton width={170} height={20} />
+                <Skeleton width={120} height={13} />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
+                <View style={styles.locationRow}>
+                  <LocationPin size={12} color="rgba(255,255,255,0.88)" />
+                  <Text style={styles.location} numberOfLines={1}>
+                    {displayAddress}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
             {me?.profilePictureUrl ? (
@@ -269,7 +283,9 @@ const HomeScreen: React.FC = () => {
       >
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
-        {featured.length > 0 && (
+        {isLoadingEvents && <FeaturedCarouselSkeleton />}
+
+        {!isLoadingEvents && featured.length > 0 && (
           <LinearGradient
             colors={[colors.brandPink, '#ff6b8a']}
             style={styles.featuredWrap}
@@ -303,7 +319,8 @@ const HomeScreen: React.FC = () => {
         </ScrollView>
 
         <SectionHeader title="Based on Interest" />
-        {recommended.slice(0, 1).map((event) => (
+        {isLoadingEvents && <InterestCardSkeleton />}
+        {!isLoadingEvents && recommended.slice(0, 1).map((event) => (
           <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
         ))}
 
@@ -324,7 +341,8 @@ const HomeScreen: React.FC = () => {
         </ScrollView>
 
         <SectionHeader title="You Might Also Like" />
-        {recommended.map((event) => (
+        {isLoadingEvents && <InterestCardSkeleton count={2} />}
+        {!isLoadingEvents && recommended.map((event) => (
           <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
         ))}
 
@@ -403,6 +421,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
+  greetingSkeleton: { gap: spacing.sm },
   greetingCol: {
     flex: 1,
     marginRight: spacing.sm,
