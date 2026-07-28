@@ -10,7 +10,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import { SpringPressable } from '../../components/common/SpringPressable';
-import { CameraIcon, PhotoIcon, MenuCloseIcon } from '../../components/common/Icons';
+import { CameraIcon, PhotoIcon, CloseIcon } from '../../components/common/Icons';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType } from '../../store/services/eventsApi';
 
@@ -138,7 +138,7 @@ const RecordReelScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <BlurView intensity={45} tint="dark" style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <SpringPressable onPress={handleClose} style={styles.closeBtn}>
-          <MenuCloseIcon color="#FFFFFF" size={20} />
+          <CloseIcon color="#FFFFFF" size={20} />
         </SpringPressable>
         <Text style={styles.topTitle}>New Reel</Text>
         <View style={styles.closeBtn} />

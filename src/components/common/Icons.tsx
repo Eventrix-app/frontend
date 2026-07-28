@@ -192,6 +192,19 @@ export const CheckCircleIcon: React.FC<IconProps> = ({ color = '#000000', size =
   </Svg>
 );
 
+// A plain X — dismiss/cancel affordances (sheet close buttons, cancelling an in-progress
+// upload). Distinct from MenuCloseIcon above, which despite the name is a *hamburger*: it
+// means "the menu is open, tap to collapse it" and is only correct paired with MenuOpenIcon.
+// Using it as a generic close button renders three bars where an X is intended.
+export const CloseIcon: React.FC<IconProps> = ({ color = '#000000', size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 -960 960 960">
+    <Path
+      d="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+      fill={color}
+    />
+  </Svg>
+);
+
 // Replaces ❌ ("Event Rejected" banner).
 export const CloseCircleIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 -960 960 960">

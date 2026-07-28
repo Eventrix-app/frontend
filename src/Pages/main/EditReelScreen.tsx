@@ -11,7 +11,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import { SpringPressable } from '../../components/common/SpringPressable';
-import { MenuCloseIcon } from '../../components/common/Icons';
+import { CloseIcon } from '../../components/common/Icons';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import { useTheme } from '../../theme/ThemeContext';
 
@@ -114,7 +114,7 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <BlurView intensity={45} tint="dark" style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <SpringPressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <MenuCloseIcon color="#FFFFFF" size={20} />
+          <CloseIcon color="#FFFFFF" size={20} />
         </SpringPressable>
       </BlurView>
 

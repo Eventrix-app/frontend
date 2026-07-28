@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Keyboard, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTheme } from '../../theme/ThemeContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -78,7 +79,16 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
 
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
-      <View style={StyleSheet.absoluteFill}>
+      {/* A second GestureHandlerRootView, even though App.tsx already wraps the whole app in
+          one. React Native's Modal renders into its own native view hierarchy — a sibling of
+          the app root, not a descendant — so gesture handlers mounted inside it are outside
+          the root view's reach and never receive touches at all.
+
+          Every SpringPressable is a GestureDetector, so without this, *no* SpringPressable
+          inside any sheet responded to taps. That is why EditReel's "Done" appeared to do
+          nothing: the tap gesture never ended, so the text was never saved. It looked like a
+          keyboard-occlusion problem and was not. */}
+      <GestureHandlerRootView style={StyleSheet.absoluteFill}>
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         </Animated.View>
@@ -97,7 +107,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
           <View style={styles.handle} />
           {children}
         </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };

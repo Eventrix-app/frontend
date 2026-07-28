@@ -128,7 +128,11 @@ function putWithProgress(
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total === 0) return;
-      onProgress(event.loaded / event.total);
+      // Clamped because the reported bytes can exceed the declared total — observed running
+      // to 200%, i.e. the body being transmitted twice (a redirect on the signed URL that
+      // OkHttp follows by re-sending, being the likely cause). Whatever the cause, progress
+      // is a fraction of one file by definition and must never be shown above 100%.
+      onProgress(Math.min(1, Math.max(0, event.loaded / event.total)));
     };
 
     xhr.onload = () => {

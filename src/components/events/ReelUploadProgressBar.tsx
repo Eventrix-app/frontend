@@ -9,7 +9,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../common/Text';
-import { MenuCloseIcon } from '../common/Icons';
+import { CloseIcon } from '../common/Icons';
 
 // How long a finished row stays on screen before clearing itself. Long enough to read
 // "Reel shared" after landing on Home, short enough not to become furniture.
@@ -31,7 +31,9 @@ const CoverThumb: React.FC<{ uri: string }> = ({ uri }) => {
 const statusLabel = (job: ReelUploadJob): string => {
   switch (job.status) {
     case 'uploading':
-      return `Uploading reel · ${Math.round(job.progress * 100)}%`;
+      // Clamped here as well as at the source: this is the string the user actually reads,
+      // and it should be incapable of saying 200% regardless of what feeds it.
+      return `Uploading reel · ${Math.min(100, Math.round(job.progress * 100))}%`;
     case 'finalizing':
       return 'Finishing up…';
     case 'success':
@@ -74,22 +76,21 @@ const UploadRow: React.FC<{ job: ReelUploadJob }> = ({ job }) => {
     cancelReelUpload(dispatch, job.id);
   }, [dispatch, isTerminal, job.id]);
 
-  const barColor = job.status === 'error' ? colors.error : colors.brandPink;
-
+  // Brand pink throughout, including the failure state. A red card would read as a system
+  // error; a failed upload is a retryable nuisance, and the message already says so.
   return (
-    <View style={[styles.row, { backgroundColor: colors.white, borderColor: colors.borderLight }]}>
+    <View style={[styles.row, { backgroundColor: colors.brandPink }]}>
       <CoverThumb uri={job.mediaUri} />
 
       <View style={styles.middle}>
-        <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
+        <Text style={styles.label} numberOfLines={1}>
           {statusLabel(job)}
         </Text>
-        <View style={[styles.track, { backgroundColor: colors.muted }]}>
+        <View style={styles.track}>
           <Animated.View
             style={[
               styles.fill,
               {
-                backgroundColor: barColor,
                 // scaleX anchors at the centre by default, which would grow the fill
                 // outward from the middle of the track. transformOrigin moves the anchor to
                 // the left edge so it reads as a progress bar filling left-to-right.
@@ -108,7 +109,7 @@ const UploadRow: React.FC<{ job: ReelUploadJob }> = ({ job }) => {
         accessibilityRole="button"
         accessibilityLabel={isTerminal ? 'Dismiss' : 'Cancel upload'}
       >
-        <MenuCloseIcon color={colors.textSecondary} size={16} />
+        <CloseIcon color="#FFFFFF" size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -148,7 +149,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    // No border: the card is a solid brand-pink block against the feed's neutral
+    // background, so it separates by colour alone and an outline only muddies the edge.
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -162,15 +164,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   middle: { flex: 1, gap: 6 },
-  label: { fontSize: 13, fontWeight: '600' },
+  // Fixed white rather than colors.text — the card is brand pink in both themes, so the
+  // contents must not follow the light/dark text colour or they'd vanish in one of them.
+  label: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+  // The bar itself is white. The unfilled remainder is a translucent white so it reads as a
+  // recessed track carved out of the pink rather than a second, competing solid shape.
   track: {
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 3,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
   fill: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 2,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
   },
   cancelBtn: {
     width: 28,
