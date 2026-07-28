@@ -1,31 +1,63 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  Dimensions,
   FlatList,
+  LayoutChangeEvent,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MOCK_SHORTS } from '../../data/mockEvents';
+import { RootStackParamList } from '../../navigation/types';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
 import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon, ShareArrowIcon } from '../../components/common/Icons';
-
-const { height } = Dimensions.get('window');
+import { CreateReelSheet } from '../../components/events/CreateReelSheet';
 
 const ShortsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // Each slide is sized from the list's *measured* viewport rather than
+  // Dimensions.get('window').height minus a hardcoded 94px for the tab bar. That constant
+  // was wrong on most devices: this app runs edge-to-edge (android.edgeToEdgeEnabled), so
+  // the window height includes the system bars, and the real tab-bar height varies with
+  // gesture vs 3-button navigation. More importantly, `pagingEnabled` snaps to the
+  // FlatList's own height — so whenever the slide height disagreed with it, every swipe
+  // accumulated a little more offset, which is why reels drifted out of alignment and the
+  // previous caption bled in at the top of the next one. Measuring makes them equal by
+  // construction, on any device.
+  const [slideHeight, setSlideHeight] = useState<number | null>(null);
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    setSlideHeight((prev) => (prev === h ? prev : h));
+  }, []);
+
+  const openCreate = useCallback(() => setCreateOpen(true), []);
+  const closeCreate = useCallback(() => setCreateOpen(false), []);
+  const startReel = useCallback(
+    (eventId: string) => {
+      setCreateOpen(false);
+      navigation.navigate('RecordReel', { eventId });
+    },
+    [navigation],
+  );
+
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={handleLayout}>
       <FlatList
         data={MOCK_SHORTS}
         keyExtractor={(item) => item.id}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { height: height - 94 }]}>
+        // Nothing renders until the viewport has been measured — a first pass at the wrong
+        // height would let the pager settle on a bad offset before the correction lands.
+        renderItem={({ item }) => slideHeight === null ? null : (
+          <View style={[styles.slide, { height: slideHeight }]}>
             <LinearGradient
               colors={item.gradient as [string, string]}
               style={StyleSheet.absoluteFill}
@@ -38,6 +70,9 @@ const ShortsScreen: React.FC = () => {
             <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
               <Text style={styles.topTitle}>← Shorts</Text>
               <View style={styles.topActions}>
+                <TouchableOpacity onPress={openCreate} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create a reel">
+                  <Text style={styles.createIcon}>＋</Text>
+                </TouchableOpacity>
                 <SearchIcon color="#FFFFFF" size={22} />
                 <Text style={styles.topIcon}>⋮</Text>
               </View>
@@ -76,6 +111,8 @@ const ShortsScreen: React.FC = () => {
           </View>
         )}
       />
+
+      <CreateReelSheet visible={createOpen} onClose={closeCreate} onSelectEvent={startReel} />
     </View>
   );
 };
@@ -88,6 +125,7 @@ const styles = StyleSheet.create({
   slide: {
     width: '100%',
   },
+  createIcon: { color: '#FFFFFF', fontSize: 24, fontWeight: '300' },
   bottomFade: {
     position: 'absolute',
     left: 0,
