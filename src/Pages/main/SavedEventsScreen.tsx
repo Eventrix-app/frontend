@@ -22,7 +22,7 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { data: favorites = [], isLoading } = useGetMyFavoritesQuery();
   const [removeFavorite, { isLoading: isRemoving }] = useRemoveFavoriteMutation();
-  const savedEvents = favorites.map((event) => toCardEvent(event));
+  const savedEvents = useMemo(() => favorites.map((event) => toCardEvent(event)), [favorites]);
 
   // Which card's "..." menu is open, if any — a single shared bottom sheet rather than
   // one per card, closed by clearing this back to null.

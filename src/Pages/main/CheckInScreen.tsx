@@ -177,7 +177,10 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     handleCheckIn(code);
   };
 
-  const confirmedEnrollments = enrollments.filter((e) => e.status === 'confirmed');
+  const confirmedEnrollments = useMemo(
+    () => enrollments.filter((e) => e.status === 'confirmed'),
+    [enrollments],
+  );
   const filtered = searchQuery.trim()
     ? confirmedEnrollments.filter((e) =>
         (e.user?.fullName ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
