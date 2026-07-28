@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Image, StyleSheet, TextInput, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -148,15 +148,10 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <HalfScreenModal visible={editorOpen} onClose={() => setEditorOpen(false)} heightPercent={0.35}>
-        {/* The sheet sits at the bottom of the screen, so an autofocused input inside it is
-            covered by the keyboard the moment it opens — the user was typing blind. Padding
-            on Android and height on iOS is the pairing that behaves for a bottom sheet:
-            'height' on Android fights the manifest's adjustResize (which already shrinks the
-            window) and double-counts the inset. */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'height' : 'padding'}
-          style={styles.editorAvoider}
-        >
+        {/* No KeyboardAvoidingView here on purpose: the sheet is position:absolute,
+            bottom:0 with a fixed height, so a KAV inside it can only shrink content within
+            an area the keyboard already covers. HalfScreenModal lifts the whole sheet
+            instead. */}
         <View style={styles.editorSheet}>
           <Text style={[styles.editorLabel, { color: colors.text }]}>Text overlay</Text>
           <TextInput
@@ -172,7 +167,6 @@ const EditReelScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.editorSaveText}>Done</Text>
           </SpringPressable>
         </View>
-        </KeyboardAvoidingView>
       </HalfScreenModal>
     </View>
   );
@@ -236,7 +230,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   nextText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
-  editorAvoider: { flex: 1 },
   editorSheet: { padding: spacing.md, gap: spacing.md },
   editorLabel: { fontSize: 13, fontWeight: '600' },
   editorInput: {
