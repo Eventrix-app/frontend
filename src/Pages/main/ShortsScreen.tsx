@@ -84,8 +84,13 @@ const extractTags = (caption?: string): string[] => caption?.match(/#[\w]+/g) ??
 const captionWithoutTags = (caption?: string): string =>
   (caption ?? '').replace(/#[\w]+/g, '').replace(/\s+/g, ' ').trim();
 
-const formatCount = (n: number): string =>
-  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
+// Nullish-tolerant on purpose. These render straight from an API response, and a field the
+// server omits (an older deployment, a narrowed projection) would otherwise be printed
+// literally as "undefined views". A count that is not there is 0, not a word.
+const formatCount = (n: number | null | undefined): string => {
+  const value = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : String(value);
+};
 
 // Draws the creator's text back over the video.
 //
@@ -334,15 +339,22 @@ const ShortsScreen: React.FC = () => {
 
   // One view per reel per visit to this screen. Held in a ref rather than state because
   // nothing renders from it and it must not trigger a re-render of the feed.
+  // Avoids re-sending a request the server would reject as a duplicate anyway. The real
+  // "one account, one view" rule lives in the database's unique (user_id, short_id)
+  // constraint — this set only lasts as long as the screen, so it can never be the rule
+  // itself, just an optimisation on top of it.
+  //
+  // Skipped entirely when signed out: views are counted per account, so the endpoint needs
+  // one, and calling it anonymously would only produce 401s.
   const viewedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!activeId || !isFocused) return;
+    if (!activeId || !isFocused || !isAuthenticated) return;
     if (viewedRef.current.has(activeId)) return;
     viewedRef.current.add(activeId);
     // Fire and forget — a view is a soft metric and a failed count must never surface to
     // the viewer or interrupt playback.
     recordShortView(activeId);
-  }, [activeId, isFocused, recordShortView]);
+  }, [activeId, isAuthenticated, isFocused, recordShortView]);
 
   const [slideHeight, setSlideHeight] = useState<number | null>(null);
   // Width is measured alongside height because stored overlays are ratios of both — using

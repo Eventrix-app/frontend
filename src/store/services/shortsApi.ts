@@ -214,23 +214,22 @@ export const shortsApi = createApi({
       },
     }),
     // Fire-and-forget from the caller's side: a view is a soft metric, and a failure to
-    // record one must never interrupt playback. The local count is bumped immediately so
-    // the number the viewer sees reflects their own view.
+    // record one must never interrupt playback.
+    //
+    // Deliberately not optimistic. The server counts one view per account for all time, so
+    // a rewatch legitimately does not move the number — incrementing locally first would
+    // show +1 and then snap back the moment the real total arrived. The server's value is
+    // simply written in when it lands.
     recordShortView: builder.mutation<{ viewCount: number }, string>({
       query: (id) => ({ url: `shorts/${id}/view`, method: 'POST' }),
       async onQueryStarted(id, api) {
-        const { queryFulfilled } = api;
-        patchFeedEverywhere(api, id, (short) => {
-          short.viewCount += 1;
-        });
         try {
-          const { data } = await queryFulfilled;
+          const { data } = await api.queryFulfilled;
           patchFeedEverywhere(api, id, (short) => {
             short.viewCount = data.viewCount;
           });
         } catch {
-          // Deliberately not rolled back. An uncounted view is invisible to the user and
-          // not worth a number that jumps backwards on screen.
+          // An uncounted view is invisible to the user and not worth surfacing.
         }
       },
     }),
