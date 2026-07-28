@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Keyboard, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTheme } from '../../theme/ThemeContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -17,6 +18,18 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
   const sheetHeight = SCREEN_HEIGHT * heightPercent;
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  // Lifts the sheet clear of the keyboard.
+  //
+  // A KeyboardAvoidingView *inside* the sheet cannot do this: the sheet is
+  // position:absolute, bottom:0 with a fixed height, so it stays pinned to the bottom of
+  // the window no matter what its children do — a KAV in there can only shrink content
+  // within an area the keyboard is already covering. The sheet itself has to move, so the
+  // shift is applied to its own transform here.
+  //
+  // This matters beyond aesthetics: any action below the input (a Done/Save button, which
+  // is the usual sheet layout) is unreachable while the keyboard covers it, so taps land on
+  // the keyboard instead and the sheet appears to ignore them.
+  const keyboardShift = useRef(new Animated.Value(0)).current;
   // Keeps the Modal mounted just long enough to play the close animation —
   // Modal's own `visible` prop unmounts instantly otherwise, cutting it off.
   const [mounted, setMounted] = useState(visible);
@@ -36,22 +49,65 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
     }
   }, [visible, sheetHeight]);
 
+  useEffect(() => {
+    // will* on iOS runs in step with the system animation; Android only emits did*.
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardShift, {
+        toValue: -e.endCoordinates.height,
+        duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 180,
+        useNativeDriver: true,
+      }).start();
+    });
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardShift, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? ((e as any)?.duration ?? 250) : 180,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [keyboardShift]);
+
   if (!mounted) return null;
 
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
-      <View style={StyleSheet.absoluteFill}>
+      {/* A second GestureHandlerRootView, even though App.tsx already wraps the whole app in
+          one. React Native's Modal renders into its own native view hierarchy — a sibling of
+          the app root, not a descendant — so gesture handlers mounted inside it are outside
+          the root view's reach and never receive touches at all.
+
+          Every SpringPressable is a GestureDetector, so without this, *no* SpringPressable
+          inside any sheet responded to taps. That is why EditReel's "Done" appeared to do
+          nothing: the tap gesture never ended, so the text was never saved. It looked like a
+          keyboard-occlusion problem and was not. */}
+      <GestureHandlerRootView style={StyleSheet.absoluteFill}>
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         </Animated.View>
 
         <Animated.View
-          style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              // Open/close animation and keyboard shift composed into one transform. Both
+              // are native-driven, so Animated.add stays on the UI thread.
+              transform: [{ translateY: Animated.add(translateY, keyboardShift) }],
+            },
+          ]}
         >
           <View style={styles.handle} />
           {children}
         </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };

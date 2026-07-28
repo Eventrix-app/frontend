@@ -22,6 +22,11 @@ interface Props {
   visible: boolean;
   initialLatitude?: number;
   initialLongitude?: number;
+  /**
+   * Defaults to the original event-organizer wording. ShareReelScreen reuses this same
+   * picker to pin where a *reel* was shot, where "Pin event location" would be wrong.
+   */
+  title?: string;
   onClose: () => void;
   onConfirm: (result: { latitude: number; longitude: number; address?: string }) => void;
 }
@@ -30,7 +35,7 @@ interface Props {
 // draggable-Marker gesture conflicts with MapView's own pan/zoom gestures (a common
 // react-native-maps pain point across Android/iOS), while giving the same "drop a pin" UX:
 // whatever's under the crosshair when the organizer stops moving the map is the picked point.
-export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude, initialLongitude, onClose, onConfirm }) => {
+export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude, initialLongitude, title = 'Pin event location', onClose, onConfirm }) => {
   const [region, setRegion] = useState<Region>(
     initialLatitude != null && initialLongitude != null
       ? { latitude: initialLatitude, longitude: initialLongitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }
@@ -99,7 +104,7 @@ export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude,
           <TouchableOpacity onPress={onClose} hitSlop={8}>
             <Feather name="x" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text variant="h3">Pin event location</Text>
+          <Text variant="h3">{title}</Text>
           <View style={{ width: 22 }} />
         </View>
 

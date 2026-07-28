@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, AppStateStatus, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, AppState, AppStateStatus, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,9 +22,12 @@ import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
+import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin } from '../../components/common/Icons';
+import Skeleton from '../../components/common/Skeleton';
+import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
 const bgImage = require('../../../assets/bg.png');
 
@@ -55,16 +58,25 @@ function randomHealthQuote(): string {
   return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
 }
 
-// How far (in negative content-offset px) the user needs to pull before releasing
-// triggers a refresh — mirrors a typical native RefreshControl's trigger distance.
-const PULL_REFRESH_TRIGGER_DISTANCE = 90;
+// Compact counts ("14k views") the way the highlights strip displays them.
+function formatViews(count: number): string {
+  if (count >= 1000) return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k views`;
+  return `${count} view${count === 1 ? '' : 's'}`;
+}
 
-// TODO: pull from a real "shorts"/highlights endpoint once available
-const HIGHLIGHTS: HighlightItem[] = [
-  { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
-  { id: 'h2', thumbnail: require('../../../assets/highlights/h2.jpg'), title: 'Event highlight title...', views: '9k views', postedAgo: '2h ago' },
-  { id: 'h3', thumbnail: require('../../../assets/highlights/h3.jpg'), title: 'Event highlight title...', views: '3k views', postedAgo: '1d ago' },
-];
+// Coarse relative time — the strip only has room for one short token, and a reel's exact
+// posting minute is not information anyone acts on.
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
 
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -89,16 +101,47 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, refetch } = usePaginatedEvents();
-  const { data: me, refetch: refetchMe } = useGetMeQuery();
-  const cardEvents = events.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
+  const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents();
+  // Real reels for the "Event Highlights" strip, replacing three bundled jpgs with invented
+  // titles and view counts. Only the newest few — this is a teaser row into the Shorts tab,
+  // not a feed.
+  const { data: shortsFeed } = useGetShortsFeedQuery({ page: 1, limit: 6 });
+  const highlights = useMemo<HighlightItem[]>(
+    () =>
+      (shortsFeed?.shorts ?? []).map((short) => ({
+        id: short.id,
+        // A reel has no generated thumbnail (no client-side video thumbnailing in this app),
+        // so it falls back to the event's cover image and then to FallbackImage's own
+        // skeleton if neither exists.
+        thumbnail: short.thumbnailUrl
+          ? { uri: short.thumbnailUrl }
+          : short.event?.coverImageUrl
+            ? { uri: short.event.coverImageUrl }
+            : undefined,
+        title: short.caption?.trim() || short.event?.title || 'Event highlight',
+        views: formatViews(short.viewCount),
+        postedAgo: timeAgo(short.createdAt),
+      })),
+    [shortsFeed],
+  );
+  const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
+  // toCardEvent runs over every loaded event and does distance maths per item, so it is
+  // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
+  // change, a notifications poll landing, a theme toggle).
+  const cardEvents = useMemo(
+    () => events.map((event) => toCardEvent(event, me?.latitude, me?.longitude)),
+    [events, me?.latitude, me?.longitude],
+  );
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
   // blow out this carousel.
-  const featured = cardEvents.filter((event) => event.featured).slice(0, 5);
+  const featured = useMemo(
+    () => cardEvents.filter((event) => event.featured).slice(0, 5),
+    [cardEvents],
+  );
   // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
   // lives on the Explore screen via "View All Events" below.
-  const recommended = cardEvents.slice(0, 15);
+  const recommended = useMemo(() => cardEvents.slice(0, 15), [cardEvents]);
 
   // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
   // down together (via pullDistance below) and reveals a random health quote behind
@@ -107,7 +150,6 @@ const HomeScreen: React.FC = () => {
   // over-scroll physics instead of fighting them.
   const scrollY = useRef(new Animated.Value(0)).current;
   const [pullQuote, setPullQuote] = useState(randomHealthQuote);
-  const hasCrossedPullTriggerRef = useRef(false);
 
   // A fast fling-to-top can make the native scroll view overshoot a few px past 0 on its
   // own (pure momentum/rubber-band settle, finger already lifted) — with no dead zone, that
@@ -126,35 +168,24 @@ const HomeScreen: React.FC = () => {
     extrapolate: 'clamp',
   });
 
-  // Home shows a fixed latest-15 feed (see `recommended` above), so scroll only needs to
-  // watch for the pull-to-refresh threshold — no lazy-loading trigger here anymore.
+  // Home shows a fixed latest-15 feed (see `recommended` above), so this only feeds scrollY
+  // to the quote-reveal interpolations — the refresh itself is triggered by the
+  // RefreshControl on the ScrollView below, not from here.
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    {
-      useNativeDriver: true,
-      listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const { contentOffset } = e.nativeEvent;
-        if (contentOffset.y <= -PULL_REFRESH_TRIGGER_DISTANCE) {
-          hasCrossedPullTriggerRef.current = true;
-        }
-      },
-    },
+    { useNativeDriver: true },
   );
 
-  const handlePullStart = () => {
+  // Picks the quote as the drag begins so it's already in place behind the header by the
+  // time the pull reveals it.
+  const handlePullStart = useCallback(() => {
     setPullQuote(randomHealthQuote());
-    hasCrossedPullTriggerRef.current = false;
-  };
+  }, []);
 
-  // Fires on release ("drops the refresh icon") — the ScrollView's own bounce-back
-  // animation already repositions the header/feed and hides the quote (both are driven
-  // off the same scrollY value), this just needs to kick off the actual data refresh.
-  const handlePullEnd = () => {
-    if (!hasCrossedPullTriggerRef.current) return;
-    hasCrossedPullTriggerRef.current = false;
+  const handleRefresh = useCallback(() => {
     refetch();
     refetchMe();
-  };
+  }, [refetch, refetchMe]);
 
   const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
   // Shared with ProfileScreen (useDisplayAddress) so both show the exact same resolved
@@ -165,22 +196,40 @@ const HomeScreen: React.FC = () => {
   const { data: notifications = [] } = useGetNotificationsQuery();
   const hasUnread = notifications.some((n) => !n.readAt);
 
-  const openEvent = (eventId: string) => {
+  const openEvent = useCallback((eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
-  };
+  }, [navigation]);
 
-  const openCategory = (categoryKey: string) => {
+  const openCategory = useCallback((categoryKey: string) => {
     navigation.navigate('Search', { category: categoryKey });
-  };
+  }, [navigation]);
 
   // "View All Events" (bottom of the events sections) goes to the full Explore screen.
-  const openExplore = () => {
+  const openExplore = useCallback(() => {
     navigation.navigate('Explore' as never);
-  };
+  }, [navigation]);
 
   // "View All" on categories opens the half-screen interest-selection popup.
-  const openInterestSheet = () => setShowInterestSheet(true);
-  const closeInterestSheet = () => setShowInterestSheet(false);
+  const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
+  const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+
+  // Built once per data change rather than per render. `pullQuote` updates on every
+  // pull-to-refresh drag, which would otherwise rebuild every card element in both lists.
+  const topInterestCards = useMemo(
+    () => recommended.slice(0, 1).map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
+  const allInterestCards = useMemo(
+    () => recommended.map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
 
   return (
     <View style={styles.root}>
@@ -210,13 +259,25 @@ const HomeScreen: React.FC = () => {
         {/* Row 1: greeting + address on the left, avatar on the right */}
         <View style={styles.headerTop}>
           <View style={styles.greetingCol}>
-            <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
-            <View style={styles.locationRow}>
-              <LocationPin size={12} color="rgba(255,255,255,0.88)" />
-              <Text style={styles.location} numberOfLines={1}>
-                {displayAddress}
-              </Text>
-            </View>
+            {isLoadingMe ? (
+              // Placeholder rather than the real Text: displayName falls back to "there" and
+              // displayAddress to a placeholder while /me is in flight, so without this the
+              // header renders plausible-but-wrong copy and then visibly rewrites itself.
+              <View style={styles.greetingSkeleton}>
+                <Skeleton width={170} height={20} />
+                <Skeleton width={120} height={13} />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
+                <View style={styles.locationRow}>
+                  <LocationPin size={12} color="rgba(255,255,255,0.88)" />
+                  <Text style={styles.location} numberOfLines={1}>
+                    {displayAddress}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
             {me?.profilePictureUrl ? (
@@ -270,14 +331,25 @@ const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.scroll}
         onScroll={handleScroll}
         onScrollBeginDrag={handlePullStart}
-        onScrollEndDrag={handlePullEnd}
         scrollEventThrottle={16}
         bounces
         overScrollMode="always"
+        // The actual refresh trigger. The quote-reveal animation above is driven off
+        // contentOffset.y going negative, which only ever happens on iOS — Android's
+        // overscroll is an EdgeEffect (glow/stretch) rendered without the scroll position
+        // ever leaving 0, so the old release handler's threshold check could never pass and
+        // pulling down on Android refreshed nothing at all. RefreshControl is the platform's
+        // own gesture on both, so it fires regardless of whether the bounce exists.
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.brandPink} />
+        }
       >
+
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
-        {featured.length > 0 && (
+        {isLoadingEvents && <FeaturedCarouselSkeleton />}
+
+        {!isLoadingEvents && featured.length > 0 && (
           <LinearGradient
             colors={[colors.brandPink, '#ff6b8a']}
             style={styles.featuredWrap}
@@ -311,13 +383,14 @@ const HomeScreen: React.FC = () => {
         </ScrollView>
 
         <SectionHeader title="Based on Interest" />
-        {recommended.slice(0, 1).map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
-        ))}
+        {isLoadingEvents && <InterestCardSkeleton />}
+        {!isLoadingEvents && topInterestCards}
 
-        <SectionHeader title="Event Highlights" />
+        {/* Hidden entirely when nobody has posted a reel yet, rather than showing a header
+            above an empty rail. */}
+        {highlights.length > 0 && <SectionHeader title="Event Highlights" />}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {HIGHLIGHTS.map((item) => (
+          {highlights.map((item) => (
             <EventHighlightCard
               key={item.id}
               item={item}
@@ -332,9 +405,8 @@ const HomeScreen: React.FC = () => {
         </ScrollView>
 
         <SectionHeader title="You Might Also Like" />
-        {recommended.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={() => navigation.navigate('Auth' as never)} />
-        ))}
+        {isLoadingEvents && <InterestCardSkeleton count={2} />}
+        {!isLoadingEvents && allInterestCards}
 
         <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
           <Text style={styles.viewAllText}>View All Events</Text>
@@ -411,6 +483,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
+  greetingSkeleton: { gap: spacing.sm },
   greetingCol: {
     flex: 1,
     marginRight: spacing.sm,

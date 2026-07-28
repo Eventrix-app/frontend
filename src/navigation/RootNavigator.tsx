@@ -32,9 +32,13 @@ import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScre
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
+import RecordReelScreen from '../Pages/main/RecordReelScreen';
+import EditReelScreen from '../Pages/main/EditReelScreen';
+import ShareReelScreen from '../Pages/main/ShareReelScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
+import { REEL_UPLOAD_NOTIFICATION_TYPE } from '../utils/reelUploadManager';
 import { useTheme } from '../theme/ThemeContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +63,19 @@ function navigateForPushData(
   data: Record<string, unknown> | undefined,
 ): void {
   const type = data?.type;
+  // Locally-posted reel upload progress/result, not a server push — it has no row in the
+  // Notifications list, so the catch-all below would open an empty screen. Tapping it takes
+  // the user to the Shorts feed, where the reel they just uploaded actually lives.
+  if (type === REEL_UPLOAD_NOTIFICATION_TYPE) {
+    navRef.navigate('Main', { screen: 'Shorts' });
+    return;
+  }
+  // Someone liked one of your reels. Opens the Shorts tab — there is no single-reel route
+  // to deep-link to yet, so this is the closest honest destination.
+  if (type === 'short_liked') {
+    navRef.navigate('Main', { screen: 'Shorts' });
+    return;
+  }
   if (
     (type === 'event_changed' || type === 'announcement' || type === 'event_approved' || type === 'event_rejected') &&
     typeof data?.eventId === 'string'
@@ -214,6 +231,21 @@ const RootNavigator = () => {
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />
+        {/* Reel creation flow. Record and Edit are full-bleed black camera/preview surfaces,
+            so they slide up as a modal group rather than pushing sideways like the rest of
+            the stack — and Record replaces itself with Edit (navigation.replace) so the back
+            gesture from Edit returns to wherever the flow was entered, not to the camera. */}
+        <Stack.Screen
+          name="RecordReel"
+          component={RecordReelScreen}
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="EditReel"
+          component={EditReelScreen}
+          options={{ presentation: 'fullScreenModal' }}
+        />
+        <Stack.Screen name="ShareReel" component={ShareReelScreen} />
         <Stack.Screen name="OrganizerProfile" component={ProfileScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />

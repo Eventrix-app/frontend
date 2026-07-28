@@ -1,3 +1,6 @@
+import type { UploadContentType } from '../store/services/eventsApi';
+import type { ShortOverlay } from '../store/services/shortsApi';
+
 // Kept in sync with the DOCUMENTS map in Pages/main/LegalDocumentScreen.tsx.
 export type LegalDocumentKey =
   | 'privacy'
@@ -35,6 +38,36 @@ export type RootStackParamList = {
   CheckIn: { eventId: string };
   RefundApproval: undefined;
   OrganizerProfile: { organizerId: string };
+  // Reel creation flow: RecordReel (capture or pick) -> EditReel (text overlay) ->
+  // ShareReel (caption + upload). Each step carries the media forward rather than holding it
+  // in a store, so backing out of the flow leaves nothing behind to clean up.
+  //
+  // `contentType` is threaded through explicitly instead of being re-derived at upload time:
+  // a gallery pick reports its own asset.mimeType, whereas expo-camera's recordAsync() only
+  // returns a { uri } and iOS records .mov (QuickTime), not .mp4. Guessing 'video/mp4' at the
+  // end would send a Content-Type inconsistent with the actual bytes, and Supabase Storage
+  // enforces the bucket's allowedMimeTypes.
+  RecordReel: { eventId: string };
+  EditReel: {
+    eventId: string;
+    mediaUri: string;
+    mediaType: 'video';
+    contentType: UploadContentType;
+  };
+  ShareReel: {
+    eventId: string;
+    mediaUri: string;
+    mediaType: 'video';
+    contentType: UploadContentType;
+    // Text the user added on EditReel, used to seed the caption — which is what makes a
+    // reel readable in a list and searchable.
+    overlayText?: string;
+    // The same text as a full composition: colour, face, size and placement, with every
+    // geometric value stored as a ratio of the video's rendered size so it lands correctly
+    // on any device. Persisted with the reel and drawn back over the video by the Shorts
+    // feed. Still not burned into the video file — that needs server-side compositing.
+    overlay?: ShortOverlay;
+  };
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
 };

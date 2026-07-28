@@ -14,6 +14,7 @@ import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 import { getDeviceLabel } from '../../utils/getDeviceLabel';
+import { prefetchPostLoginData } from '../../utils/prefetchPostLoginData';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
@@ -56,6 +57,11 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       const result = await login({ email: email.trim(), password, deviceLabel: getDeviceLabel() }).unwrap();
       // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
+      // Warm the queries the landing screens subscribe to while the navigation transition
+      // animates, so Home renders with data rather than skeletons. Must come after unwrap():
+      // these endpoints need the Bearer token, which only reaches the store when the login
+      // mutation settles.
+      prefetchPostLoginData(dispatch);
       if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
       } else if (!result.hasCompletedOnboarding) {

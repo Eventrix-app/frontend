@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Platform, ScrollView, StyleSheet, TouchableOp
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 import { Text } from '../../components/common/Text';
 import { RootStackParamList } from '../../navigation/types';
 import { ColorPalette } from '../../theme/colors.light';
@@ -41,8 +42,10 @@ const BlockedUsersScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Blocked Users" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Leading circle: each row shows the blocked user's avatar. Prefetched from
+            Settings, so this is the cold-cache fallback rather than the normal path. */}
         {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+          <SimpleListSkeleton count={3} showLeadingCircle />
         ) : isError ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Couldn't load your blocked users</Text>

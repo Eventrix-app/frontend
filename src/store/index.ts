@@ -18,6 +18,7 @@ import eventsSlice from './slices/eventsSlice';
 import uiSlice from './slices/uiSlice';
 import onboardingDraftReducer from './slices/onboardingDraftSlice';
 import checkInCacheReducer from './slices/checkInCacheSlice';
+import reelUploadReducer from './slices/reelUploadSlice';
 
 import { eventsApi } from './services/eventsApi';
 import { authApi } from './services/authApi';
@@ -28,6 +29,7 @@ import { organizerApi } from './services/organizerApi';
 import { chatApi } from './services/chatApi';
 import { geocodeApi } from './services/geocodeApi';
 import { moderationApi } from './services/moderationApi';
+import { shortsApi } from './services/shortsApi';
 import { authErrorMiddleware } from './middleware/authErrorMiddleware';
 import { clearApiCacheOnLogout } from './middleware/clearApiCacheOnLogout';
 
@@ -61,6 +63,10 @@ const rootReducer = combineReducers({
   ui: uiSlice,
   onboardingDraft: persistReducer(onboardingDraftPersistConfig, onboardingDraftReducer),
   checkInCache: persistReducer(checkInCachePersistConfig, checkInCacheReducer),
+  // Deliberately NOT persisted: an in-flight upload is owned by a live XMLHttpRequest that
+  // cannot survive the process being killed. Rehydrating a "42% uploading" row would show a
+  // progress bar nothing is driving, which can never finish or be cancelled.
+  reelUpload: reelUploadReducer,
   [eventsApi.reducerPath]: eventsApi.reducer,
   [authApi.reducerPath]: authApi.reducer,
   [userApi.reducerPath]: userApi.reducer,
@@ -70,6 +76,7 @@ const rootReducer = combineReducers({
   [chatApi.reducerPath]: chatApi.reducer,
   [geocodeApi.reducerPath]: geocodeApi.reducer,
   [moderationApi.reducerPath]: moderationApi.reducer,
+  [shortsApi.reducerPath]: shortsApi.reducer,
 });
 
 export const store = configureStore({
@@ -90,6 +97,11 @@ export const store = configureStore({
       chatApi.middleware,
       geocodeApi.middleware,
       moderationApi.middleware,
+      // shortsApi was defined but never registered here. Without its reducer and middleware
+      // in the store, every `useCreateShortMutation()` call threw at dispatch time instead
+      // of issuing a request — which is why no reel ever finished uploading: the file
+      // reached Supabase Storage but the row that makes it a reel was never created.
+      shortsApi.middleware,
       authErrorMiddleware,
       clearApiCacheOnLogout,
     ),

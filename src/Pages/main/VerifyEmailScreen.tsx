@@ -12,6 +12,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetMeQuery } from '../../store/services/userApi';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 import {
   useSendEmailVerificationOtpMutation,
   useConfirmEmailVerificationMutation,
@@ -32,7 +33,7 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { data: me, refetch: refetchMe } = useGetMeQuery();
+  const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
   const [sendOtp, { isLoading: isSending }] = useSendEmailVerificationOtpMutation();
   const [confirmOtp, { isLoading: isConfirming }] = useConfirmEmailVerificationMutation();
 
@@ -65,6 +66,19 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation }) => {
       setErrorMessage(errorMessageFrom(err, 'Invalid or expired code. Please try again.'));
     }
   };
+
+  // Rendered before either branch below, because both of them are claims about the user's
+  // verification state and `me` is what decides which is true. Without this, an
+  // already-verified user briefly sees "enter the code we sent you" — an instruction for
+  // something they do not need to do — before it flips to the verified panel.
+  if (isLoadingMe && !isSuccess) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <ScreenHeader title="Verify Email" onBack={() => navigation.goBack()} />
+        <SimpleListSkeleton count={2} />
+      </View>
+    );
+  }
 
   if (me?.isEmailVerified || isSuccess) {
     return (

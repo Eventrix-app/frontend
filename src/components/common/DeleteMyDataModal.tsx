@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
+import { GoogleSignin, statusCodes, isErrorWithCode } from '@react-native-google-signin/google-signin';
+import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import HalfScreenModal from './halfscreenmodal';
 import Input from './Input';
 import Button from './Button';
@@ -11,13 +12,8 @@ import { spacing } from '../../theme/spacing';
 import { useEraseMyDataMutation } from '../../store/services/userApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import {
-  GOOGLE_IOS_CLIENT_ID,
-  GOOGLE_ANDROID_CLIENT_ID,
-  GOOGLE_WEB_CLIENT_ID,
-  FACEBOOK_APP_ID,
   APPLE_CLIENT_ID,
   APPLE_REDIRECT_URI,
-  FACEBOOK_DISCOVERY,
   APPLE_DISCOVERY,
 } from '../../config/socialAuth';
 
@@ -51,15 +47,10 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
 
   const linkedProvider = (authProviders.find((p) => p === 'google' || p === 'apple' || p === 'facebook') as Provider | undefined);
 
-  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-  });
-  const [, facebookResponse, promptFacebookAsync] = AuthSession.useAuthRequest(
-    { clientId: FACEBOOK_APP_ID, scopes: ['public_profile', 'email'], redirectUri: 'https://auth.expo.io/@aarish34/frontend', responseType: AuthSession.ResponseType.Token },
-    FACEBOOK_DISCOVERY,
-  );
+  // Google/Facebook re-auth runs through the same native SDKs the sign-in screen uses (see
+  // SocialLoginRow) — same platform-native UI, and no dependence on a browser redirect
+  // finding its way back to the app. GoogleSignin.configure() is called there on mount; its
+  // config is process-wide, so it does not need repeating here.
   const [, appleResponse, promptAppleAsync] = AuthSession.useAuthRequest(
     { clientId: APPLE_CLIENT_ID, scopes: ['name', 'email'], redirectUri: APPLE_REDIRECT_URI || AuthSession.makeRedirectUri(), responseType: AuthSession.ResponseType.Code, extraParams: { response_mode: 'form_post' } },
     APPLE_DISCOVERY,
@@ -88,27 +79,51 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
   };
 
   React.useEffect(() => {
-    const token = extractToken(googleResponse);
-    if (token) void submitReauth('google', token);
-    else if (googleResponse) setReauthing(false);
-  }, [googleResponse]);
-
-  React.useEffect(() => {
-    const token = extractToken(facebookResponse);
-    if (token) void submitReauth('facebook', token);
-    else if (facebookResponse) setReauthing(false);
-  }, [facebookResponse]);
-
-  React.useEffect(() => {
     const token = extractToken(appleResponse);
     if (token) void submitReauth('apple', token);
     else if (appleResponse) setReauthing(false);
   }, [appleResponse]);
 
+  const reauthWithGoogle = async () => {
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      const idToken = response.type === 'cancelled' ? undefined : response.data?.idToken;
+      if (!idToken) {
+        setReauthing(false);
+        return;
+      }
+      await submitReauth('google', idToken);
+    } catch (err) {
+      setReauthing(false);
+      if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) return;
+      showAlert('Could not delete your data', 'Re-authentication with Google failed. Please try again.');
+    }
+  };
+
+  const reauthWithFacebook = async () => {
+    try {
+      const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+      if (result.isCancelled) {
+        setReauthing(false);
+        return;
+      }
+      const session = await AccessToken.getCurrentAccessToken();
+      if (!session?.accessToken) {
+        setReauthing(false);
+        return;
+      }
+      await submitReauth('facebook', session.accessToken.toString());
+    } catch {
+      setReauthing(false);
+      showAlert('Could not delete your data', 'Re-authentication with Facebook failed. Please try again.');
+    }
+  };
+
   const handleReauthPress = () => {
     setReauthing(true);
-    if (linkedProvider === 'google') promptGoogleAsync();
-    else if (linkedProvider === 'facebook') promptFacebookAsync();
+    if (linkedProvider === 'google') void reauthWithGoogle();
+    else if (linkedProvider === 'facebook') void reauthWithFacebook();
     else if (linkedProvider === 'apple') promptAppleAsync();
     else setReauthing(false);
   };

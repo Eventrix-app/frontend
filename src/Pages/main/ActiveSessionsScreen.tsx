@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 import { Text } from '../../components/common/Text';
 import { RootStackParamList } from '../../navigation/types';
 import { ColorPalette } from '../../theme/colors.light';
@@ -73,8 +74,11 @@ const ActiveSessionsScreen: React.FC<Props> = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader title="Active Sessions" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Session rows are title + meta lines with no avatar, so no leading circle.
+            Prefetched from Settings (this screen's only entry point), so in the normal flow
+            the data is already warm and this never appears. */}
         {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+          <SimpleListSkeleton count={3} />
         ) : isError ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Couldn't load your sessions</Text>

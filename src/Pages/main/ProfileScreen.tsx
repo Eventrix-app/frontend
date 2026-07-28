@@ -255,7 +255,7 @@ const OrganizerProfile: React.FC<{
     }
   };
 
-  const cardEvents = events.map((event) => toCardEvent(event));
+  const cardEvents = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
 
   if (isLoading) {
     return <ProfileHeaderSkeleton />;

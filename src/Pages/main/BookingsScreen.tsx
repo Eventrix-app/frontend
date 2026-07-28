@@ -35,14 +35,21 @@ function bucketFor(enrollment: EnrollmentRecord): TabId {
 
 // Paid/unpaid text color, matching the reference's inline colored status word
 // rather than a background chip.
-function statusDisplayFor(enrollment: EnrollmentRecord): { label: string; color: string } {
-  if (enrollment.status === 'refunded') return { label: 'Refunded', color: '#3730A3' };
-  if (enrollment.status === 'cancelled') return { label: 'Cancelled', color: '#991B1B' };
+//
+// Returns a palette *key* rather than a hex value: these were literal dark tones (#059669,
+// #991B1B…) chosen against a white card, so on the dark theme they sat as near-black text on
+// a dark surface and were effectively unreadable. Resolving through the palette at render
+// time means each status picks up the lighter variant the dark theme defines for it.
+type StatusTone = 'success' | 'warning' | 'error' | 'secondary';
+
+function statusDisplayFor(enrollment: EnrollmentRecord): { label: string; tone: StatusTone } {
+  if (enrollment.status === 'refunded') return { label: 'Refunded', tone: 'secondary' };
+  if (enrollment.status === 'cancelled') return { label: 'Cancelled', tone: 'error' };
   if (enrollment.paymentStatus && enrollment.paymentStatus !== 'paid') {
-    return { label: 'Unpaid', color: '#B45309' };
+    return { label: 'Unpaid', tone: 'warning' };
   }
   const amount = enrollment.totalAmount != null ? ` ₹${enrollment.totalAmount}` : '';
-  return { label: `Paid${amount}`, color: '#059669' };
+  return { label: `Paid${amount}`, tone: 'success' };
 }
 
 // Ticket-stub shaped card, built with plain Views instead of a background image —
@@ -207,7 +214,7 @@ const BookingsScreen: React.FC = () => {
 
                     <View style={styles.footerRow}>
                       <Text style={styles.footerLabel}>
-                        Status: <Text style={{ color: '#B45309', fontWeight: '700' }}>#{entry.position} in line</Text>
+                        Status: <Text style={{ color: colors.warning, fontWeight: '700' }}>#{entry.position} in line</Text>
                       </Text>
                     </View>
                   </TicketCard>
@@ -261,7 +268,7 @@ const BookingsScreen: React.FC = () => {
 
                     <View style={styles.footerRow}>
                       <Text style={styles.footerLabel}>
-                        Status: <Text style={{ color: status.color, fontWeight: '700' }}>{status.label}</Text>
+                        Status: <Text style={{ color: colors[status.tone], fontWeight: '700' }}>{status.label}</Text>
                       </Text>
                       <TouchableOpacity
                         style={styles.viewTicketBtn}
@@ -441,7 +448,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
 card: {
   borderWidth: 1,
-  borderColor: '#D1D5DB',   // was colors.borderLight — darker, more visible border
+  // colors.border, not borderLight — the intent of the original hardcoded #D1D5DB was "a
+  // more visible border than borderLight gives", and `border` is exactly that in both
+  // themes (a solid grey in light, a translucent white in dark).
+  borderColor: colors.border,
   borderRadius: borderRadius.lg,
   padding: spacing.md,
   backgroundColor: colors.white,
@@ -458,7 +468,7 @@ notchLeft: {
   borderRadius: 10,
   backgroundColor: colors.white,
   borderWidth: 1,
-  borderColor: '#D1D5DB',   // match the new card border color
+  borderColor: colors.border,   // match the card border color
 },
  notchRight: {
   position: 'absolute',
@@ -469,7 +479,7 @@ notchLeft: {
   borderRadius: 10,
   backgroundColor: colors.white,
   borderWidth: 1,
-  borderColor: '#D1D5DB',   // match the new card border color
+  borderColor: colors.border,   // match the card border color
 },
   eventTitle: {
     fontSize: 15,
@@ -501,9 +511,11 @@ notchLeft: {
   // and web, but Android's dashed border support is inconsistent — if it renders solid on
   // Android, swap this for a row of small dot Views instead.
  stubDivider: {
-  borderTopWidth: 1.5,        // was 1 — slightly thicker
+  borderTopWidth: 1.5,        // slightly thicker than a hairline, so the perforation reads
   borderStyle: 'dashed',
-  borderTopColor: '#9CA3AF',  // was colors.borderLight — noticeably darker grey
+  // neutralLine, not borderLight — the original hardcoded #9CA3AF existed because
+  // borderLight was too faint to see. neutralLine keeps that weight in both themes.
+  borderTopColor: colors.neutralLine,
   marginVertical: spacing.sm,
 },
   footerRow: {

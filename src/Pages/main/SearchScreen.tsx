@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,17 +12,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SvgXml } from 'react-native-svg';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { CATEGORIES as CATEGORY_SVGS } from '../../components/events/CategoryIconCard';
-import { MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
+import { CATEGORIES as CATEGORY_ICONS } from '../../components/events/CategoryIconCard';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRecentSearches } from '../../hooks/useRecentSearches';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
@@ -31,14 +31,26 @@ import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icon
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
-// Bridges the backend's category name (e.g. "Music") to the home-screen icon set, which
-// is keyed the same way lowercased ("music") — only the 6 categories with a matching SVG
-// (Music/Tech/Sports/Health/Education/Business) get an icon; others (Food, Art, ...) have
-// none and stay text-only, same as before this change.
-const CATEGORY_SVG_BY_NAME: Record<string, string> = Object.fromEntries(
-  CATEGORY_SVGS.map((c) => [c.key, c.svg]),
+// Bridges the backend's category name (e.g. "Music") to the home-screen icon set, which is
+// keyed the same way lowercased ("music"). Ten categories now have artwork — Music, Tech,
+// Sports, Health, Education, Business, Art, Food, Gaming, Travel — and the lookup is
+// deliberately best-effort: any category whose name does not lowercase to one of those keys
+// simply gets no icon and stays text-only.
+//
+// The shared asset is a whole 104x104 card (label, border, glow and drop shadow all baked
+// into the bitmap), which is illegible shrunk to chip size — so the chip shows only the
+// artwork region of it. The artwork sits at x=27..77, y=34..84 on that canvas; scaling by
+// CHIP/ARTWORK and offsetting by that origin crops to it inside a fixed-size clipping
+// container. The card's white fill still sits behind the artwork, reading as a rounded tile.
+const CATEGORY_ICON_BY_NAME: Record<string, number> = Object.fromEntries(
+  CATEGORY_ICONS.map((c) => [c.key, c.icon]),
 );
-const svgForCategoryName = (name: string): string | undefined => CATEGORY_SVG_BY_NAME[name.toLowerCase()];
+const iconForCategoryName = (name: string): number | undefined => CATEGORY_ICON_BY_NAME[name.toLowerCase()];
+
+const CHIP_ICON_SIZE = 20;
+const CANVAS = 104;
+const ARTWORK = { x: 27, y: 34, size: 50 };
+const CHIP_SCALE = CHIP_ICON_SIZE / ARTWORK.size;
 
 const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -68,6 +80,15 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
     categoryId: categoryId ?? undefined,
   });
   const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
+
+  // Real, device-local search history replacing the hardcoded sample terms.
+  const { recent, addRecentSearch, clearRecentSearches } = useRecentSearches();
+  // Recorded once the debounced term has actually been searched, not on every keystroke —
+  // otherwise every prefix along the way ("m", "mu", "mus"…) would be stored as its own
+  // entry and the list would fill with fragments of a single search.
+  useEffect(() => {
+    if (debouncedQuery) addRecentSearch(debouncedQuery);
+  }, [debouncedQuery, addRecentSearch]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
@@ -115,7 +136,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
         </TouchableOpacity>
         {categories.map((cat) => {
           const isSelected = categoryId === cat.id;
-          const svg = isSelected ? svgForCategoryName(cat.name) : undefined;
+          const icon = isSelected ? iconForCategoryName(cat.name) : undefined;
           return (
             <TouchableOpacity
               key={cat.id}
@@ -123,8 +144,12 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => setCategoryId((prev) => (prev === cat.id ? null : cat.id))}
             >
               <View style={[styles.chipGlass, isSelected && styles.chipActive]}>
-                <View style={[styles.chipContent, svg && styles.chipContentWithIcon]}>
-                  {svg ? <SvgXml xml={svg} width={20} height={20} /> : null}
+                <View style={[styles.chipContent, !!icon && styles.chipContentWithIcon]}>
+                  {icon ? (
+                    <View style={styles.chipIcon}>
+                      <Image source={icon} style={styles.chipIconImage} />
+                    </View>
+                  ) : null}
                   <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                     {cat.name}
                   </Text>
@@ -157,11 +182,16 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           onEndReachedThreshold={0.4}
           ListHeaderComponent={
             <>
-              {!query && !categoryId ? (
+              {!query && !categoryId && recent.length > 0 ? (
                 <>
-                  <Text style={styles.sectionTitle}>Recent searches</Text>
+                  <View style={styles.recentHeaderRow}>
+                    <Text style={styles.sectionTitle}>Recent searches</Text>
+                    <TouchableOpacity onPress={clearRecentSearches} hitSlop={8}>
+                      <Text style={styles.clearRecentText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.recentRow}>
-                    {MOCK_RECENT_SEARCHES.map((term) => (
+                    {recent.map((term) => (
                       <TouchableOpacity
                         key={term}
                         style={styles.recentChipWrap}
@@ -276,6 +306,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     alignItems: 'center',
     gap: spacing.xs ?? 6,
   },
+  chipIcon: {
+    width: CHIP_ICON_SIZE,
+    height: CHIP_ICON_SIZE,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  chipIconImage: {
+    width: CANVAS * CHIP_SCALE,
+    height: CANVAS * CHIP_SCALE,
+    marginLeft: -ARTWORK.x * CHIP_SCALE,
+    marginTop: -ARTWORK.y * CHIP_SCALE,
+  },
   chipActive: {
     backgroundColor: 'rgba(244,51,98,0.16)',
   },
@@ -298,6 +340,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.sm,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },
+  // Puts "Clear" on the same baseline as the section title, so the row keeps the title's
+  // own vertical rhythm instead of adding a second stacked line above the chips.
+  recentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearRecentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.brandPink,
+  },
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
