@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { TextInput, View, Platform, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
-import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from './Text';

@@ -8,7 +8,6 @@ import { LegalFooter } from '../../components/auth/LegalFooter';
 import { AuthStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import { borderRadius } from '../../theme/borderRadius';
 import { useResetPasswordMutation } from '../../store/services/authApi';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';

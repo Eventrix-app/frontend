@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Location from 'expo-location';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';

@@ -19,6 +19,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
@@ -197,17 +199,51 @@ const HomeScreen: React.FC = () => {
   // pull-to-refresh drag, which would otherwise rebuild every card element in both lists.
   const topInterestCards = useMemo(
     () => recommended.slice(0, 1).map((event) => (
-      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+      <EventInterestCard key={event.id} event={event as any} onPress={openEvent} onRequireAuth={requireAuth} />
     )),
     [recommended, openEvent, requireAuth],
   );
 
   const allInterestCards = useMemo(
     () => recommended.map((event) => (
-      <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} onRequireAuth={requireAuth} />
+      <EventInterestCard key={event.id} event={event as any} onPress={openEvent} onRequireAuth={requireAuth} />
     )),
     [recommended, openEvent, requireAuth],
   );
+
+  // Same reasoning as the card lists above: this was built inline in the JSX, so every
+  // re-render handed FeaturedCarousel a brand-new array of brand-new objects and defeated
+  // any memoization inside it. `pullQuote` alone changes on every pull-to-refresh drag.
+  const featuredSlides = useMemo(
+    () => featured.map((event) => ({
+      id: event.id,
+      title: event.title,
+      date: event.date,
+      location: event.venue,
+      price: event.price,
+      image: event.image,
+      featured: event.featured,
+    })),
+    [featured],
+  );
+
+  // The highlights rail always routes to the same place regardless of which tile is tapped,
+  // so it is one stable callback rather than a fresh closure per tile per render.
+  const openShortsTab = useCallback(() => {
+    (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
+      'Main',
+      { screen: 'Shorts' },
+    );
+  }, [navigation]);
+
+  // Keyed off the events feed rather than /me: the header already degrades gracefully into
+  // its own skeleton, whereas an empty body is the part that leaves the user wondering
+  // whether anything is happening.
+  const { stage: slowStage } = useSlowNetwork(isLoadingEvents);
+
+  const openProfile = useCallback(() => navigation.navigate('Profile'), [navigation]);
+  const openSearch = useCallback(() => navigation.navigate('Search'), [navigation]);
+  const openNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
 
 
   return (
@@ -258,7 +294,7 @@ const HomeScreen: React.FC = () => {
               </>
             )}
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+          <TouchableOpacity onPress={openProfile}>
             {me?.profilePictureUrl ? (
               <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImg} />
             ) : (
@@ -274,7 +310,7 @@ const HomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.search}
             activeOpacity={0.95}
-            onPress={() => navigation.navigate('Search')}
+            onPress={openSearch}
           >
             <Image
               source={require('../../../assets/location/search.png')}
@@ -295,7 +331,7 @@ const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.bell}
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={openNotifications}
           >
             <NotificationBell unread={hasUnread} color="#000000" size={24} />
             {hasUnread && <View style={styles.bellDot} />}
@@ -326,6 +362,8 @@ const HomeScreen: React.FC = () => {
 
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
+        <SlowNetworkNotice stage={slowStage} onRetry={handleRefresh} style={styles.slowNotice} />
+
         {isLoadingEvents && <FeaturedCarouselSkeleton />}
 
         {!isLoadingEvents && featured.length > 0 && (
@@ -339,16 +377,8 @@ const HomeScreen: React.FC = () => {
             <SectionHeader title="Featured Near You" light hideLine />
             <FeaturedCarousel
               cardWidth={SCREEN_WIDTH - spacing.sm * 2}
-              events={featured.map((event) => ({
-                id: event.id,
-                title: event.title,
-                date: event.date,
-                location: event.venue,
-                price: event.price,
-                image: event.image,
-                featured: event.featured,
-              }))}
-              onEventPress={(eventId) => openEvent(eventId)}
+              events={featuredSlides}
+              onEventPress={openEvent}
             />
           </LinearGradient>
         )}
@@ -370,16 +400,7 @@ const HomeScreen: React.FC = () => {
         {highlights.length > 0 && <SectionHeader title="Event Highlights" />}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {highlights.map((item) => (
-            <EventHighlightCard
-              key={item.id}
-              item={item}
-              onPress={() =>
-                (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
-                  'Main',
-                  { screen: 'Shorts' },
-                )
-              }
-            />
+            <EventHighlightCard key={item.id} item={item} onPress={openShortsTab} />
           ))}
         </ScrollView>
 
@@ -591,6 +612,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  slowNotice: {
+    marginBottom: spacing.md,
   },
   categoryRow: {
     flexDirection: 'row',

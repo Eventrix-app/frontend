@@ -298,10 +298,16 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
       eventsApi.endpoints.getUploadUrl.initiate({ purpose: 'reel-video', contentType: job.contentType }),
     );
     pendingMutations.push(uploadUrlRequest);
-    const { uploadUrl, publicUrl } = await uploadUrlRequest.unwrap();
 
-    const response = await fetch(job.mediaUri);
-    const blob = await response.blob();
+    // Overlapped deliberately: minting the signed URL is a backend round trip while reading
+    // the clip is local I/O, and only putWithProgress below needs both. Reels are the
+    // largest payload in the app, so this is where the serialised version cost the most.
+    // The request is issued before the size checks below either way — it already was — so
+    // the only change is that the file read no longer waits on the network.
+    const [{ uploadUrl, publicUrl }, blob] = await Promise.all([
+      uploadUrlRequest.unwrap(),
+      fetch(job.mediaUri).then((r) => r.blob()),
+    ]);
     // A zero-byte blob means the file:// URI did not resolve — uploading it would "succeed"
     // and produce a reel that plays nothing, which is worse than failing here.
     if (blob.size === 0) {

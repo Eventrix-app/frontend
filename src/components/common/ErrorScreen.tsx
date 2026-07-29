@@ -22,7 +22,6 @@ const ErrorScreen: React.FC<Props> = ({
   return (
     <View style={styles.root}>
       <Image
-        // TODO: swap for your actual asset path, e.g. require('../../../assets/Error.png')
         source={require('../../../assets/Error.png')}
         style={styles.illustration}
         resizeMode="contain"

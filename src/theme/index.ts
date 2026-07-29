@@ -7,7 +7,7 @@ export { shadows, type Shadows } from './shadows';
 import { colors, type Colors } from './colors';
 import { typography, type Typography } from './typography';
 import { spacing, type Spacing } from './spacing';
-import { borderRadius, radius, type BorderRadius } from './borderRadius';
+import { borderRadius, type BorderRadius } from './borderRadius';
 import { shadows, type Shadows } from './shadows';
 
 export interface Theme {

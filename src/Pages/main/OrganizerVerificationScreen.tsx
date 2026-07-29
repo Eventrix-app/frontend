@@ -69,8 +69,12 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
 
     setUploadingField(field);
     try {
-      const { uploadUrl, publicUrl } = await getUploadUrl({ purpose, contentType }).unwrap();
-      const fileBlob = await (await fetch(asset.uri)).blob();
+      // Signed-URL round trip and the local file read are independent; only the PUT needs
+      // both, so they overlap instead of queueing.
+      const [{ uploadUrl, publicUrl }, fileBlob] = await Promise.all([
+        getUploadUrl({ purpose, contentType }).unwrap(),
+        fetch(asset.uri).then((r) => r.blob()),
+      ]);
       const putResponse = await fetch(uploadUrl, {
         method: 'PUT',
         body: fileBlob,

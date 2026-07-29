@@ -17,13 +17,13 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventEnrollmentsQuery, useCheckInMutation, EnrollmentRecord } from '../../store/services/eventsApi';
-import { cacheEnrollments, markCheckedInLocally } from '../../store/slices/checkInCacheSlice';
+import { acknowledgeDuplicates, cacheEnrollments, markCheckedInLocally } from '../../store/slices/checkInCacheSlice';
 import { AppDispatch, RootState } from '../../store';
 import { Text } from '../../components/common/Text';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 import { showAlert } from '../../utils/crossPlatformAlert';
-import { WifiOffIcon, SyncIcon, CameraIcon, SearchIcon } from '../../components/common/Icons';
+import { WifiOffIcon, SyncIcon, CameraIcon, SearchIcon, WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CheckIn'>;
 
@@ -33,6 +33,19 @@ type Mode = 'scanner' | 'search';
 // CameraView's barcodeScannerSettings on every render (e.g. from unrelated state changes
 // like typing in the manual-code field) can make the native scanner reconfigure mid-session.
 const BARCODE_SCANNER_SETTINGS: { barcodeTypes: BarcodeType[] } = { barcodeTypes: ['qr'] };
+
+// Identifies one physical scan for its whole life, across every retry of it.
+//
+// Generated before the first send attempt, which is the entire point: if that request
+// reaches the server and only the response is lost, the queued replay carries the same key
+// and the backend recognises it as already-applied rather than as a second gate scanning
+// the same ticket. Only ever compared for equality, so this needs collision resistance, not
+// UUID formatting — which avoids pulling a crypto dependency in for it.
+function newScanKey(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
 
 const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -58,6 +71,11 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   const [checkIn, { isLoading: isCheckingIn }] = useCheckInMutation();
   const cached = useSelector((state: RootState) => state.checkInCache[eventId]);
   const pendingSync = cached?.pendingSync ?? [];
+  // Tickets this device admitted offline that another gate had already checked in. Cannot
+  // be prevented while both devices are offline, so the guarantee is that it always
+  // surfaces here rather than being silently dropped during sync.
+  const duplicates = cached?.duplicates ?? [];
+  const unacknowledgedDuplicates = duplicates.filter((d) => !d.acknowledged);
 
   // Cache every successful online fetch so the attendee list survives offline/killed-app
   // sessions, and overlay any not-yet-synced local check-ins on top of whichever list (live
@@ -94,7 +112,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     return pending ? { ...e, checkedInAt: pending.checkedInAt } : e;
   });
 
-  const handleOfflineCheckIn = (ticketCode: string, enrollmentId?: string) => {
+  const handleOfflineCheckIn = (ticketCode: string, scanKey: string, enrollmentId?: string) => {
     const target = enrollments.find(
       (e) => e.ticketCode === ticketCode || (!!enrollmentId && e.id === enrollmentId),
     );
@@ -115,6 +133,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
         enrollmentId: target.id,
         ticketCode: target.ticketCode ?? ticketCode,
         checkedInAt: new Date().toISOString(),
+        idempotencyKey: scanKey,
       }),
     );
     showAlert('Checked In (Offline)', "Saved locally — it'll sync once you're back online.");
@@ -130,16 +149,21 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
+    // One key for this scan, minted before anything is sent and reused by the offline
+    // fallback below. Generating it later (e.g. only when queueing) would defeat it: the
+    // dropped-response case is precisely the one where the online attempt already happened.
+    const scanKey = newScanKey();
+
     try {
       const netState = await NetInfo.fetch();
       const online = netState.isConnected !== false && netState.isInternetReachable !== false;
       if (!online) {
-        handleOfflineCheckIn(code, enrollmentId);
+        handleOfflineCheckIn(code, scanKey, enrollmentId);
         return;
       }
 
       try {
-        await checkIn({ ticketCode: code }).unwrap();
+        await checkIn({ ticketCode: code, idempotencyKey: scanKey }).unwrap();
         if (enrollmentId) {
           setCheckedInIds((prev) => new Set(prev).add(enrollmentId));
         }
@@ -148,13 +172,27 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       } catch (e: any) {
         // The device can drop signal between the NetInfo check above and this request
         // actually reaching the backend — fall back to the offline path instead of
-        // surfacing a raw network error for what is still a connectivity problem.
+        // surfacing a raw network error for what is still a connectivity problem. The queued
+        // entry carries the same scanKey, so if the request did land the replay resolves as
+        // a success rather than looking like a second scan.
         if (e?.status === 'FETCH_ERROR' || e?.status === 'TIMEOUT_ERROR') {
-          handleOfflineCheckIn(code, enrollmentId);
+          handleOfflineCheckIn(code, scanKey, enrollmentId);
           return;
         }
-        const msg: string = e?.data?.message ?? 'Check-in failed';
-        if (msg.toLowerCase().includes('already')) {
+        const data = e?.data ?? {};
+        const msg: string = data.message ?? 'Check-in failed';
+        if (data.duplicateScan === true) {
+          // Scanned live against a ticket another gate had already used. Unlike the offline
+          // path there is no admission to undo — the organizer is standing here and can
+          // simply refuse entry — so this is a plain refusal, stated precisely.
+          const at = data.checkedInAt ? new Date(data.checkedInAt).toLocaleTimeString() : null;
+          showAlert(
+            'Already Checked In',
+            at
+              ? `This ticket was already used at ${at}. Do not admit without verifying identity.`
+              : 'This ticket was already used at another gate. Do not admit without verifying identity.',
+          );
+        } else if (msg.toLowerCase().includes('already')) {
           showAlert('Already Checked In', 'This ticket was already used.');
         } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired')) {
           showAlert('Invalid Ticket', 'This ticket code is invalid or has been tampered with.');
@@ -228,6 +266,46 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
             {isOffline ? 'Offline — check-ins are being saved locally' : 'Syncing queued check-ins…'}
             {pendingSync.length > 0 ? ` · ${pendingSync.length} pending` : ''}
           </Text>
+        </View>
+      )}
+
+      {unacknowledgedDuplicates.length > 0 && (
+        <View style={styles.duplicateBanner}>
+          <View style={styles.duplicateHeader}>
+            <WarningIcon color="#7F1D1D" size={16} />
+            <Text style={styles.duplicateTitle}>
+              {unacknowledgedDuplicates.length === 1
+                ? 'Duplicate entry detected'
+                : `${unacknowledgedDuplicates.length} duplicate entries detected`}
+            </Text>
+          </View>
+          <Text style={styles.duplicateBody}>
+            Admitted here while offline, but already checked in elsewhere:
+          </Text>
+          {unacknowledgedDuplicates.slice(0, 3).map((d) => {
+            const attendee = enrollments.find((e) => e.id === d.enrollmentId);
+            const firstAt = d.firstCheckedInAt
+              ? new Date(d.firstCheckedInAt).toLocaleTimeString()
+              : 'another gate';
+            return (
+              <Text key={d.ticketCode} style={styles.duplicateItem}>
+                • {attendee?.user?.fullName ?? attendee?.bookingReference ?? d.ticketCode} — first
+                checked in at {firstAt}
+              </Text>
+            );
+          })}
+          {unacknowledgedDuplicates.length > 3 && (
+            <Text style={styles.duplicateItem}>
+              …and {unacknowledgedDuplicates.length - 3} more
+            </Text>
+          )}
+          <TouchableOpacity
+            style={styles.duplicateDismiss}
+            onPress={() => dispatch(acknowledgeDuplicates({ eventId }))}
+            accessibilityRole="button"
+          >
+            <Text style={styles.duplicateDismissText}>Reviewed</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -345,6 +423,31 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     backgroundColor: '#FEF3C7',
   },
   offlineBannerText: { fontSize: 12, fontWeight: '600', color: '#92400E', textAlign: 'center' },
+  // Red, not the amber used for the offline/syncing banner above: that one is informational
+  // ("this is working, just later"), this one is an incident the organizer has to act on.
+  duplicateBanner: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    gap: 4,
+  },
+  duplicateHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  duplicateTitle: { fontSize: 13, fontWeight: '700', color: '#7F1D1D' },
+  duplicateBody: { fontSize: 12, color: '#7F1D1D' },
+  duplicateItem: { fontSize: 12, color: '#7F1D1D', marginLeft: 2 },
+  duplicateDismiss: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.sm,
+    backgroundColor: '#7F1D1D',
+  },
+  duplicateDismissText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   modeTabs: {
     flexDirection: 'row',
     marginHorizontal: spacing.md,

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SvgXml } from 'react-native-svg';
@@ -31,7 +31,10 @@ export interface InterestEvent {
 interface Props {
   event: InterestEvent;
   width?: number;
-  onPress: () => void;
+  // Takes the id rather than being a pre-bound closure, so a screen can hand the same
+  // stable callback to every card instead of minting one per row per render — which is what
+  // makes the React.memo below actually hold in a list.
+  onPress: (eventId: string) => void;
   // Called instead of the save mutation when a logged-out user taps the bookmark — the
   // card doesn't own navigation (every screen that renders it does), so it hands the
   // "go to login" decision back up rather than reaching for useNavigation() itself.
@@ -112,11 +115,15 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
     }
   };
 
+  // Bound here rather than at each call site: TouchableOpacity would otherwise invoke
+  // onPress with a GestureResponderEvent instead of the id.
+  const handlePress = useCallback(() => onPress(event.id), [onPress, event.id]);
+
   return (
     <TouchableOpacity
       style={[styles.card, width ? { width } : undefined]}
       activeOpacity={0.9}
-      onPress={onPress}
+      onPress={handlePress}
     >
       <View style={styles.imageWrap}>
         <FallbackImage source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />

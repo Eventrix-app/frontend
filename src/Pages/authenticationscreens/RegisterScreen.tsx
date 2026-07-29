@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
-import { AuthActions, OutlineButtonRow } from '../../components/auth/AuthActions';
+import { AuthActions } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
 import { AuthStackParamList, RootStackParamList } from '../../navigation/types';

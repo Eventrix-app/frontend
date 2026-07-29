@@ -13,6 +13,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
@@ -81,8 +83,12 @@ const ExploreScreen: React.FC = () => {
       return mapped;
     }
     const radiusKm = filters.radiusKm;
+    // Indexed once rather than re-scanned per card: the previous `source.find(...)` inside
+    // the filter made this O(n²), so enabling the radius filter got quadratically slower as
+    // more pages were loaded in.
+    const byId = new Map(source.map((e) => [e.id, e]));
     return mapped.filter((event) => {
-      const backendEvent = source.find((e) => e.id === event.id);
+      const backendEvent = byId.get(event.id);
       if (!backendEvent?.latitude || !backendEvent?.longitude) return false;
       return calculateDistanceKm(me.latitude!, me.longitude!, backendEvent.latitude, backendEvent.longitude) <= radiusKm;
     });
@@ -110,6 +116,41 @@ const ExploreScreen: React.FC = () => {
 
   const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
   const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
+
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+
+  // Only the first, cache-empty load — a pull-to-refresh already has the old list on screen
+  // to look at, so warning about it there would be noise.
+  const { stage: slowStage } = useSlowNetwork(isLoading);
+
+  // EventInterestCard is React.memo'd, but that was doing nothing here: renderItem was an
+  // inline arrow that built two fresh closures per card per render, so every card's props
+  // compared unequal and the whole visible list re-rendered on any state change — a filter
+  // chip tap, a notifications poll landing, a pull-to-refresh.
+  const renderItem = useCallback(
+    ({ item }: { item: (typeof cardEvents)[number] }) => (
+      <EventInterestCard event={item as any} onPress={openEvent} onRequireAuth={requireAuth} />
+    ),
+    [openEvent, requireAuth],
+  );
+
+  // Same reason: an inline ListHeaderComponent element is a new element on every render,
+  // which re-renders the whole category rail above the feed.
+  const listHeader = useMemo(
+    () => (
+      <>
+        <SectionHeader title="Browse by Category" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+          {CATEGORIES.map((category) => (
+            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          ))}
+          <ViewAllCategoryIconCard onPress={openInterestSheet} />
+        </ScrollView>
+        <SectionHeader title="You Might Also Like" />
+      </>
+    ),
+    [styles.categoryRow, openCategory, openInterestSheet],
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -178,7 +219,12 @@ const ExploreScreen: React.FC = () => {
       </ScrollView>
 
       {isLoading ? (
-        <EventListSkeleton />
+        // Notice above the skeleton, not instead of it: the skeleton still shows what is
+        // coming, and this only explains why it hasn't arrived yet.
+        <>
+          <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
+          <EventListSkeleton />
+        </>
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Couldn't load events</Text>
@@ -195,13 +241,7 @@ const ExploreScreen: React.FC = () => {
         <FlatList
           data={cardEvents}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <EventInterestCard
-              event={item as any}
-              onPress={() => openEvent(item.id)}
-              onRequireAuth={() => navigation.navigate('Auth' as never)}
-            />
-          )}
+          renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           refreshControl={
@@ -209,18 +249,16 @@ const ExploreScreen: React.FC = () => {
           }
           onEndReached={followingOnly ? undefined : loadMore}
           onEndReachedThreshold={0.4}
-          ListHeaderComponent={
-            <>
-              <SectionHeader title="Browse by Category" />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-                {CATEGORIES.map((category) => (
-                  <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
-                ))}
-                <ViewAllCategoryIconCard onPress={openInterestSheet} />
-              </ScrollView>
-              <SectionHeader title="You Might Also Like" />
-            </>
-          }
+          // These cards are tall (full-width cover image each), so the default window of 21
+          // screens' worth kept far more mounted image views alive than this list ever shows.
+          // Deliberately no removeClippedSubviews: these rows are TouchableOpacity-based and
+          // that prop is known to swallow taps on Android, which is not a trade worth making
+          // on the main browse feed. ShortsScreen can use it because a slide's tap target is
+          // a gesture handler over a full-screen video, not a nested touchable.
+          windowSize={11}
+          maxToRenderPerBatch={8}
+          initialNumToRender={5}
+          ListHeaderComponent={listHeader}
           ListFooterComponent={
             <>
               {isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null}
@@ -248,6 +286,10 @@ const ExploreScreen: React.FC = () => {
 };
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  slowNotice: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.white,

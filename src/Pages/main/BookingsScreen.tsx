@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,11 +10,13 @@ import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetMeQuery } from '../../store/services/userApi';
-import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { formatEventDate } from '../../utils/eventCardAdapter';
 import { getEventStartDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LeftArrow } from '../../components/common/Icons';
 import BookingListSkeleton from '../../components/common/BookingListSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 
 type TabId = 'upcoming' | 'previous' | 'waitlist' | 'cancelled';
 
@@ -94,6 +96,10 @@ const BookingsScreen: React.FC = () => {
   const isError = isWaitlistTab ? isErrorWaitlist : isErrorEnrollments;
   const refetch = isWaitlistTab ? refetchWaitlist : refetchEnrollments;
 
+  // Re-evaluates per tab: switching to Waitlist starts its own load, and that load
+  // deserves the same explanation as the first one.
+  const { stage: slowStage } = useSlowNetwork(isLoading);
+
   const bookings = useMemo(
     () => enrollments.filter((e) => bucketFor(e) === activeTab),
     [enrollments, activeTab],
@@ -170,7 +176,10 @@ const BookingsScreen: React.FC = () => {
       </View>
 
       {isLoading ? (
-        <BookingListSkeleton />
+        <>
+          <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
+          <BookingListSkeleton />
+        </>
       ) : isError ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>
@@ -295,6 +304,10 @@ const BookingsScreen: React.FC = () => {
 };
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  slowNotice: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.white,

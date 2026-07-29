@@ -366,7 +366,11 @@ export const eventsApi = createApi({
       query: (eventId) => ({ url: `events/${eventId}/favorite`, method: 'DELETE' }),
       invalidatesTags: ['Favorite'],
     }),
-    checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string }>({
+    // idempotencyKey identifies the *scan*, not the request: generated once when the QR is
+    // read and reused for every retry of that scan. It is what lets the backend answer 200
+    // for "this same scan, arriving again" and 409 only for "a different scan of an
+    // already-used ticket" — see events.service.ts checkIn().
+    checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string; idempotencyKey?: string }>({
       query: (body) => ({
         url: 'events/check-in',
         method: 'POST',

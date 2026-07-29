@@ -15,7 +15,7 @@ import { userApi } from '../store/services/userApi';
  */
 export async function registerForPushNotifications(dispatch: AppDispatch): Promise<void> {
   if (!Device.isDevice) {
-    console.log('[registerForPushNotifications] Skipped — not a physical device');
+    if (__DEV__) console.log('[registerForPushNotifications] Skipped — not a physical device');
     return;
   }
 
@@ -27,7 +27,7 @@ export async function registerForPushNotifications(dispatch: AppDispatch): Promi
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      console.log(`[registerForPushNotifications] Skipped — permission "${finalStatus}"`);
+      if (__DEV__) console.log(`[registerForPushNotifications] Skipped — permission "${finalStatus}"`);
       return;
     }
 
@@ -42,10 +42,10 @@ export async function registerForPushNotifications(dispatch: AppDispatch): Promi
     }
 
     const { data: pushToken } = await Notifications.getExpoPushTokenAsync({ projectId });
-    console.log(`[registerForPushNotifications] Got token ${pushToken.slice(0, 24)}… — registering with backend`);
+    if (__DEV__) console.log(`[registerForPushNotifications] Got token ${pushToken.slice(0, 24)}… — registering with backend`);
 
     await dispatch(userApi.endpoints.updatePushToken.initiate(pushToken)).unwrap();
-    console.log('[registerForPushNotifications] Push token registered successfully');
+    if (__DEV__) console.log('[registerForPushNotifications] Push token registered successfully');
   } catch (err) {
     console.warn('[registerForPushNotifications] Failed to register push token', err);
   }

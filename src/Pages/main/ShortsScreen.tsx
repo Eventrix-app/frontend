@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Image,
   LayoutChangeEvent,
   StyleSheet,
   TouchableOpacity,
   View,
   ViewToken,
 } from 'react-native';
+// expo-image, not core Image: uploader avatars repeat constantly down the feed (the same
+// creator posts several reels), and only expo-image keeps them in a disk cache across the
+// slide unmounting as rows recycle.
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -27,6 +30,8 @@ import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon } from '../.
 const HEART_ANIMATION = require('../../../assets/animations/heart-like.json');
 import { CreateReelSheet } from '../../components/events/CreateReelSheet';
 import ShortsFeedSkeleton from '../../components/common/ShortsFeedSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import ReelCommentsSheet from '../../components/events/ReelCommentsSheet';
 import {
   FeedShort,
@@ -214,23 +219,41 @@ const ReelSlide = React.memo<SlideProps>(({
   // bursts the heart, even when the reel is already liked — the animation acknowledges the
   // gesture, and a double tap that appeared to do nothing would read as a dropped input.
   // Unliking stays deliberate: only the heart button removes a like.
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    // maxDelay a touch above the default so a slightly slow double tap still registers
-    // rather than being read as two separate taps.
-    .maxDelay(300)
-    .onEnd(() => {
-      // Both hop to the JS thread: a gesture callback body is a worklet, and neither the
-      // Lottie ref nor the mutation hook exists on the UI thread.
-      runOnJS(playHeart)();
-      runOnJS(onLikeByDoubleTap)(item.id, liked);
-    });
-  const tags = extractTags(item.caption);
-  const rawBody = captionWithoutTags(item.caption);
-  // The overlay text seeds the caption on the share screen, so by default the two are
-  // identical — printing both would show the same sentence twice on one slide. The caption
-  // line is dropped only when it adds nothing; if the user edited it, both are shown.
-  const body = item.overlay && item.overlay.text.trim() === rawBody ? '' : rawBody;
+  //
+  // Memoized because GestureDetector re-attaches the native handler whenever the gesture
+  // object's identity changes. Rebuilding it on every render meant every re-render of a
+  // slide tore down and re-registered a native gesture recogniser — on the one component in
+  // this app that also owns a video player.
+  const doubleTap = useMemo(
+    () =>
+      Gesture.Tap()
+        .numberOfTaps(2)
+        // maxDelay a touch above the default so a slightly slow double tap still registers
+        // rather than being read as two separate taps.
+        .maxDelay(300)
+        .onEnd(() => {
+          // Both hop to the JS thread: a gesture callback body is a worklet, and neither the
+          // Lottie ref nor the mutation hook exists on the UI thread.
+          runOnJS(playHeart)();
+          runOnJS(onLikeByDoubleTap)(item.id, liked);
+        }),
+    [playHeart, onLikeByDoubleTap, item.id, liked],
+  );
+
+  // Two regex passes over the caption, memoized together: they only depend on the caption
+  // and the overlay, neither of which changes for the life of a slide, whereas this
+  // component re-renders on every like and on every swipe that changes `active`.
+  const { tags, body } = useMemo(() => {
+    const parsedTags = extractTags(item.caption);
+    const rawBody = captionWithoutTags(item.caption);
+    // The overlay text seeds the caption on the share screen, so by default the two are
+    // identical — printing both would show the same sentence twice on one slide. The caption
+    // line is dropped only when it adds nothing; if the user edited it, both are shown.
+    return {
+      tags: parsedTags,
+      body: item.overlay && item.overlay.text.trim() === rawBody ? '' : rawBody,
+    };
+  }, [item.caption, item.overlay]);
 
   return (
     <GestureDetector gesture={doubleTap}>
@@ -261,7 +284,13 @@ const ReelSlide = React.memo<SlideProps>(({
             accessibilityLabel={`View ${item.uploader?.fullName ?? 'uploader'}'s profile`}
           >
             {item.uploader?.profilePictureUrl ? (
-              <Image source={{ uri: item.uploader.profilePictureUrl }} style={styles.avatar} />
+              <Image
+                source={{ uri: item.uploader.profilePictureUrl }}
+                style={styles.avatar}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+              />
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <PersonIcon color="#000000" size={16} />
@@ -462,10 +491,24 @@ const ShortsScreen: React.FC = () => {
 
   const showEmpty = !isLoading && !isError && loaded.length === 0;
 
+  // Reels are the heaviest thing this app fetches, so a slow connection shows up here first
+  // and most painfully — a black screen with no explanation.
+  const { stage: slowStage } = useSlowNetwork(isLoading);
+
   return (
     <View style={styles.root} onLayout={handleLayout}>
       {isLoading ? (
-        <ShortsFeedSkeleton />
+        <>
+          <ShortsFeedSkeleton />
+          {/* Overlaid rather than stacked: the skeleton fills the viewport here, so there is
+              no flow position to push the notice into. */}
+          <SlowNetworkNotice
+            stage={slowStage}
+            onRetry={refetch}
+            tone="onDark"
+            style={[styles.slowNotice, { top: insets.top + 72 }]}
+          />
+        </>
       ) : isError ? (
         <View style={styles.centered}>
           <Text style={styles.emptyTitle}>Couldn't load reels</Text>
@@ -534,6 +577,12 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   heartLottie: { width: HEART_SIZE, height: HEART_SIZE },
+  slowNotice: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    zIndex: 4,
+  },
   viewCount: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
   overlayWrap: {
     position: 'absolute',

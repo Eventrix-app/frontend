@@ -27,6 +27,8 @@ import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
 import Noevents from '../../components/common/Noevents';
 import EventListSkeleton from '../../components/common/EventListSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
@@ -80,6 +82,10 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
     categoryId: categoryId ?? undefined,
   });
   const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
+
+  // Search is debounced by 400ms before it even fires, so a slow round trip on top of
+  // that is exactly where a query feels like it silently did nothing.
+  const { stage: slowStage } = useSlowNetwork(isLoading);
 
   // Real, device-local search history replacing the hardcoded sample terms.
   const { recent, addRecentSearch, clearRecentSearches } = useRecentSearches();
@@ -161,7 +167,10 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       {isLoading ? (
-        <EventListSkeleton />
+        <>
+          <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
+          <EventListSkeleton />
+        </>
       ) : isError ? (
         <View style={styles.empty}>
           <WarningIcon color={colors.textSecondary} size={48} />
@@ -229,6 +238,10 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  slowNotice: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.neutralBg,

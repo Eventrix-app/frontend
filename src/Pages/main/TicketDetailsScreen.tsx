@@ -14,6 +14,8 @@ import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { Text } from '../../components/common/Text';
 import TicketDetailsSkeleton from '../../components/common/TicketDetailsSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import { TicketIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TicketDetails'>;
@@ -29,7 +31,8 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   // route.params.bookingId maps to enrollmentId on the backend (Section 5 naming fix)
   const enrollmentId = route.params.bookingId;
-  const { data: enrollment, isLoading, isError } = useGetEnrollmentByIdQuery(enrollmentId);
+  const { data: enrollment, isLoading, isError, refetch } = useGetEnrollmentByIdQuery(enrollmentId);
+  const { stage: slowStage } = useSlowNetwork(isLoading);
   const [requestRefund, { isLoading: isRequestingRefund }] = useRequestRefundMutation();
   const [cancelEnrollment, { isLoading: isCancellingEnrollment }] = useCancelEnrollmentMutation();
   const [showRefundForm, setShowRefundForm] = useState(false);
@@ -94,6 +97,9 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <ScreenHeader title="Ticket Details" onBack={handleGoBack} />
+        {/* The venue-entrance case: pulling up a QR on congested event wifi is one of the
+            few places in this app where the user genuinely cannot just try again later. */}
+        <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
         <TicketDetailsSkeleton />
       </View>
     );
@@ -268,6 +274,10 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  slowNotice: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
   root: { flex: 1, backgroundColor: colors.neutralBg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: colors.textSecondary, fontSize: 15 },

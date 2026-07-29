@@ -94,6 +94,12 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false,
 
   const handlePostLogin = (result: { roles?: string[]; hasCompletedOnboarding: boolean }) => {
     syncOnboardingDraft(dispatch, store.getState);
+    // Same warm-up the email/password paths do (LoginScreen/RegisterScreen). The token only
+    // lands in the store once the socialLogin mutation settles, which is exactly here — so
+    // this is the earliest point these authenticated prefetches can succeed. Without it a
+    // Google sign-in landed on Home with a cold cache and rendered skeletons, while an
+    // email/password login of the same account did not.
+    prefetchPostLoginData(dispatch);
     if ((result?.roles ?? []).includes('admin')) {
       navigation.getParent()?.navigate('AdminRedirect' as never);
     } else if (!result.hasCompletedOnboarding) {

@@ -5,31 +5,30 @@ import * as Sentry from '@sentry/react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-//import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
-import {
-  ZalandoSansExpanded_200ExtraLight,
-  ZalandoSansExpanded_300Light,
-  ZalandoSansExpanded_400Regular,
-  ZalandoSansExpanded_500Medium,
-  ZalandoSansExpanded_600SemiBold,
-  ZalandoSansExpanded_700Bold,
-  ZalandoSansExpanded_800ExtraBold,
-  ZalandoSansExpanded_900Black,
-} from '@expo-google-fonts/zalando-sans-expanded';
-import {
-  Poppins_200ExtraLight,
-  Poppins_300Light,
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  Poppins_900Black,
-} from '@expo-google-fonts/poppins';
+// Imported per weight rather than from each family's package root. The root index
+// re-exports every weight *and* every italic, and each of those modules require()s its own
+// .ttf — so a barrel import made Metro bundle all 38 font files (~3.1 MB) when only these
+// 16 are ever passed to useFonts below. The per-weight paths pull in exactly one file each.
+import { ZalandoSansExpanded_200ExtraLight } from '@expo-google-fonts/zalando-sans-expanded/200ExtraLight';
+import { ZalandoSansExpanded_300Light } from '@expo-google-fonts/zalando-sans-expanded/300Light';
+import { ZalandoSansExpanded_400Regular } from '@expo-google-fonts/zalando-sans-expanded/400Regular';
+import { ZalandoSansExpanded_500Medium } from '@expo-google-fonts/zalando-sans-expanded/500Medium';
+import { ZalandoSansExpanded_600SemiBold } from '@expo-google-fonts/zalando-sans-expanded/600SemiBold';
+import { ZalandoSansExpanded_700Bold } from '@expo-google-fonts/zalando-sans-expanded/700Bold';
+import { ZalandoSansExpanded_800ExtraBold } from '@expo-google-fonts/zalando-sans-expanded/800ExtraBold';
+import { ZalandoSansExpanded_900Black } from '@expo-google-fonts/zalando-sans-expanded/900Black';
+import { Poppins_200ExtraLight } from '@expo-google-fonts/poppins/200ExtraLight';
+import { Poppins_300Light } from '@expo-google-fonts/poppins/300Light';
+import { Poppins_400Regular } from '@expo-google-fonts/poppins/400Regular';
+import { Poppins_500Medium } from '@expo-google-fonts/poppins/500Medium';
+import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
+import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
+import { Poppins_800ExtraBold } from '@expo-google-fonts/poppins/800ExtraBold';
+import { Poppins_900Black } from '@expo-google-fonts/poppins/900Black';
 import { store, persistor } from './src/store';
 import { AppDispatch, RootState } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -188,7 +187,6 @@ function App() {
       <PersistGate loading={null} persistor={persistor}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <ThemeProvider>
-            {/* <BottomSheetModalProvider> */}
               <SafeAreaProvider>
                 <SplashGate />
                 <AppStateSync />
@@ -201,7 +199,6 @@ function App() {
                 </NetworkGate>
                 <ThemedStatusBar />
               </SafeAreaProvider>
-           {/* </BottomSheetModalProvider> */}
           </ThemeProvider>
         </GestureHandlerRootView>
       </PersistGate>

@@ -20,7 +20,10 @@ const NetworkGate: React.FC<Props> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      console.log('NetInfo state:', state.isConnected, state.isInternetReachable);
+      // Fires on every connectivity transition — frequent on cellular, and this gate is
+      // mounted for the whole app session, so it is the one console call here that would
+      // actually accumulate in production.
+      if (__DEV__) console.log('NetInfo state:', state.isConnected, state.isInternetReachable);
       const offline = state.isConnected === false || state.isInternetReachable === false;
       setIsOffline(offline);
     });

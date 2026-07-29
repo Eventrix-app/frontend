@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
 type Props = {

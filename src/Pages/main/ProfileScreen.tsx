@@ -1,9 +1,9 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
@@ -257,6 +257,25 @@ const OrganizerProfile: React.FC<{
 
   const cardEvents = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
 
+  // Stable across renders so EventInterestCard's React.memo actually holds — an inline
+  // renderItem rebuilt both of these per card on every render of this screen.
+  const openEvent = useCallback(
+    (eventId: string) => navigation.navigate('EventDetails', { eventId }),
+    [navigation],
+  );
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+  const renderEventCard = useCallback(
+    ({ item }: { item: (typeof cardEvents)[number] }) => (
+      <EventInterestCard
+        event={item as any}
+        width={EVENT_CARD_WIDTH}
+        onPress={openEvent}
+        onRequireAuth={requireAuth}
+      />
+    ),
+    [openEvent, requireAuth],
+  );
+
   if (isLoading) {
     return <ProfileHeaderSkeleton />;
   }
@@ -367,14 +386,7 @@ const OrganizerProfile: React.FC<{
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <EventInterestCard
-            event={item as any}
-            width={EVENT_CARD_WIDTH}
-            onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
-            onRequireAuth={() => navigation.navigate('Auth' as never)}
-          />
-        )}
+        renderItem={renderEventCard}
         ListHeaderComponentStyle={styles.eventsHeader}
         ListEmptyComponent={
           <View style={styles.emptyEvents}>

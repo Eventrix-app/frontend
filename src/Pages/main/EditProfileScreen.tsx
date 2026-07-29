@@ -106,8 +106,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsUploadingPhoto(true);
     try {
-      const { uploadUrl, publicUrl } = await getUploadUrl({ purpose: 'profile-picture', contentType }).unwrap();
-      const fileBlob = await (await fetch(asset.uri)).blob();
+      // Signed-URL round trip and the local file read are independent; only the PUT needs
+      // both, so they overlap instead of queueing.
+      const [{ uploadUrl, publicUrl }, fileBlob] = await Promise.all([
+        getUploadUrl({ purpose: 'profile-picture', contentType }).unwrap(),
+        fetch(asset.uri).then((r) => r.blob()),
+      ]);
       const putResponse = await fetch(uploadUrl, {
         method: 'PUT',
         body: fileBlob,

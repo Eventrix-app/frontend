@@ -41,7 +41,7 @@ import InlineDatePicker from '../../components/common/InlineDatePicker';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { LocationPickerModal } from '../../components/common/LocationPickerModal';
 import CreateEventSkeleton from '../../components/common/CreateEventSkeleton';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import TicketTypeEditor, {
   TierDraft,
   createBlankTier,
@@ -305,10 +305,14 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const uploadPendingCoverImage = async (): Promise<string> => {
     const image = pendingImage!;
-    const uploadResponse = await getUploadUrl({ purpose: 'event-cover', contentType: image.contentType }).unwrap();
-
-    const fileResponse = await fetch(image.uri);
-    const fileBlob = await fileResponse.blob();
+    // Independent of each other: minting the signed URL is a round trip to our backend,
+    // reading the picked file is local I/O, and only the PUT below needs both. Running them
+    // in sequence made every cover upload cost one full server latency before the file had
+    // even started being read.
+    const [uploadResponse, fileBlob] = await Promise.all([
+      getUploadUrl({ purpose: 'event-cover', contentType: image.contentType }).unwrap(),
+      fetch(image.uri).then((r) => r.blob()),
+    ]);
 
     const putResponse = await fetch(uploadResponse.uploadUrl, {
       method: 'PUT',
@@ -360,8 +364,11 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     for (let i = 0; i < pendingGalleryItems.length; i++) {
       const item = pendingGalleryItems[i];
       try {
-        const { uploadUrl, publicUrl } = await getUploadUrl({ purpose: 'event-image', contentType: item.contentType }).unwrap();
-        const fileBlob = await (await fetch(item.uri)).blob();
+        // Signed URL and local file read are independent — see uploadPendingCoverImage.
+        const [{ uploadUrl, publicUrl }, fileBlob] = await Promise.all([
+          getUploadUrl({ purpose: 'event-image', contentType: item.contentType }).unwrap(),
+          fetch(item.uri).then((r) => r.blob()),
+        ]);
         const putResponse = await fetch(uploadUrl, {
           method: 'PUT',
           body: fileBlob,

@@ -68,7 +68,6 @@ import {
   HourglassIcon,
   TicketIcon,
   PersonIcon,
-  ChatIcon,
   PhoneIcon,
   WhatsAppIcon,
   CalendarIcon,
@@ -85,6 +84,8 @@ import { useCreateReportMutation, useBlockUserMutation } from '../../store/servi
 import { useChatSocket } from '../../hooks/useChatSocket';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
@@ -954,6 +955,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
+  const { stage: slowStage } = useSlowNetwork(isLoading);
   const { data: ticketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
   const { data: mediaItems = [] } = useGetEventMediaQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
@@ -1113,7 +1115,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   if (isLoading) {
-    return <EventDetailsSkeleton />;
+    // Overlaid on the skeleton's own layout rather than replacing it — this screen is
+    // usually reached by tapping a specific card, so the user has a clear expectation of
+    // what should appear and mainly needs to know it is still coming.
+    return (
+      <View style={styles.root}>
+        <EventDetailsSkeleton />
+        <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
+      </View>
+    );
   }
 
   if (isError || !event) {
@@ -1765,6 +1775,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
+  slowNotice: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.xl,
+  },
   center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
   errorText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
   errorActions: { flexDirection: 'row', gap: spacing.sm },
