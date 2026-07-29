@@ -120,7 +120,6 @@ module.exports = {
       'expo-video',
       'expo-secure-store',
       'expo-web-browser',
-      '@sentry/react-native/expo',
       // Native Google sign-in — shows Android's own "Choose an account" system sheet
       // instead of handing off to a browser.
       //
