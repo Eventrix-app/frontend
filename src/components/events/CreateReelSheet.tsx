@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import HalfScreenModal from '../common/halfscreenmodal';
 import { Text } from '../common/Text';
 import { useTheme } from '../../theme/ThemeContext';
