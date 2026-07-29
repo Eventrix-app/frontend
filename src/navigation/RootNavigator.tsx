@@ -39,6 +39,7 @@ import UserProfileScreen from '../Pages/main/UserProfileScreen';
 import { useForegroundSyncRetry } from '../hooks/useForegroundSyncRetry';
 import { useCheckInSyncRetry } from '../hooks/useCheckInSyncRetry';
 import { showAlert } from '../utils/crossPlatformAlert';
+import CheckoutScreen from '../Pages/main/CheckoutScreen'; 
 import { REEL_UPLOAD_NOTIFICATION_TYPE } from '../utils/reelUploadManager';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -220,6 +221,7 @@ const RootNavigator = () => {
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
         <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
         <Stack.Screen name="ActiveSessions" component={ActiveSessionsScreen} />

@@ -93,18 +93,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 const GALLERY_PAGE_SIZE = 6;
 const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
 
-// Inlined from assets/icons/{share,calendar}-{dark,light}.svg — react-native-svg's SvgXml
-// can't load a bare require()'d .svg file on native, same reasoning as EventInterestCard's
-// inlined badge icons. Per ticket: light mode uses the white ("-dark") variant, dark mode
-// uses the black ("-light") variant — these action buttons sit on the hero photo/gradient,
-// not on the app's own background, so the mapping is intentionally the opposite of most
-// theme-driven colors elsewhere in the app.
 const SHARE_DARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
 const SHARE_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#000" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
 const CALENDAR_DARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>`;
 const CALENDAR_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#000" d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>`;
-// From assets/events/bookmark.svg / bookmark-check.svg — same re-filled pair EventInterestCard
-// already uses for the identical unsaved/saved states, kept in sync with that card's accent.
 const BOOKMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 const BOOKMARK_CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#F43362"><path d="m438-400 198-198-57-56-141 141-57-57-57 57 114 113ZM200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 
@@ -144,15 +136,8 @@ const GalleryTab: React.FC<{ gallery: GalleryItem[]; eventId: string }> = ({ gal
   const [visibleCount, setVisibleCount] = useState(GALLERY_PAGE_SIZE);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // useNavigation rather than a prop: GalleryTab is rendered several levels below the
-  // screen's own props, and threading navigation down would mean touching every tab.
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  // Entry point into the reel creation flow (RecordReel -> EditReel -> ShareReel). The
-  // gallery is where an event's media already lives, so it is where a user looks to add
-  // more. eventId is required by the flow — every reel is scoped to an event — which is
-  // why the entry point lives on a screen that has one rather than on the Shorts tab,
-  // where the user would first have to pick an event.
   const createReel = useCallback(
     () => navigation.navigate('RecordReel', { eventId }),
     [navigation, eventId],
@@ -230,10 +215,6 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
   const [deleteScheduleItem] = useDeleteScheduleItemMutation();
   const [time, setTime] = useState('');
   const [title, setTitle] = useState('');
-  // The add form lives in a dialog rather than permanently above the list. Inline, it pushed
-  // the schedule itself down the screen for every organizer visit — including the common one
-  // where they only came to read it — and focusing a field there left the submit button under
-  // the keyboard.
   const [showAddDialog, setShowAddDialog] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -253,8 +234,6 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
       }).unwrap();
       setTime('');
       setTitle('');
-      // Only on success — a failed add keeps the dialog open with the text intact, so the
-      // organizer can retry instead of retyping.
       setShowAddDialog(false);
     } catch (err) {
       showAlert('Could not add schedule item', extractErrorMessage(err, 'Please try again.'));
@@ -296,8 +275,6 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
         </TouchableOpacity>
       )}
 
-      {/* Default liftOnKeyboard: this is a form, so the whole sheet rising keeps "Add to
-          Schedule" reachable while a field is focused. */}
       <HalfScreenModal
         visible={showAddDialog}
         onClose={() => setShowAddDialog(false)}
@@ -380,7 +357,7 @@ interface ReviewItem {
   userId: string;
   name: string;
   username: string;
-  rating: number; // 1-5
+  rating: number;
   text: string;
 }
 
@@ -638,10 +615,6 @@ const CommunityTab: React.FC<{ eventId: string; currentUserId?: string }> = ({ e
     try {
       await sendMessage(trimmed);
     } catch {
-      // Only restore the failed text if the user hasn't already started typing something
-      // new in the meantime — using the functional updater to read the actual current
-      // value at catch-time (not the stale `draft` from this closure) avoids clobbering a
-      // newer, unsent draft with the older failed message.
       setDraft((current) => (current === '' ? trimmed : current));
       showAlert('Message not sent', 'Please check your connection and try again.');
     }
@@ -970,9 +943,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('about');
   const [descExpanded, setDescExpanded] = useState(false);
   const [showOrganizerMenu, setShowOrganizerMenu] = useState(false);
-  // Real measured height of the sticky footer button — used as scroll padding so tab
-  // content is never hidden underneath it, instead of a guessed flat pixel value that
-  // could fall short on smaller screens or once the footer's own content changes size.
   const [footerHeight, setFooterHeight] = useState(100);
   const authUser = useSelector((state: RootState) => state.auth.user);
   const { colors, theme } = useTheme();
@@ -997,11 +967,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const organizerPhone = organizerProfile?.phone;
   const saved = !!event && favorites.some((f) => f.id === event.id);
 
-  // navigation.goBack() throws "GO_BACK was not handled by any navigator" whenever this
-  // screen has no previous screen to pop to — e.g. opened directly via a deep link
-  // (eventrix://event/:id) or a push-notification tap (see navigateForPushData in
-  // RootNavigator.tsx), both of which can land here as the first screen in the stack. Fall
-  // back to Home in that case instead of leaving the back button a no-op.
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -1058,9 +1023,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         showAlert("Couldn't add to calendar", 'No calendar is available on this device.');
         return;
       }
-      // A missing endTime falls back to a flat +2h block here rather than reusing
-      // getEventEndDateTime's start==end fallback, since a zero-length calendar entry
-      // renders oddly in most calendar apps.
       const startDate = getEventStartDateTime(event);
       const endDate = event.endTime
         ? getEventEndDateTime(event)
@@ -1139,9 +1101,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   if (isLoading) {
-    // Overlaid on the skeleton's own layout rather than replacing it — this screen is
-    // usually reached by tapping a specific card, so the user has a clear expectation of
-    // what should appear and mainly needs to know it is still coming.
     return (
       <View style={styles.root}>
         <EventDetailsSkeleton />
@@ -1191,9 +1150,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       showAlert('No phone number', "This organizer hasn't added a WhatsApp number yet.");
       return;
     }
-    // Strip everything except digits and leading +
     const digits = organizerPhone.replace(/[^\d]/g, '');
-    // If number doesn't start with country code, assume India (+91)
     const withCountry = digits.startsWith('91') && digits.length === 12
       ? digits
       : digits.length === 10
@@ -1210,22 +1167,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const notApprovedYet = event.isPaid && event.approvalStatus !== 'approved';
   const selectedAvailability = selectedTier ? tierAvailability(selectedTier) : null;
 
-  // A user with an active (non-cancelled, non-refunded) booking for this event can't
-  // re-enroll — the backend already 409s on a second enroll() — so the CTA becomes a
-  // way to manage the existing booking instead of a disabled dead end. Waitlist state is
-  // checked only when there's no active enrollment, since a promoted waitlist entry
-  // always has a corresponding Enrollment row by the time it matters here.
   const myActiveEnrollment = myEnrollments.find(
     (e) => e.eventId === event.id && e.status !== 'cancelled' && e.status !== 'refunded',
   );
   const myActiveWaitlistEntry = !myActiveEnrollment
     ? myWaitlist.find((w) => w.eventId === event.id && w.status === 'waiting')
     : undefined;
-  // Both conditions matter: totalAmount > 0 alone isn't enough, since a paid ticket type
-  // sits at paymentStatus 'pending' from enroll() until checkout actually completes (no
-  // in-app payment flow exists yet) — requestRefund() 400s on anything that isn't
-  // 'paid'. Only route through the refund flow once money has actually been collected;
-  // otherwise a direct, no-refund-needed cancel is both correct and necessary.
   const isMyEnrollmentPaid =
     !!myActiveEnrollment && Number(myActiveEnrollment.totalAmount) > 0 && myActiveEnrollment.paymentStatus === 'paid';
 
@@ -1245,9 +1192,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  // Paid bookings can only be unwound through the refund-request flow (it's the only
-  // path that actually reverses payment) — hand off to Ticket Details, which already has
-  // that form, rather than duplicating it here.
+  // ============================================================
+  // UPDATED: "Book Now" now navigates to Checkout instead of
+  // enrolling directly. Waitlist ("sold out") still enrolls
+  // right away since there's nothing to pay for at that point.
+  // ============================================================
   const handleFooterPress = () => {
     if (myActiveEnrollment) {
       if (isMyEnrollmentPaid) {
@@ -1257,7 +1206,23 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       }
       return;
     }
-    handleEnroll();
+
+    if (!authUser) {
+      navigation.navigate('Auth');
+      return;
+    }
+    if (!event || !selectedTier) return;
+
+    if (selectedAvailability === 'sold_out') {
+      handleEnroll();
+      return;
+    }
+
+    navigation.navigate('Checkout', {
+      eventId: event.id,
+      ticketTypeId: selectedTier.id,
+      quantity,
+    });
   };
 
   const footerLabel = myActiveEnrollment
@@ -1305,12 +1270,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   if (earlyBirdTier) badges.push('Early Bird');
 
   const organizerName = event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer';
-  // No invented filler. These previously fell back to generic blurbs when the organizer had
-  // left a field blank, which meant a real event displayed sentences its organizer never
-  // wrote, in their own voice, on their own listing - and a reader has no way to tell that
-  // apart from real copy. An absent section is honest; a fabricated one is not. Each label
-  // below is hidden when its content is empty (the .map() calls already render nothing),
-  // and the tab shows a short note when the organizer filled in none of the three.
   const aboutDescription = event.description?.trim() ?? '';
   const highlights: string[] = event.highlights ?? [];
   const whoShouldAttend: string[] = event.whoShouldAttend ?? [];
@@ -1539,8 +1498,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'about' && (
           <View style={styles.tabContent}>
-            {/* Says plainly that there is nothing here yet, rather than filling the space
-                with copy the organizer never wrote. */}
             {!hasAboutContent ? (
               <Text style={styles.bulletText}>
                 The organizer hasn't added a description for this event yet.
@@ -1576,22 +1533,12 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'tickets' && (
           <View style={styles.tabContent}>
-            {/* Gated on the tiers existing, not on who is looking. This used to also require
-                !isOwner, which meant an organizer opening their own event's Tickets tab fell
-                through to "No ticket information available" no matter how many tiers they had
-                just created — the data was there (findTicketTypes deliberately returns *more*
-                to an owner, including hidden tiers), it simply was never rendered. Only the
-                transactional parts below — tier selection and the quantity stepper — are
-                owner-gated now; the tier details themselves are the organizer's own setup and
-                are exactly what they come here to check. */}
             {ticketTypes.length > 0 ? (
               <>
                 <View style={styles.ticketStubList}>
                   {ticketTypes.map((tier) => {
                     const remaining = remainingForTier(tier);
                     const availability = tierAvailability(tier);
-                    // An owner cannot buy their own tickets, so for them a tier is a read-only
-                    // summary rather than a choice.
                     const selectable =
                       !isOwner && (availability === 'available' || availability === 'sold_out');
                     const selected = !isOwner && tier.id === selectedTierId;
@@ -1623,10 +1570,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                         style={[
                           styles.ticketStubWrap,
                           selected && styles.ticketStubSelected,
-                          // Dim only a tier a buyer genuinely cannot pick. An owner's tiers are
-                          // all unselectable by design, and greying every one of them out would
-                          // read as "something is wrong with these" rather than "not for sale to
-                          // you".
                           !isOwner && !selectable && styles.ticketStubDisabled,
                         ]}
                       >
@@ -1665,8 +1608,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   })}
                 </View>
 
-                {/* Purchase control, so it stays owner-gated — there is nothing for an
-                    organizer to set a quantity of on their own event. */}
                 {!isOwner && selectedTier && (() => {
                   const { min, max } = quantityBoundsForTier(selectedTier);
                   const atMin = quantity <= min;
@@ -1725,8 +1666,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 </View>
               </>
             ) : (
-              // Two genuinely different situations, so they no longer share one message: an
-              // owner with no tiers has something to do about it, a visitor does not.
               <Text style={styles.emptyTabText}>
                 {isOwner
                   ? 'No ticket tiers yet. Add them from "Manage Ticket Types" in the organizer menu.'

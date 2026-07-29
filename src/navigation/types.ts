@@ -37,6 +37,7 @@ export type RootStackParamList = {
   ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };
   RefundApproval: undefined;
+  Checkout: { eventId: string; ticketTypeId: string; quantity: number };
   OrganizerProfile: { organizerId: string };
   // Another user's public profile — their name, avatar and reels. Distinct from
   // OrganizerProfile, which needs an organizer record most reel uploaders do not have.
@@ -71,6 +72,7 @@ export type RootStackParamList = {
     // feed. Still not burned into the video file — that needs server-side compositing.
     overlay?: ShortOverlay;
   };
+  
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
 };

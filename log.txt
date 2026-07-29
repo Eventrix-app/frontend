@@ -1,0 +1,268 @@
+--------- beginning of main
+07-29 15:01:16.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129695570549, event=167.000000
+07-29 15:01:16.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129696306747, event=167.000000
+07-29 15:01:17.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129795579611, event=168.000000
+07-29 15:01:17.047  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129796300236, event=168.000000
+07-29 15:01:17.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129895550705, event=168.000000
+07-29 15:01:17.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129896301070, event=168.000000
+07-29 15:01:17.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129995580393, event=169.000000
+07-29 15:01:17.247  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134129996304090, event=169.000000
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: Connected to unknown network * ID: 2 SSID: "Airtel_afza_2914" PROVIDER-NAME: null BSSID: null FQDN: null HOME-PROVIDER-NETWORK: false PRIO: 0 HIDDEN: false PMF: false CarrierId: -1 SubscriptionId: -1 SubscriptionGroup: null Currently Connected: true User Selected: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  NetworkSelectionStatus NETWORK_SELECTION_ENABLED
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  hasEverConnected: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  hasNeverDetectedCaptivePortal: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  hasEverValidatedInternetAccess: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  mCandidateSecurityParams: Security Parameters:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Type: 2
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Enabled: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  KeyMgmt: WPA_PSK
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Protocols: WPA RSN
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  AuthAlgorithms:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PairwiseCiphers: TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupCiphers: WEP40 WEP104 TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupMgmtCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  SuiteBCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  RequirePmf: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsAddedByAutoUpgrade: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaeH2eOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaePkOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  mLastUsedSecurityParams: Security Parameters:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Type: 2
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Enabled: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  KeyMgmt: WPA_PSK
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Protocols: WPA RSN
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  AuthAlgorithms:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PairwiseCiphers: TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupCiphers: WEP40 WEP104 TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupMgmtCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  SuiteBCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  RequirePmf: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsAddedByAutoUpgrade: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaeH2eOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaePkOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  numAssociation 74
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  validatedInternetAccess shared trusted
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  macRandomizationSetting: 3
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  mRandomizedMacAddress: 06:5b:dd:5c:7a:74
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  randomizedMacExpirationTimeMs: 2026-07-30T14:44:31.313
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  randomizedMacLastModifiedTimeMs: <none>
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  mIsSendDhcpHostnameEnabled: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  deletionPriority: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  KeyMgmt: WPA_PSK Protocols: WPA RSN
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  AuthAlgorithms:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PairwiseCiphers: TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupCiphers: WEP40 WEP104 TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupMgmtCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  SuiteBCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PSK/SAE: *
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: SecurityParams List:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: Security Parameters:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Type: 2
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Enabled: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  KeyMgmt: WPA_PSK
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Protocols: WPA RSN
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  AuthAlgorithms:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PairwiseCiphers: TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupCiphers: WEP40 WEP104 TKIP CCMP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupMgmtCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  SuiteBCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  RequirePmf: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsAddedByAutoUpgrade: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaeH2eOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaePkOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: Security Parameters:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Type: 4
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Enabled: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  KeyMgmt: SAE
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  Protocols: RSN
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  AuthAlgorithms:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  PairwiseCiphers: CCMP GCMP_256 GCMP_128
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupCiphers: CCMP GCMP_256 GCMP_128
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  GroupMgmtCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  SuiteBCiphers:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  RequirePmf: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsAddedByAutoUpgrade: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaeH2eOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  IsSaePkOnlyMode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: 
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: Enterprise config:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  ocsp: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  trust_on_first_use: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  user_approve_no_ca_cert: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  selected_rcoi: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  minimum_tls_version: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  enable_conservative_peer_mode: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  tofu_dialog_state: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  tofu_connection_state: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: IP config:
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: IP assignment: DHCP
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: Proxy settings: NONE
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  cuid=1000 cname=android.uid.system:1000 luid=1000 lname=android.uid.system:1000 lcuid=10046 allowAutojoin=true noInternetAccessExpected=false mostRecentlyConnected=false 
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: lastConnected: 2026-07-29T14:44:31.345 
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: 
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: numRebootsSinceLastUse: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: recentFailure: Association Rejection code: 0, last update time: 0
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: bssidAllowlist unset
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: vendorData unset
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: IsDppConfigurator: true
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory: HasEncryptedPreSharedKey: false
+07-29 15:01:17.253  1699  2682 W WifiNetworkFactory:  setWifi7Enabled=true:22:0c:86:5c:03:a1. Ignoring...
+07-29 15:01:17.254  1699  6842 D SemWifiUsabilityStatsMonitor: onWifiUsabilityStats - seqNum 8735, isSameBssidAndFreq true
+07-29 15:01:17.255  1699  2694 D ConnectivityService: notifyType CALLBACK_CAP_CHANGED for [176 WIFI]
+07-29 15:01:17.258  1699  2728 D SemWifiApNsd:Client: lpInterface:wlan0
+07-29 15:01:17.258  1699  2728 D SemWifiSwitchForIndividualAppsService: stopTCPMonitoring : already stopped
+07-29 15:01:17.259  1699  2728 I WifiConnectivityMonitor.NCC: sNetworkCallback(oCC) FULL : 176(valid: true/captive: false)
+07-29 15:01:17.264  1699  2728 I WifiConnectivityMonitor.NCC: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=9550Kbps LinkDnBandwidth>=32068Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:**:**:00, MAC: 02:00:00:**:**:00, IP: /192.***.*.14, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11n, RSSI: -63, Link speed: 65Mbps, Tx Link speed: 65Mbps, Max Supported Tx Link speed: 72Mbps, Rx Link speed: 72Mbps, Max Supported Rx Link speed: 72Mbps, Frequency: 2462MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -63 AdminUids: [1000] SSID: "Airtel_afza_2914" UnderlyingNetworks: Null]
+07-29 15:01:17.265  1699  2795 D WifiConnectivityMonitor: HANDLE_ON_CAPABILITIES_CHANGED
+07-29 15:01:17.265  1699  2795 I WifiConnectivityMonitor: determineMode : MODE_NON_SWITCHABLE_BY_POOR_NETWORK_DETECTION_DISABLED
+07-29 15:01:17.265  1699  2795 D OpenNetworkQos[4.00]: updateBssidNoInternet: mBssidNoInternet = false
+07-29 15:01:17.265  1699  2795 D OpenNetworkQos[4.00]: getOpenNetworkQosNoInternetStatus: false
+07-29 15:01:17.265  1699  2795 D OpenNetworkQos[4.00]: getOpenNetworkQosScores: 26 30 30 
+--------- beginning of system
+07-29 15:01:17.266  1699  2795 D KNOX_MDM_SettingsProvider: isChangeAllowed() : name = wifi_wcm_qos_sharing_score_summary
+07-29 15:01:17.268 25961 26002 I NullBinder: NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl, calling uid: 1000, calling pid: 0
+07-29 15:01:17.268 25961 26002 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+07-29 15:01:17.271  5306  5500 I HBD     : i onCapabilitiesChanged network : 176 current network state : invalid 
+07-29 15:01:17.277 25961  8351 D ConnectivityManager: StackLog: [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4744)] [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4912)] [android.net.ConnectivityManager.registerNetworkCallback(ConnectivityManager.java:5329)] [android.net.ConnectivityManager.registerNetworkCallback(ConnectivityManager.java:5299)] [dtzg.a(:com.google.android.gms@262634035@26.26.34 (260400-945364269):34)] [lnz.a(:com.google.android.gms@262634035@26.26.34 (260400-945364269):19)] [dtzs.j(:com.google.android.gms@262634035@26.26.34 (260400-945364269):19)] [dtzs.O(:com.google.android.gms@262634035@26.26.34 (260400-945364269):14)] [dtzs.K(:com.google.android.gms@262634035@26.26.34 (260400-945364269):7)] [dtzs.I(:com.google.android.gms@262634035@26.26.34 (260400-945364269):23)] [dtzk.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):9)] [blvq.c(:com.google.android.gms@262634035@26.26.34 (260400-945364269):50)] [blvq.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):71)] [java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)] [java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)] [bmbk.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):8)] [java.lang.Thread.run(Thread.java:1572)]
+07-29 15:01:17.283  2932  3214 D WifiPickerTracker: updateWifiEntries capabilities
+07-29 15:01:17.285  1699  2694 D ConnectivityService: Rematched networks [computed 0ms] [applied 1ms] [issued 0]
+07-29 15:01:17.285  1699  2694 D ConnectivityService: NetworkReassignment : no changes
+07-29 15:01:17.286 25961  8351 D ConnectivityManager: StackLog: [android.net.ConnectivityManager.unregisterNetworkCallback(ConnectivityManager.java:5579)] [dtzs.j(:com.google.android.gms@262634035@26.26.34 (260400-945364269):43)] [dtzs.O(:com.google.android.gms@262634035@26.26.34 (260400-945364269):14)] [dtzs.K(:com.google.android.gms@262634035@26.26.34 (260400-945364269):7)] [dtzs.I(:com.google.android.gms@262634035@26.26.34 (260400-945364269):23)] [dtzk.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):9)] [blvq.c(:com.google.android.gms@262634035@26.26.34 (260400-945364269):50)] [blvq.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):71)] [java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)] [java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)] [bmbk.run(:com.google.android.gms@262634035@26.26.34 (260400-945364269):8)] [java.lang.Thread.run(Thread.java:1572)]
+07-29 15:01:17.286  2932  3214 D WifiPickerTracker: update AutoHotspot Entries() : bleAccessPoints -> 0
+07-29 15:01:17.286  2932  3214 D WifiPickerTracker: handleNetworkCapabilitiesChanged
+07-29 15:01:17.287 25961  8351 I NearbyMediums: Wifi changed new SSID: "Airtel_afza_2914"
+07-29 15:01:17.287 25961  8351 I NearbyMediums: WifiLanConnectivityInfo is not changed, skip notify.
+07-29 15:01:17.306  1522  1522 W Layer   : gatherBufferInfo: Received unknown dataspace from gralloc
+07-29 15:01:17.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130095578830, event=170.000000
+07-29 15:01:17.347  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130096300653, event=170.000000
+07-29 15:01:17.373  5306  5306 E HBD     : i activeNetwork is null 
+07-29 15:01:17.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130195575393, event=171.000000
+07-29 15:01:17.447  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130196298830, event=171.000000
+07-29 15:01:17.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130295571434, event=171.000000
+07-29 15:01:17.547  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130296300653, event=171.000000
+07-29 15:01:17.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130395567893, event=170.000000
+07-29 15:01:17.647  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130396300601, event=170.000000
+07-29 15:01:17.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130495552007, event=170.000000
+07-29 15:01:17.747  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130496301070, event=170.000000
+07-29 15:01:17.776 25961  8351 I NearbySharing: Network state changed: NetworkState(isRestricted=false, isOnline=true, isCongested=false, isMetered=false, isWifiConnected=true)
+07-29 15:01:17.776 25961  7674 I NearbySharing: Network state changed: NetworkState(isRestricted=false, isOnline=true, isCongested=false, isMetered=false, isWifiConnected=true)
+07-29 15:01:17.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130595567476, event=170.000000
+07-29 15:01:17.848  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130596301226, event=170.000000
+07-29 15:01:17.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130695572059, event=170.000000
+07-29 15:01:17.948  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130696300705, event=170.000000
+07-29 15:01:18.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130795569143, event=170.000000
+07-29 15:01:18.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130796307163, event=170.000000
+07-29 15:01:18.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130895568934, event=170.000000
+07-29 15:01:18.149  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130896299924, event=170.000000
+07-29 15:01:18.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130995568309, event=170.000000
+07-29 15:01:18.247  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134130996299820, event=170.000000
+07-29 15:01:18.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131095550393, event=170.000000
+07-29 15:01:18.349  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131096308726, event=170.000000
+07-29 15:01:18.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131195569976, event=170.000000
+07-29 15:01:18.449  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131196299924, event=170.000000
+07-29 15:01:18.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131295568882, event=170.000000
+07-29 15:01:18.550  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131296301174, event=170.000000
+07-29 15:01:18.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131395579611, event=170.000000
+07-29 15:01:18.650  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131396301747, event=170.000000
+07-29 15:01:18.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131495580132, event=170.000000
+07-29 15:01:18.750  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131496305705, event=170.000000
+07-29 15:01:18.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131595576747, event=169.000000
+07-29 15:01:18.848   619   619 D io_stats: !@   8,0 r 32078772 689788716 w 6552533 100514044 d 904278 100478272 f 0 0 iot 19290348 0 th 0 0 0 pt 0 inp 0 0 462361.483
+07-29 15:01:18.848   619   619 D io_stats: !@ Read_top(KB): ndroid.systemui(2932) 4
+07-29 15:01:18.849   619   619 D io_stats: !@ Write_top(KB): kworker/u16:4(22994) 24 sait.sohservice(6191) 16 c.android.sdhms(9178) 4
+07-29 15:01:18.850  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131596304455, event=169.000000
+07-29 15:01:18.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131695551226, event=169.000000
+07-29 15:01:18.950  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131696300497, event=169.000000
+07-29 15:01:19.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131795578309, event=169.000000
+07-29 15:01:19.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131796306382, event=169.000000
+07-29 15:01:19.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131895574924, event=169.000000
+07-29 15:01:19.147  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131896302111, event=169.000000
+07-29 15:01:19.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131995574403, event=169.000000
+07-29 15:01:19.247  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134131996301226, event=169.000000
+07-29 15:01:19.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132095582476, event=169.000000
+07-29 15:01:19.347  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132096300393, event=169.000000
+07-29 15:01:19.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132195577788, event=169.000000
+07-29 15:01:19.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132196302997, event=169.000000
+07-29 15:01:19.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132295576486, event=169.000000
+07-29 15:01:19.547  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132296300757, event=169.000000
+07-29 15:01:19.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132395584299, event=169.000000
+07-29 15:01:19.647  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132396300705, event=169.000000
+07-29 15:01:19.672  1699  2473 D SensorService: [SO] 7.263 0.100 4.381
+07-29 15:01:19.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132495576226, event=168.000000
+07-29 15:01:19.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132496300653, event=168.000000
+07-29 15:01:19.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132595577528, event=168.000000
+07-29 15:01:19.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132596302580, event=168.000000
+07-29 15:01:19.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132695580132, event=168.000000
+07-29 15:01:19.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132696302215, event=168.000000
+07-29 15:01:20.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132795577476, event=168.000000
+07-29 15:01:20.047  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132796301174, event=168.000000
+07-29 15:01:20.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132895580913, event=168.000000
+07-29 15:01:20.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132896301695, event=168.000000
+07-29 15:01:20.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132995579872, event=168.000000
+07-29 15:01:20.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134132996301330, event=168.000000
+07-29 15:01:20.276  1699  6842 D SemWifiUsabilityStatsMonitor: onWifiUsabilityStats - seqNum 8736, isSameBssidAndFreq true
+07-29 15:01:20.304  1522  1522 W Layer   : gatherBufferInfo: Received unknown dataspace from gralloc
+07-29 15:01:20.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133095580132, event=168.000000
+07-29 15:01:20.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133096302320, event=168.000000
+07-29 15:01:20.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133195582215, event=168.000000
+07-29 15:01:20.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133196301174, event=168.000000
+07-29 15:01:20.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133295568413, event=167.000000
+07-29 15:01:20.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133296300965, event=167.000000
+07-29 15:01:20.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133395578309, event=167.000000
+07-29 15:01:20.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133396301434, event=167.000000
+07-29 15:01:20.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133495577268, event=167.000000
+07-29 15:01:20.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133496301955, event=167.000000
+07-29 15:01:20.805  1699  2137 E Watchdog: !@Sync: 15405 heap(MB): 118 / 125 FD: 1101 [2026-07-29 15:01:20.805]
+07-29 15:01:20.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133595575445, event=167.000000
+07-29 15:01:20.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133596300965, event=167.000000
+07-29 15:01:20.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133695579351, event=167.000000
+07-29 15:01:20.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133696300809, event=167.000000
+07-29 15:01:21.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133795578049, event=167.000000
+07-29 15:01:21.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133796299872, event=167.000000
+07-29 15:01:21.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133895578830, event=167.000000
+07-29 15:01:21.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133896301903, event=167.000000
+07-29 15:01:21.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133995576747, event=167.000000
+07-29 15:01:21.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134133996301695, event=167.000000
+07-29 15:01:21.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134095575184, event=167.000000
+07-29 15:01:21.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134096301070, event=167.000000
+07-29 15:01:21.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134195575705, event=167.000000
+07-29 15:01:21.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134196301070, event=167.000000
+07-29 15:01:21.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134295579351, event=167.000000
+07-29 15:01:21.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134296300340, event=167.000000
+07-29 15:01:21.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134395581434, event=166.000000
+07-29 15:01:21.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134396301955, event=166.000000
+07-29 15:01:21.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134495581174, event=166.000000
+07-29 15:01:21.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134496302111, event=166.000000
+07-29 15:01:21.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134595578309, event=166.000000
+07-29 15:01:21.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134596300132, event=166.000000
+07-29 15:01:21.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134695580132, event=166.000000
+07-29 15:01:21.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134696305445, event=166.000000
+07-29 15:01:22.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134795575445, event=166.000000
+07-29 15:01:22.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134796301226, event=166.000000
+07-29 15:01:22.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134895580653, event=166.000000
+07-29 15:01:22.147  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134896300653, event=166.000000
+07-29 15:01:22.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134995577788, event=166.000000
+07-29 15:01:22.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134134996301434, event=166.000000
+07-29 15:01:22.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135095578049, event=165.000000
+07-29 15:01:22.346  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135096302215, event=165.000000
+07-29 15:01:22.446  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135195572372, event=165.000000
+07-29 15:01:22.449  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135196300236, event=165.000000
+07-29 15:01:22.546  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135295578309, event=165.000000
+07-29 15:01:22.547  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135296301018, event=165.000000
+07-29 15:01:22.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135395578309, event=165.000000
+07-29 15:01:22.646  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135396302163, event=165.000000
+07-29 15:01:22.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135495568934, event=165.000000
+07-29 15:01:22.746  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135496300393, event=165.000000
+07-29 15:01:22.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135595580132, event=164.000000
+07-29 15:01:22.846  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135596301695, event=164.000000
+07-29 15:01:22.849   619   619 D io_stats: !@   8,0 r 32078772 689788716 w 6552534 100514100 d 904278 100478272 f 0 0 iot 19290356 0 th 0 0 0 pt 0 inp 0 0 462365.484
+07-29 15:01:22.850   619   619 D io_stats: !@ Write_top(KB): kworker/u16:2(22984) 4
+07-29 15:01:22.946  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135695577528, event=165.000000
+07-29 15:01:22.947  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135696301538, event=165.000000
+07-29 15:01:23.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135795577528, event=166.000000
+07-29 15:01:23.046  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135796300653, event=166.000000
+07-29 15:01:23.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135895580653, event=167.000000
+07-29 15:01:23.146  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135896304507, event=167.000000
+07-29 15:01:23.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135995580913, event=166.000000
+07-29 15:01:23.246  1371  5138 I sensors-hal: handle_sns_client_event:44, ambient_light_event: ts=2134135996304299, event=166.000000
+07-29 15:01:23.256  6579  6579 I adbd    : adbd service requested 'shell,v2,TERM=xterm-256color:export ANDROID_LOG_TAGS="''"; exec logcat '-d''
