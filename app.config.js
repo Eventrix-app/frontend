@@ -31,11 +31,11 @@ module.exports = {
     scheme: 'eventrix',
     orientation: 'portrait',
     sdkVersion: '54.0.0',
-    icon: './assets/logo/logo.jpg',
+    icon: './assets/app/logo.jpg',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
     splash: {
-      image: './assets/logo/logo.jpg',
+      image: './assets/app/logo.jpg',
       resizeMode: 'contain',
       backgroundColor: '#ffffff',
     },
@@ -53,7 +53,7 @@ module.exports = {
       // variable instead — GOOGLE_SERVICES_JSON then holds the path to that injected copy.
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       adaptiveIcon: {
-        foregroundImage: './assets/logo/adaptive-icon-foreground.png',
+        foregroundImage: './assets/app/adaptive-icon-foreground.png',
         backgroundColor: '#FF3366',
       },
       edgeToEdgeEnabled: true,
@@ -92,7 +92,7 @@ module.exports = {
       },
     },
     web: {
-      favicon: './assets/favicon.jpg',
+      favicon: './assets/app/favicon.jpg',
     },
     plugins: [
       '@react-native-community/datetimepicker',
@@ -113,7 +113,7 @@ module.exports = {
       [
         'expo-notifications',
         {
-          icon: './assets/logo/logo.jpg',
+          icon: './assets/app/logo.jpg',
           color: '#F43362',
         },
       ],

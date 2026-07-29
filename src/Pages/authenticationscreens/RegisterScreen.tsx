@@ -122,14 +122,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         autoCapitalize="none"
       />
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Create Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Confirm Password"
         value={confirm}
         onChangeText={setConfirm}

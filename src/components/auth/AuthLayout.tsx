@@ -72,7 +72,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         <View style={[styles.brandCardContent, { paddingTop: insets.top }]}>
           <Animated.View style={{ opacity: logoOpacity, transform: [{ translateY: logoTranslateY }] }}>
             <Image
-              source={require('../../../assets/logo/logo.jpg')}
+              source={require('../../../assets/app/logo.jpg')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -106,7 +106,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         style={StyleSheet.absoluteFill}
       />
       <Image
-        source={require('../../../assets/Background.png')}
+        source={require('../../../assets/auth/background.png')}
         style={styles.orbTop}
         resizeMode="cover"
       />

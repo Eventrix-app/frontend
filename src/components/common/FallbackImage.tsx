@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Image, ImageContentFit } from 'expo-image';
 
-const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
+const SKELETON_IMG = require('../../../assets/shared/placeholders/image-frame.png');
 
 interface Props {
   source: unknown; // already-resolved image source — a {uri} object or a require()'d local asset

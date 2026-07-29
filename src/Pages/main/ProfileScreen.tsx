@@ -26,7 +26,7 @@ import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import ProfileHeaderSkeleton from '../../components/common/ProfileHeaderSkeleton';
 
-const bgImage = require('../../../assets/bg.png');
+const bgImage = require('../../../assets/shared/backgrounds/bg.png');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile' | 'OrganizerProfile'>;
 

@@ -109,7 +109,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [isFree, setIsFree] = useState(true);
-  const [tiers, setTiers] = useState<TierDraft[]>(() => [createBlankTier()]);
+  const [tiers, setTiers] = useState<TierDraft[]>(() => [createBlankTier('EARLY_BIRD')]);
   // Optional event-wide seat cap — left blank, the backend derives capacity from the sum
   // of ticket-tier quantities instead (see events.service.ts withComputedSeats). Kept as a
   // string for the TextInput; converted to a number (or omitted) in buildPayload().

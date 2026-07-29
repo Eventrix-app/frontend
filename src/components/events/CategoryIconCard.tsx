@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, ImageStyle, StyleSheet, TouchableOpacity } from 'react-native';
 import { spacing } from '../../theme/spacing';
 
-// Every PNG in assets/home-screen-categories/ is a complete, pre-rendered card: the white
+// Every PNG in assets/home/categories/ is a complete, pre-rendered card: the white
 // rounded rect, the border, the category label, the tinted glow at the card's foot, the
 // artwork and the drop shadow are all baked into the bitmap. So there is deliberately no
 // card styling, no <Text> and no elevation/shadowColor here — anything added would double
@@ -63,19 +63,19 @@ export interface CategoryItem {
 }
 
 export const CATEGORIES: CategoryItem[] = [
-  { key: 'music', icon: require('../../../assets/home-screen-categories/music.png'), layout: STANDARD_LAYOUT },
-  { key: 'tech', icon: require('../../../assets/home-screen-categories/tech.png'), layout: STANDARD_LAYOUT },
-  { key: 'sports', icon: require('../../../assets/home-screen-categories/sports.png'), layout: STANDARD_LAYOUT },
-  { key: 'health', icon: require('../../../assets/home-screen-categories/health.png'), layout: STANDARD_LAYOUT },
-  { key: 'education', icon: require('../../../assets/home-screen-categories/education.png'), layout: STANDARD_LAYOUT },
-  { key: 'business', icon: require('../../../assets/home-screen-categories/business.png'), layout: STANDARD_LAYOUT },
-  { key: 'art', icon: require('../../../assets/home-screen-categories/art.png'), layout: WIDE_LAYOUT },
-  { key: 'food', icon: require('../../../assets/home-screen-categories/food.png'), layout: WIDE_LAYOUT },
-  { key: 'gaming', icon: require('../../../assets/home-screen-categories/gaming.png'), layout: WIDE_LAYOUT },
-  { key: 'travel', icon: require('../../../assets/home-screen-categories/travel.png'), layout: WIDE_LAYOUT },
+  { key: 'music', icon: require('../../../assets/home/categories/music.png'), layout: STANDARD_LAYOUT },
+  { key: 'tech', icon: require('../../../assets/home/categories/tech.png'), layout: STANDARD_LAYOUT },
+  { key: 'sports', icon: require('../../../assets/home/categories/sports.png'), layout: STANDARD_LAYOUT },
+  { key: 'health', icon: require('../../../assets/home/categories/health.png'), layout: STANDARD_LAYOUT },
+  { key: 'education', icon: require('../../../assets/home/categories/education.png'), layout: STANDARD_LAYOUT },
+  { key: 'business', icon: require('../../../assets/home/categories/business.png'), layout: STANDARD_LAYOUT },
+  { key: 'art', icon: require('../../../assets/home/categories/art.png'), layout: WIDE_LAYOUT },
+  { key: 'food', icon: require('../../../assets/home/categories/food.png'), layout: WIDE_LAYOUT },
+  { key: 'gaming', icon: require('../../../assets/home/categories/gaming.png'), layout: WIDE_LAYOUT },
+  { key: 'travel', icon: require('../../../assets/home/categories/travel.png'), layout: WIDE_LAYOUT },
 ];
 
-const VIEW_ALL_ICON = require('../../../assets/home-screen-categories/view-all.png');
+const VIEW_ALL_ICON = require('../../../assets/home/categories/view-all.png');
 
 interface Props {
   item: CategoryItem;

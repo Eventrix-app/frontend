@@ -22,7 +22,7 @@ const ErrorScreen: React.FC<Props> = ({
   return (
     <View style={styles.root}>
       <Image
-        source={require('../../../assets/Error.png')}
+        source={require('../../../assets/shared/placeholders/error.png')}
         style={styles.illustration}
         resizeMode="contain"
       />

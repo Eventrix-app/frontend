@@ -158,7 +158,7 @@ const LocationAccessScreen: React.FC = () => {
           {/* Map image */}
           <View style={styles.imageContainer}>
             <Image
-              source={require('../../../assets/location/location.png')}
+              source={require('../../../assets/location/pin.png')}
               style={styles.locationImage}
               resizeMode="cover"
             />
@@ -171,7 +171,7 @@ const LocationAccessScreen: React.FC = () => {
           {/* Manual city input */}
           <View style={styles.inputContainer}>
             <Image
-              source={require('../../../assets/location/search.png')}
+              source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchIcon}
               resizeMode="contain"
               tintColor="#9CA3AF"

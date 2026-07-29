@@ -29,19 +29,19 @@ type Slide = {
 
 const slides: Slide[] = [
   {
-    image: require('../../../assets/carousel/onboarding-carousel/1.jpg'),
+    image: require('../../../assets/onboarding/1.jpg'),
     title: 'Find events near you',
     subtitle:
       'Explore events happening around you based on your interests, location and schedule.',
   },
   {
-    image: require('../../../assets/carousel/onboarding-carousel/2.jpg'),
+    image: require('../../../assets/onboarding/2.jpg'),
     title: 'Join what excites you',
     subtitle:
       'From workshops and concerts to sports and meetups — choose what fits your vibe.',
   },
   {
-    image: require('../../../assets/carousel/onboarding-carousel/3.jpg'),
+    image: require('../../../assets/onboarding/3.jpg'),
     title: 'Connect beyond events',
     subtitle:
       'Watch reels, chat with attendees and be part of the event community.',

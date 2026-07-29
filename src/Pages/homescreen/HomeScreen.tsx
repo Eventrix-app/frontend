@@ -31,7 +31,7 @@ import { NotificationBell, LocationPin } from '../../components/common/Icons';
 import Skeleton from '../../components/common/Skeleton';
 import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
-const bgImage = require('../../../assets/bg.png');
+const bgImage = require('../../../assets/shared/backgrounds/bg.png');
 
 const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none">
   <rect x="9" y="2" width="6" height="12" rx="3" fill="#F43362"/>
@@ -313,7 +313,7 @@ const HomeScreen: React.FC = () => {
             onPress={openSearch}
           >
             <Image
-              source={require('../../../assets/location/search.png')}
+              source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchImg}
               resizeMode="contain"
             />

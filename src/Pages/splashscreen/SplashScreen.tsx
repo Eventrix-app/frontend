@@ -7,7 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackParamList } from '../../navigation/types';
 
-const logoVideoSource = require('../../../assets/3d-logo-reveal.mp4');
+const logoVideoSource = require('../../../assets/splash/logo-reveal.mp4');
 
 // 4s video + buffer — guarantees we move on even if `playToEnd` never fires (e.g. a
 // player stuck in a bad state on some device).

@@ -122,7 +122,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           autoCapitalize="none"
         />
         <AuthInput
-          icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+          icon={require('../../../assets/auth/lock.png')}
           placeholder="Password"
           value={password}
           onChangeText={setPassword}

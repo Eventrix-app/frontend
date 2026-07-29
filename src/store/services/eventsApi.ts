@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import type { TicketCategory } from '../../utils/ticketCategories';
 
 export interface BackendEvent {
   id: string;
@@ -46,10 +47,16 @@ export interface BackendEvent {
 }
 
 export interface CreateTicketTypePayload {
-  name: string;
+  // No `name` — the backend derives and stores the display name from `category` (see
+  // TICKET_CATEGORY_LABELS on TicketType) so every ticket type on the platform draws from
+  // the same small vocabulary instead of organizer-typed free text.
+  category: TicketCategory;
   price: number;
   currency?: string;
   quantityTotal?: number;
+  // Bullet points shown on the ticket card (see EventDetailsScreen's ticket tab). Capped at
+  // 6 server-side — CreateTicketTypeDto's benefits validation.
+  benefits?: string[];
   salesStartAt?: string;
   salesEndAt?: string;
   minPerOrder?: number;
@@ -62,6 +69,11 @@ export interface TicketTypeRecord extends CreateTicketTypePayload {
   id: string;
   eventId: string;
   quantitySold: number;
+  // Server-derived from `category` at write time (create or edit) — always
+  // TICKET_CATEGORY_LABELS[category]. Present because BookingsScreen and other existing
+  // consumers already read `.name` for display and there is no reason to make them all
+  // re-derive it from `category` themselves.
+  name: string;
 }
 
 export interface CreateEventPayload {

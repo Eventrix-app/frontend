@@ -53,6 +53,7 @@ import {
 } from '../../store/services/eventsApi';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
+import { TICKET_CATEGORIES } from '../../utils/ticketCategories';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '../../utils/eventDateTime';
@@ -91,7 +92,7 @@ import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetails'>;
 
 const GALLERY_PAGE_SIZE = 6;
-const SKELETON_IMG = require('../../../assets/skeleton/imageframe.png');
+const SKELETON_IMG = require('../../../assets/shared/placeholders/image-frame.png');
 
 const SHARE_DARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
 const SHARE_LIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#000" d="m21 12l-7-7v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19z"/></svg>`;
@@ -950,7 +951,18 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const { stage: slowStage } = useSlowNetwork(isLoading);
-  const { data: ticketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
+  const { data: rawTicketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
+  // Sorted into the canonical Early Bird -> General -> VIP order regardless of the order
+  // tiers were created in — the same "maintain ticket types" reasoning as the category enum
+  // itself: an organizer who added VIP first and Early Bird second shouldn't produce a card
+  // order that looks arbitrary next to every other event on the platform.
+  const ticketTypes = useMemo(
+    () =>
+      [...rawTicketTypes].sort(
+        (a, b) => TICKET_CATEGORIES.indexOf(a.category) - TICKET_CATEGORIES.indexOf(b.category),
+      ),
+    [rawTicketTypes],
+  );
   const { data: mediaItems = [] } = useGetEventMediaQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
@@ -1265,7 +1277,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   });
   if (soonEndingTier) badges.push('Ending Soon');
   const earlyBirdTier = ticketTypes.find(
-    (t) => t.name?.toLowerCase().includes('early bird') && tierAvailability(t) === 'available',
+    (t) => t.category === 'EARLY_BIRD' && tierAvailability(t) === 'available',
   );
   if (earlyBirdTier) badges.push('Early Bird');
 
@@ -1543,14 +1555,31 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                       !isOwner && (availability === 'available' || availability === 'sold_out');
                     const selected = !isOwner && tier.id === selectedTierId;
 
-                    const benefits: string[] = (tier as any).benefits ?? [];
+                    const benefits: string[] = tier.benefits ?? [];
 
-                    const nameLower = tier.name?.toLowerCase() ?? '';
-                    const stubImage = nameLower.includes('vip')
-                      ? require('../../../assets/tickets/vip.png')
-                      : nameLower.includes('standard')
-                        ? require('../../../assets/tickets/standard.png')
-                        : require('../../../assets/tickets/earlybird.png');
+                    // Matched on the enum now, not a substring of a free-typed name — the
+                    // previous `name.toLowerCase().includes('vip')` broke the moment an
+                    // organizer's own wording didn't happen to contain that word (or did by
+                    // accident, e.g. a name mentioning "standard-sized" seating). category
+                    // is exact by construction: CreateTicketTypeDto only accepts one of the
+                    // three enum values in the first place.
+                    //
+                    // vip.png is a solid brandPink card with a white pill header; earlybird/
+                    // standard.png are a light card with a brandPink pill header — General
+                    // reuses the "standard" art since both non-VIP tiers share the same
+                    // light treatment and only the pill's text differs.
+                    const stubImage =
+                      tier.category === 'VIP'
+                        ? require('../../../assets/events/tickets/vip.png')
+                        : tier.category === 'EARLY_BIRD'
+                          ? require('../../../assets/events/tickets/earlybird.png')
+                          : require('../../../assets/events/tickets/standard.png');
+                    // The only two colors that vary by card: VIP's background is solid pink,
+                    // so everything on it (labels included) has to be white/near-white to
+                    // read; Early Bird/General are a light card where only the pill header
+                    // (holding the title) is pink — the price/availability/benefit *labels*
+                    // use brandPink as an accent against that light background instead.
+                    const isVip = tier.category === 'VIP';
 
                     const availabilityText =
                       availability === 'not_started'
@@ -1580,24 +1609,42 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                         />
 
                         <View style={styles.ticketStubContent}>
-                          <Text style={styles.ticketStubTitle}>{tier.name}</Text>
+                          {/* The pill's fill is brandPink for Early Bird/General but
+                              inverts to white on the VIP card art, so only VIP needs the
+                              text color flipped to read against it. */}
+                          <Text style={[styles.ticketStubTitle, isVip && styles.ticketStubTitleOnVip]}>
+                            {tier.name}
+                          </Text>
 
                           <View style={styles.ticketStubBody}>
                             <View style={styles.ticketStubCol}>
-                              <Text style={styles.ticketStubLabel}>Price</Text>
-                              <Text style={styles.ticketStubBullet}>
+                              <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
+                                Price
+                              </Text>
+                              <Text style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}>
                                 • {tier.price > 0 ? `₹${tier.price}` : 'Free'}
                               </Text>
 
-                              <Text style={styles.ticketStubLabel}>Availability</Text>
-                              <Text style={styles.ticketStubBullet}>• {availabilityText}</Text>
+                              <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
+                                Availability
+                              </Text>
+                              <Text style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}>
+                                • {availabilityText}
+                              </Text>
                             </View>
 
                             {benefits.length > 0 && (
                               <View style={styles.ticketStubCol}>
-                                <Text style={styles.ticketStubLabel}>Benefits</Text>
+                                <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
+                                  Benefits
+                                </Text>
                                 {benefits.map((b, i) => (
-                                  <Text key={i} style={styles.ticketStubBullet}>• {b}</Text>
+                                  <Text
+                                    key={i}
+                                    style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}
+                                  >
+                                    • {b}
+                                  </Text>
                                 ))}
                               </View>
                             )}
@@ -2184,10 +2231,21 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     justifyContent: 'flex-start',
   },
   ticketStubTitle: {
-    color: colors.white,
+    // Literal white, not colors.white: that token is a dark-mode *surface* color (see
+    // colors.dark.ts), not literal white, and this sits inside the pill header baked into
+    // the stub artwork — a fixed-color rect that does not change with the app theme. Correct
+    // for Early Bird/General, whose pill is brandPink (earlybird.png/standard.png); VIP's
+    // pill is the inverse — white on vip.png's pink card — so it overrides to
+    // ticketStubTitleOnVip instead. Same white/on-light split as ticketStubBullet below,
+    // just applied to the opposite category because the pill's fill is inverted from the
+    // surrounding card on that one asset.
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 8,
+  },
+  ticketStubTitleOnVip: {
+    color: colors.brandPink,
   },
   ticketStubBody: {
     flexDirection: 'row',
@@ -2206,9 +2264,23 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   ticketStubBullet: {
     fontSize: 14,
-    color: colors.white,
+    // Literal white — see ticketStubTitle's comment. This is the VIP-card default (solid
+    // pink body); the light-card override just below is what earlybird.png/standard.png
+    // actually need.
+    color: '#FFFFFF',
     lineHeight: 20,
     fontWeight: '600',
+  },
+  // Applied on Early Bird/General, whose card body is light (earlybird.png/standard.png),
+  // not VIP's solid pink — brandPink is theme-stable (identical in colors.light.ts and
+  // colors.dark.ts) so it is safe to use directly; the body text below it is a literal dark
+  // gray rather than colors.text, which is the one token here that *isn't* theme-stable —
+  // it flips to near-white in dark mode, which would vanish against this fixed light image.
+  ticketStubLabelOnLight: {
+    color: colors.brandPink,
+  },
+  ticketStubBulletOnLight: {
+    color: '#1A1A2E',
   },
   paymentMethodsList: { gap: 4, marginBottom: spacing.md },
   paymentMethodItem: { fontSize: 14, color: colors.text },

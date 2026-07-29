@@ -136,7 +136,7 @@ const BookingsScreen: React.FC = () => {
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
             <Image
-              source={require('../../../assets/location/search.png')}
+              source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchIconImg}
               resizeMode="contain"
             />

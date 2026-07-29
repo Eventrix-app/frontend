@@ -130,7 +130,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Create Password"
         value={password}
         onChangeText={(text) => {
@@ -141,7 +141,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Confirm Password"
         value={confirm}
         onChangeText={(text) => {

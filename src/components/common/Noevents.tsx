@@ -24,7 +24,7 @@ const Noevents: React.FC<Props> = ({
   return (
     <View style={inline ? styles.rootInline : styles.root}>
       <Image
-        source={require('../../../assets/NoEvents.png')}
+        source={require('../../../assets/shared/placeholders/no-events.png')}
         style={inline ? styles.illustrationInline : styles.illustration}
         resizeMode="contain"
       />

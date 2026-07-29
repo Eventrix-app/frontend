@@ -27,7 +27,7 @@ import { SearchIcon, PersonIcon, ChatIcon, HeartIcon, MusicNoteIcon } from '../.
 
 // Required at module scope: Metro resolves require() at build time, so it cannot sit
 // inside the component.
-const HEART_ANIMATION = require('../../../assets/animations/heart-like.json');
+const HEART_ANIMATION = require('../../../assets/shorts/heart-like.json');
 import { CreateReelSheet } from '../../components/events/CreateReelSheet';
 import ShortsFeedSkeleton from '../../components/common/ShortsFeedSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
@@ -146,7 +146,7 @@ const ReelOverlayText: React.FC<{ overlay: ShortOverlay; width: number; height: 
 // The burst that appears when a reel is double-tapped.
 //
 // A Lottie composition rather than a hand-rolled Reanimated sequence: the motion is
-// authored as data (assets/animations/heart-like.json), so its timing can be revised
+// authored as data (assets/shorts/heart-like.json), so its timing can be revised
 // without touching this file, and it plays identically on both platforms rather than
 // depending on each one's spring solver.
 //
