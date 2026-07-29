@@ -230,6 +230,11 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
   const [deleteScheduleItem] = useDeleteScheduleItemMutation();
   const [time, setTime] = useState('');
   const [title, setTitle] = useState('');
+  // The add form lives in a dialog rather than permanently above the list. Inline, it pushed
+  // the schedule itself down the screen for every organizer visit — including the common one
+  // where they only came to read it — and focusing a field there left the submit button under
+  // the keyboard.
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -248,6 +253,9 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
       }).unwrap();
       setTime('');
       setTitle('');
+      // Only on success — a failed add keeps the dialog open with the text intact, so the
+      // organizer can retry instead of retyping.
+      setShowAddDialog(false);
     } catch (err) {
       showAlert('Could not add schedule item', extractErrorMessage(err, 'Please try again.'));
     }
@@ -279,7 +287,23 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
   return (
     <View style={styles.tabContent}>
       {isOwner && (
-        <View style={styles.reviewComposer}>
+        <TouchableOpacity
+          style={styles.scheduleAddBtn}
+          onPress={() => setShowAddDialog(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.scheduleAddBtnText}>+ Add Schedule Item</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Default liftOnKeyboard: this is a form, so the whole sheet rising keeps "Add to
+          Schedule" reachable while a field is focused. */}
+      <HalfScreenModal
+        visible={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        heightPercent={0.5}
+      >
+        <View style={styles.scheduleDialog}>
           <Text style={styles.sectionLabel}>Add Schedule Item</Text>
           <TextInput
             style={styles.chatInput}
@@ -299,7 +323,7 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
             <Text style={styles.chatSendBtnText}>{isAdding ? 'Adding…' : 'Add to Schedule'}</Text>
           </TouchableOpacity>
         </View>
-      )}
+      </HalfScreenModal>
 
       {schedule.length === 0 ? (
         <Text style={styles.emptyTabText}>No schedule yet.</Text>
@@ -1552,14 +1576,25 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {activeTab === 'tickets' && (
           <View style={styles.tabContent}>
-            {!isOwner && ticketTypes.length > 0 ? (
+            {/* Gated on the tiers existing, not on who is looking. This used to also require
+                !isOwner, which meant an organizer opening their own event's Tickets tab fell
+                through to "No ticket information available" no matter how many tiers they had
+                just created — the data was there (findTicketTypes deliberately returns *more*
+                to an owner, including hidden tiers), it simply was never rendered. Only the
+                transactional parts below — tier selection and the quantity stepper — are
+                owner-gated now; the tier details themselves are the organizer's own setup and
+                are exactly what they come here to check. */}
+            {ticketTypes.length > 0 ? (
               <>
                 <View style={styles.ticketStubList}>
                   {ticketTypes.map((tier) => {
                     const remaining = remainingForTier(tier);
                     const availability = tierAvailability(tier);
-                    const selectable = availability === 'available' || availability === 'sold_out';
-                    const selected = tier.id === selectedTierId;
+                    // An owner cannot buy their own tickets, so for them a tier is a read-only
+                    // summary rather than a choice.
+                    const selectable =
+                      !isOwner && (availability === 'available' || availability === 'sold_out');
+                    const selected = !isOwner && tier.id === selectedTierId;
 
                     const benefits: string[] = (tier as any).benefits ?? [];
 
@@ -1585,7 +1620,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                         activeOpacity={0.9}
                         onPress={() => selectable && setSelectedTierId(tier.id)}
                         disabled={!selectable}
-                        style={[styles.ticketStubWrap, selected && styles.ticketStubSelected, !selectable && styles.ticketStubDisabled]}
+                        style={[
+                          styles.ticketStubWrap,
+                          selected && styles.ticketStubSelected,
+                          // Dim only a tier a buyer genuinely cannot pick. An owner's tiers are
+                          // all unselectable by design, and greying every one of them out would
+                          // read as "something is wrong with these" rather than "not for sale to
+                          // you".
+                          !isOwner && !selectable && styles.ticketStubDisabled,
+                        ]}
                       >
                         <Image
                           source={stubImage}
@@ -1622,7 +1665,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   })}
                 </View>
 
-                {selectedTier && (() => {
+                {/* Purchase control, so it stays owner-gated — there is nothing for an
+                    organizer to set a quantity of on their own event. */}
+                {!isOwner && selectedTier && (() => {
                   const { min, max } = quantityBoundsForTier(selectedTier);
                   const atMin = quantity <= min;
                   const atMax = quantity >= max;
@@ -1680,7 +1725,13 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 </View>
               </>
             ) : (
-              <Text style={styles.emptyTabText}>No ticket information available.</Text>
+              // Two genuinely different situations, so they no longer share one message: an
+              // owner with no tiers has something to do about it, a visitor does not.
+              <Text style={styles.emptyTabText}>
+                {isOwner
+                  ? 'No ticket tiers yet. Add them from "Manage Ticket Types" in the organizer menu.'
+                  : 'No ticket information available.'}
+              </Text>
             )}
           </View>
         )}
@@ -2021,6 +2072,23 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  scheduleAddBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  scheduleAddBtnText: {
+    color: colors.brandPink,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  scheduleDialog: {
+    paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
   reviewComposerStars: { flexDirection: 'row', gap: spacing.xs },

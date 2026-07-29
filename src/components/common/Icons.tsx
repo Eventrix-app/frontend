@@ -327,6 +327,14 @@ export const CameraIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }
 );
 
 // Replaces 🎵 (shorts background-music indicator).
+// Solid triangle rather than the outlined play_circle used in the tab bar: this one is drawn
+// over arbitrary reel artwork, where a thin outline disappears against a busy frame.
+export const PlayIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 -960 960 960">
+    <Path d="M320-200v-560l440 280-440 280Z" fill={color} />
+  </Svg>
+);
+
 export const MusicNoteIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 -960 960 960">
     <Path

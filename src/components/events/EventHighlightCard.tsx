@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { FallbackImage } from '../common/FallbackImage';
+import { PlayIcon } from '../common/Icons';
 
 export interface HighlightItem {
   id: string;
@@ -27,9 +28,8 @@ export const EventHighlightCard: React.FC<Props> = React.memo(({ item, onPress }
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    // The card is the reel frame and nothing else — no caption, no play glyph, no view
-    // count. The old wrapper View existed only to stack text beneath the image, so it goes
-    // with the text.
+    // No caption or view count — the tile is the reel frame plus the one affordance that
+    // says it is a reel rather than a photo.
     //
     // item.title is not drawn, but it is the only human-readable description this tile has:
     // without it the card is a bare image and announces nothing to a screen reader, so it
@@ -42,6 +42,16 @@ export const EventHighlightCard: React.FC<Props> = React.memo(({ item, onPress }
       accessibilityLabel={item.title}
     >
       <FallbackImage source={item.thumbnail} style={styles.thumb} resizeMode="cover" />
+      {/* pointerEvents none so the glyph never swallows the tap meant for the card.
+          The scrim disc is what keeps it legible: a bare white triangle vanishes against a
+          pale or busy frame, and these thumbnails are arbitrary user video. */}
+      <View style={styles.playOverlay} pointerEvents="none">
+        <View style={styles.playDisc}>
+          {/* Nudged right by a hair — a triangle's visual centre sits left of its bounding
+              box, so centring the box makes it look off-centre in the circle. */}
+          <PlayIcon color="#FFFFFF" size={26} />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -67,5 +77,24 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   thumb: {
     width: '100%',
     height: '100%',
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playDisc: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Fixed rgba, not a theme token: this sits on video artwork, which is neither light nor
+    // dark surface, so it must not flip with the theme.
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.65)',
+    // Offsets the triangle's left-heavy visual weight inside the circle.
+    paddingLeft: 3,
   },
 });

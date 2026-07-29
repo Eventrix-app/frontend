@@ -58,29 +58,21 @@ const VENUE_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" x
 const EVENT_DATE_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2H11.5V1.5C11.5 1.36739 11.4473 1.24021 11.3536 1.14645C11.2598 1.05268 11.1326 1 11 1C10.8674 1 10.7402 1.05268 10.6464 1.14645C10.5527 1.24021 10.5 1.36739 10.5 1.5V2H5.5V1.5C5.5 1.36739 5.44732 1.24021 5.35355 1.14645C5.25979 1.05268 5.13261 1 5 1C4.86739 1 4.74021 1.05268 4.64645 1.14645C4.55268 1.24021 4.5 1.36739 4.5 1.5V2H3C2.73478 2 2.48043 2.10536 2.29289 2.29289C2.10536 2.48043 2 2.73478 2 3V13C2 13.2652 2.10536 13.5196 2.29289 13.7071C2.48043 13.8946 2.73478 14 3 14H13C13.2652 14 13.5196 13.8946 13.7071 13.7071C13.8946 13.5196 14 13.2652 14 13V3C14 2.73478 13.8946 2.48043 13.7071 2.29289C13.5196 2.10536 13.2652 2 13 2ZM8 10.5C7.80222 10.5 7.60888 10.4414 7.44443 10.3315C7.27998 10.2216 7.15181 10.0654 7.07612 9.88268C7.00043 9.69996 6.98063 9.49889 7.01921 9.30491C7.0578 9.11093 7.15304 8.93275 7.29289 8.79289C7.43275 8.65304 7.61093 8.5578 7.80491 8.51921C7.99889 8.48063 8.19996 8.50043 8.38268 8.57612C8.56541 8.65181 8.72159 8.77998 8.83147 8.94443C8.94135 9.10888 9 9.30222 9 9.5C9 9.76522 8.89464 10.0196 8.70711 10.2071C8.51957 10.3946 8.26522 10.5 8 10.5ZM13 5H3V3H4.5V3.5C4.5 3.63261 4.55268 3.75979 4.64645 3.85355C4.74021 3.94732 4.86739 4 5 4C5.13261 4 5.25979 3.94732 5.35355 3.85355C5.44732 3.75979 5.5 3.63261 5.5 3.5V3H10.5V3.5C10.5 3.63261 10.5527 3.75979 10.6464 3.85355C10.7402 3.94732 10.8674 4 11 4C11.1326 4 11.2598 3.94732 11.3536 3.85355C11.4473 3.75979 11.5 3.63261 11.5 3.5V3H13V5Z" fill="#F43362"/></svg>`;
 const EVENT_TIME_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5C6.71442 1.5 5.45772 1.88122 4.3888 2.59545C3.31988 3.30968 2.48676 4.32484 1.99479 5.51256C1.50282 6.70028 1.37409 8.00721 1.6249 9.26809C1.8757 10.529 2.49477 11.6872 3.40381 12.5962C4.31285 13.5052 5.47104 14.1243 6.73192 14.3751C7.99279 14.6259 9.29973 14.4972 10.4874 14.0052C11.6752 13.5132 12.6903 12.6801 13.4046 11.6112C14.1188 10.5423 14.5 9.28558 14.5 8C14.4982 6.27665 13.8128 4.62441 12.5942 3.40582C11.3756 2.18722 9.72335 1.50182 8 1.5ZM11.5 8.5H8C7.86739 8.5 7.74022 8.44732 7.64645 8.35355C7.55268 8.25979 7.5 8.13261 7.5 8V4.5C7.5 4.36739 7.55268 4.24021 7.64645 4.14645C7.74022 4.05268 7.86739 4 8 4C8.13261 4 8.25979 4.05268 8.35356 4.14645C8.44732 4.24021 8.5 4.36739 8.5 4.5V7.5H11.5C11.6326 7.5 11.7598 7.55268 11.8536 7.64645C11.9473 7.74021 12 7.86739 12 8C12 8.13261 11.9473 8.25979 11.8536 8.35355C11.7598 8.44732 11.6326 8.5 11.5 8.5Z" fill="#F43362"/></svg>`;
 const ORGANIZER_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.75 7.5C10.75 8.0439 10.5887 8.57558 10.2865 9.02782C9.98437 9.48005 9.55488 9.83253 9.05238 10.0407C8.54989 10.2488 7.99695 10.3033 7.4635 10.1972C6.93006 10.0911 6.44005 9.82914 6.05546 9.44454C5.67086 9.05995 5.40895 8.56995 5.30284 8.0365C5.19673 7.50305 5.25119 6.95012 5.45933 6.44762C5.66748 5.94512 6.01995 5.51563 6.47218 5.21346C6.92442 4.91128 7.4561 4.75 8 4.75C8.72909 4.75083 9.42809 5.04082 9.94363 5.55637C10.4592 6.07192 10.7492 6.77091 10.75 7.5ZM14.5 8C14.5 9.28558 14.1188 10.5423 13.4046 11.6112C12.6903 12.6801 11.6752 13.5132 10.4874 14.0052C9.29973 14.4972 7.99279 14.6259 6.73192 14.3751C5.47104 14.1243 4.31285 13.5052 3.40381 12.5962C2.49477 11.6872 1.8757 10.529 1.6249 9.26809C1.37409 8.00721 1.50282 6.70028 1.99479 5.51256C2.48676 4.32484 3.31988 3.30968 4.3888 2.59545C5.45772 1.88122 6.71442 1.5 8 1.5C9.72335 1.50182 11.3756 2.18722 12.5942 3.40582C13.8128 4.62441 14.4982 6.27665 14.5 8ZM13.5 8C13.4992 7.25971 13.3491 6.52718 13.0587 5.84622C12.7683 5.16527 12.3436 4.54987 11.8099 4.03683C11.2762 3.5238 10.6445 3.12366 9.95264 2.86035C9.26075 2.59704 8.52287 2.47597 7.78313 2.50437C4.83938 2.61812 2.49188 5.07 2.5 8.01562C2.50283 9.35658 2.99739 10.6499 3.89 11.6506C4.25352 11.1234 4.71528 10.6712 5.25 10.3188C5.29559 10.2886 5.34979 10.2743 5.40431 10.2779C5.45883 10.2815 5.51066 10.3029 5.55188 10.3387C6.23136 10.9265 7.09973 11.2499 7.99813 11.2499C8.89652 11.2499 9.76489 10.9265 10.4444 10.3387C10.4856 10.3029 10.5374 10.2815 10.5919 10.2779C10.6465 10.2743 10.7007 10.2886 10.7463 10.3188C11.2817 10.671 11.7441 11.1232 12.1081 11.6506C13.0052 10.6463 13.5007 9.34662 13.5 8Z" fill="#F43362"/></svg>`;
-// Sourced from assets/events/bookmark.svg / bookmark-check.svg, re-filled to match this
-// card's existing icon accent (#F43362, same as VENUE/ORGANIZER/etc. above) for the saved
-// state, and a neutral gray for the unsaved state — the original files' own fills
-// (#e3e3e3 / #D3E2F1) are near-invisible against this button's white circular background.
+// Re-filled from the source SVGs: their own fills are near-invisible on this white button.
 const BOOKMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#9CA3AF"><path d="M200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 const BOOKMARK_CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#F43362"><path d="m438-400 198-198-57-56-141 141-57-57-57 57 114 113ZM200-120v-640q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v640L480-240 200-120Zm80-122 200-86 200 86v-518H280v518Zm0-518h400-400Z"/></svg>`;
 
-// Memoized: these render inside lists that re-render whenever the parent screen does.
-// Props are compared shallowly, so this only pays off where the parent passes stable
-// values — the screens now memoize their derived arrays and callbacks for that reason.
+// Memoized: props are compared shallowly, so this only pays off where the parent passes
+// stable values — which is why the screens memoize their arrays and callbacks.
 export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, onPress, onRequireAuth }) => {
   const authUser = useSelector((state: RootState) => state.auth.user);
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
   const [addFavorite] = useAddFavoriteMutation();
   const [removeFavorite] = useRemoveFavoriteMutation();
 
-  // getMyFavorites only refetches after addFavorite/removeFavorite invalidates it — a
-  // round trip that would otherwise flash the bookmark back to its old state for a moment
-  // after the request finishes (the same flicker fixed for follow/unfollow). Since
-  // getMyFavorites returns full Event objects we don't have here (event is the lighter
-  // card-shaped InterestEvent), a local override is simpler and safer than optimistically
-  // splicing an incomplete object into that shared cache — SavedEventsScreen depends on
-  // every field being real. Cleared once the server-confirmed value matches our guess.
+  // Local override rather than an optimistic cache patch: getMyFavorites holds full Event
+  // objects this card doesn't have, and SavedEventsScreen needs every field real. Without it
+  // the bookmark flickers back to its old state until the invalidated refetch lands.
   const [pendingSaved, setPendingSaved] = useState<boolean | null>(null);
   const serverSaved = favorites.some((f) => f.id === event.id);
   const saved = pendingSaved ?? serverSaved;
@@ -204,18 +196,18 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
 });
 EventInterestCard.displayName = 'EventInterestCard';
 
-// The badge is positioned against this, so it has to be a shared constant rather than a
-// literal repeated in two rules that could drift apart.
 const IMAGE_HEIGHT = 160;
 const BADGE_HEIGHT = 44;
 
-// A tint/shade ramp around brandPink (#FF3366), which is the app's locked accent and is
-// byte-identical in both themes — so the badge needs no theme-awareness and can be a module
-// constant rather than being rebuilt per render inside createStyles.
-//
-// The stops are literals because the palette has no tint/shade ramp to derive them from:
-// brandPinkDark is #FF3368, one digit off brandPink, so it cannot serve as a gradient's dark
-// end. The middle stop is brandPink exactly; the others are lightened and darkened from it.
+// Fraction of the badge sitting over the artwork; the rest overhangs the description panel.
+// Shared because the badge's offset and that panel's top padding must move together.
+const BADGE_OVER_IMAGE = 0.1;
+const BADGE_OVER_INFO = 1 - BADGE_OVER_IMAGE;
+
+const BADGE_RADIUS = 12;
+
+// Tint/shade ramp around brandPink. Literals because the palette has no ramp to derive from,
+// and brandPink is identical in both themes so this needs no theme-awareness.
 const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
@@ -278,39 +270,26 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   priceBadgeWrap: {
     position: 'absolute',
     right: spacing.md,
-    // Centred on the seam: half the badge sits over the artwork, half over the description.
-    top: IMAGE_HEIGHT - BADGE_HEIGHT / 2,
+    top: IMAGE_HEIGHT - BADGE_HEIGHT * BADGE_OVER_IMAGE,
     zIndex: 3,
-    // Cast onto both panels it overlaps, which is what sells it as sitting *on* the card
-    // rather than being part of either one.
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    elevation: 6,
+    elevation: 8,
   },
   priceBadge: {
     minWidth: 68,
     height: BADGE_HEIGHT,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    // Square on top: that edge is buried against the artwork, so rounding it only notched
+    // the image.
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: BADGE_RADIUS,
+    borderBottomRightRadius: BADGE_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
-    // The bevel. Per-side border colours are what make it read as a raised tag: a light
-    // top/left edge catching the light and a dark bottom/right edge in shadow. A single
-    // uniform border would look printed on instead of moulded. The shadow side is a deep
-    // pink rather than a neutral grey, so the darkening stays in the accent's own hue.
-    borderWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.9)',
-    borderLeftColor: 'rgba(255,255,255,0.55)',
-    borderRightColor: 'rgba(120,6,36,0.5)',
-    borderBottomColor: 'rgba(120,6,36,0.75)',
   },
   priceBadgeText: {
-    // White, which is how brandPink is paired everywhere else in the app (share, retry and
-    // primary buttons all put white on it). The shadow is not decoration: the gradient's
-    // top-left tint is light enough that plain white would lose contrast against it, and a
-    // soft dark shadow keeps the glyphs readable across the whole ramp.
+    // The gradient's top-left tint is light enough that plain white loses contrast, hence
+    // the text shadow below.
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
@@ -322,8 +301,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   info: {
     padding: spacing.md,
-    // Clears the half of the badge that hangs into this panel.
-    paddingTop: BADGE_HEIGHT / 2 + spacing.xs,
+    // Clears the badge overhang so the category line starts below it.
+    paddingTop: BADGE_HEIGHT * BADGE_OVER_INFO + spacing.xs,
   },
   category: {
     color: colors.brandPink,
@@ -345,8 +324,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginBottom: 6,
     gap: spacing.sm,
   },
-  // Equal halves, so the two rows line up as a grid instead of each row laying itself out
-  // independently.
+  // Equal halves so the two rows line up as a grid.
   metaCol: {
     flex: 1,
     flexDirection: 'row',

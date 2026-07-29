@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Keyboard, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
+import { useKeyboardShift } from '../../hooks/useKeyboardShift';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -10,10 +11,27 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   heightPercent?: number; // 0–1, default 0.68 (68% of screen height)
+  /**
+   * Whether the whole sheet rises with the keyboard. Default true, which is right for a sheet
+   * that is a form — everything below the focused field (a Done/Save button) has to stay
+   * reachable, so the sheet moves as one.
+   *
+   * Set false when only one element needs to clear the keyboard and the rest should stay put
+   * — a comment thread, where lifting the entire sheet drags the conversation off-screen. The
+   * sheet then stays anchored and the caller is responsible for moving its own input, e.g.
+   * with the same useKeyboardShift hook this uses.
+   */
+  liftOnKeyboard?: boolean;
   children: React.ReactNode;
 }
 
-const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.68, children }) => {
+const HalfScreenModal: React.FC<Props> = ({
+  visible,
+  onClose,
+  heightPercent = 0.68,
+  liftOnKeyboard = true,
+  children,
+}) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const sheetHeight = SCREEN_HEIGHT * heightPercent;
@@ -30,7 +48,7 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
   // This matters beyond aesthetics: any action below the input (a Done/Save button, which
   // is the usual sheet layout) is unreachable while the keyboard covers it, so taps land on
   // the keyboard instead and the sheet appears to ignore them.
-  const keyboardShift = useRef(new Animated.Value(0)).current;
+  const { shift: keyboardShift, keyboardVisible } = useKeyboardShift();
   // Keeps the Modal mounted just long enough to play the close animation —
   // Modal's own `visible` prop unmounts instantly otherwise, cutting it off.
   const [mounted, setMounted] = useState(visible);
@@ -42,7 +60,6 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
   // bottom of the screen entirely, so reserving space for a nav bar that is no longer under
   // the sheet would just leave a gap between the content and the keyboard.
   const insets = useSafeAreaInsets();
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -58,34 +75,6 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
       ]).start(() => setMounted(false));
     }
   }, [visible, sheetHeight]);
-
-  useEffect(() => {
-    // will* on iOS runs in step with the system animation; Android only emits did*.
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const onShow = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardVisible(true);
-      Animated.timing(keyboardShift, {
-        toValue: -e.endCoordinates.height,
-        duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 180,
-        useNativeDriver: true,
-      }).start();
-    });
-    const onHide = Keyboard.addListener(hideEvent, (e) => {
-      setKeyboardVisible(false);
-      Animated.timing(keyboardShift, {
-        toValue: 0,
-        duration: Platform.OS === 'ios' ? ((e as any)?.duration ?? 250) : 180,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => {
-      onShow.remove();
-      onHide.remove();
-    };
-  }, [keyboardShift]);
 
   if (!mounted) return null;
 
@@ -113,7 +102,9 @@ const HalfScreenModal: React.FC<Props> = ({ visible, onClose, heightPercent = 0.
               paddingBottom: keyboardVisible ? 0 : insets.bottom,
               // Open/close animation and keyboard shift composed into one transform. Both
               // are native-driven, so Animated.add stays on the UI thread.
-              transform: [{ translateY: Animated.add(translateY, keyboardShift) }],
+              transform: [
+                { translateY: liftOnKeyboard ? Animated.add(translateY, keyboardShift) : translateY },
+              ],
             },
           ]}
         >

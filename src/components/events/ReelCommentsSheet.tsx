@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useKeyboardShift } from '../../hooks/useKeyboardShift';
 import { useSelector } from 'react-redux';
 import HalfScreenModal from '../common/halfscreenmodal';
 import { Text } from '../common/Text';
@@ -49,6 +50,10 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [draft, setDraft] = useState('');
+  // Only the composer tracks the keyboard here — the sheet itself stays anchored (see
+  // liftOnKeyboard={false} below). Lifting the whole sheet dragged the thread the user was
+  // reading up and off the screen just because they tapped the input.
+  const { shift: keyboardShift } = useKeyboardShift();
 
   const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -126,7 +131,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
   );
 
   return (
-    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.75}>
+    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.75} liftOnKeyboard={false}>
       <View style={styles.root}>
         <Text style={styles.title}>
           {data ? `${data.total} comment${data.total === 1 ? '' : 's'}` : 'Comments'}
@@ -157,7 +162,10 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
         )}
 
         {isAuthenticated ? (
-          <View style={styles.composer}>
+          // Translated rather than laid out above the keyboard: a layout change would resize
+          // the list and scroll the thread, which is exactly what should not happen. The
+          // composer floats over the last comment instead, and the list keeps its position.
+          <Animated.View style={[styles.composer, { transform: [{ translateY: keyboardShift }] }]}>
             <TextInput
               style={styles.input}
               value={draft}
@@ -178,7 +186,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
                 <Text style={styles.postLabel}>Post</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         ) : (
           <Text style={styles.signedOut}>Sign in to join the conversation.</Text>
         )}
@@ -216,6 +224,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderLight,
+    // Opaque because it slides up over the thread when the keyboard opens — without a
+    // background the comments underneath read straight through the input.
+    backgroundColor: colors.white,
   },
   input: {
     flex: 1,
