@@ -27,6 +27,7 @@ import { extractErrorMessage } from '../../utils/apiError';
 import ProfileHeaderSkeleton from '../../components/common/ProfileHeaderSkeleton';
 
 const bgImage = require('../../../assets/shared/backgrounds/bg.png');
+const VERIFIED_BADGE_IMG = require('../../../assets/shared/icons/checked.png');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile' | 'OrganizerProfile'>;
 
@@ -340,7 +341,7 @@ const OrganizerProfile: React.FC<{
                 <Text variant="h4" color="text">{profile.companyName}</Text>
                 {profile.verified && (
                   <View style={styles.verifiedPill}>
-                    <Feather name="check-circle" size={12} color={colors.success} />
+                    <Image source={VERIFIED_BADGE_IMG} style={styles.verifiedBadge} />
                     <Text variant="caption" style={styles.verifiedText}>Verified</Text>
                   </View>
                 )}
@@ -549,6 +550,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: 3,
   },
   verifiedText: { color: colors.success, fontWeight: '700' },
+  verifiedBadge: { width: 12, height: 12 },
   description: { marginTop: 2 },
   websiteRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
   websiteText: { fontWeight: '600' },

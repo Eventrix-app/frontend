@@ -34,6 +34,7 @@ import {
   CheckCircleIcon,
   CloseCircleIcon,
 } from '../../components/common/Icons';
+import { PLATFORM_FEE_INR, GST_RATE, getGstInclusivePrice, getGstPortion } from '../../utils/pricing';
 
 // TODO: register 'Checkout' in RootStackParamList with this params shape once wired into
 // the navigator. Kept local/inline here so this file is self-contained.
@@ -52,11 +53,6 @@ interface Props {
 const VALID_PROMO_CODES: Record<string, number> = {
   RUN50: 150,
 };
-
-// TODO: mock — platform fee / GST have no backend source yet; approximated to match the
-// reference design. Replace with real values from the order/pricing endpoint once available.
-const PLATFORM_FEE = 20;
-const GST_RATE = 0.09;
 
 const PAYMENT_METHODS = ['Google Pay', 'PhonePe', 'Paytm', 'UPI', 'Credit / Debit Card'];
 
@@ -91,10 +87,15 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
-  const subtotal = selectedTier ? selectedTier.price * quantity : 0;
-  const gst = Math.round(subtotal * GST_RATE);
+  // selectedTier.price is the organizer-entered, GST-exclusive amount — subtotal is the
+  // inclusive figure the ticket tab already showed, so this screen never surfaces a lower
+  // pre-tax number that then grows. gst below is the portion already inside subtotal, shown
+  // for transparency only; it is not added to totalPayable a second time.
+  const unitPrice = selectedTier ? getGstInclusivePrice(selectedTier.price) : 0;
+  const subtotal = unitPrice * quantity;
+  const gst = selectedTier ? getGstPortion(selectedTier.price * quantity) : 0;
   const promoDiscount = appliedPromo?.amount ?? 0;
-  const totalPayable = Math.max(subtotal + PLATFORM_FEE + gst - promoDiscount, 0);
+  const totalPayable = Math.max(subtotal + PLATFORM_FEE_INR - promoDiscount, 0);
 
   const handleApplyPromo = () => {
     const code = promoInput.trim().toUpperCase();
@@ -332,22 +333,22 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.toPayLabel}>To Pay</Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
               {promoDiscount > 0 && (
-                <Text style={styles.toPayOriginal}>₹{subtotal + PLATFORM_FEE + gst}</Text>
+                <Text style={styles.toPayOriginal}>₹{subtotal + PLATFORM_FEE_INR}</Text>
               )}
               <Text style={styles.toPayFinal}>₹{totalPayable}</Text>
             </View>
           </View>
 
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Tickets ({quantity} x ₹{selectedTier?.price ?? 0})</Text>
+            <Text style={styles.orderLabel}>Tickets ({quantity} x ₹{unitPrice})</Text>
             <Text style={styles.orderValue}>₹{subtotal}</Text>
           </View>
           <View style={styles.orderRow}>
             <Text style={styles.orderLabel}>Platform Fee</Text>
-            <Text style={styles.orderValue}>₹{PLATFORM_FEE}</Text>
+            <Text style={styles.orderValue}>₹{PLATFORM_FEE_INR}</Text>
           </View>
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>GST (18%)</Text>
+            <Text style={styles.orderLabel}>GST ({Math.round(GST_RATE * 100)}%) — included above</Text>
             <Text style={styles.orderValue}>₹{gst}</Text>
           </View>
           {promoDiscount > 0 && (

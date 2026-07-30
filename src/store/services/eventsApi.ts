@@ -43,7 +43,19 @@ export interface BackendEvent {
   // Eager-loaded by the backend on both GET /events and GET /events/:id
   // (events.service.ts findAllFiltered/findOne relations: ['organizer', 'organizer.user', 'category']).
   category?: { id: string; name: string };
-  organizer?: { id: string; userId: string; companyName: string; companyLogoUrl?: string; user?: { id: string; fullName: string } };
+  // verified/verificationLevel are already returned by the backend (SAFE_ORGANIZER_SELECT on
+  // events.service.ts) — this type just hadn't caught up. verified is true exactly when
+  // verificationLevel is 'document_verified' (kept in sync in organizer.service.ts), so
+  // either can be used to gate a "verified" badge.
+  organizer?: {
+    id: string;
+    userId: string;
+    companyName: string;
+    companyLogoUrl?: string;
+    verified?: boolean;
+    verificationLevel?: 'unverified' | 'email_verified' | 'phone_verified' | 'document_verified';
+    user?: { id: string; fullName: string };
+  };
 }
 
 export interface CreateTicketTypePayload {
