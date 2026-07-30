@@ -321,14 +321,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  // Reserves the same width on both sides — the right icon group (search + bell + avatar,
-  // 36+36+34 plus two 8px gaps = 122) is far wider than the single 36px back button, so
-  // reserving only each side's own width would still leave the centered text off true
-  // center; reserving the wider side's width symmetrically is what actually centers it.
+  // Centered on the whole bar rather than reserving each side's icon-group width — that
+  // symmetric reservation (130px both sides, to offset the wider right-hand icon group)
+  // left too little room for "My Bookings" itself and clipped it to "My Bookin...".
+  // Centering on the full bar trades a few px of true-center precision for headroom the
+  // title actually needs.
   titleAbsoluteWrap: {
     position: 'absolute',
-    left: 130,
-    right: 130,
+    left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
     alignItems: 'center',

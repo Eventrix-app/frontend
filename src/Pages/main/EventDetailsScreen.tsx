@@ -56,7 +56,8 @@ import { extractErrorMessage } from '../../utils/apiError';
 import { TICKET_CATEGORIES } from '../../utils/ticketCategories';
 import { GST_RATE, PLATFORM_FEE_INR, getGstInclusivePrice } from '../../utils/pricing';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
-import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { formatEventDate, formatEventTime, calculateDistanceKm, formatDistanceKm } from '../../utils/eventCardAdapter';
+import { useGetMeQuery } from '../../store/services/userApi';
 import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 import {
@@ -957,6 +958,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const { data: event, isLoading, isError, refetch } = useGetEventByIdQuery(route.params.eventId);
   const { stage: slowStage } = useSlowNetwork(isLoading);
+  const { data: me } = useGetMeQuery();
+  const venueDistance =
+    me?.latitude != null && me?.longitude != null && event?.latitude != null && event?.longitude != null
+      ? formatDistanceKm(calculateDistanceKm(me.latitude, me.longitude, event.latitude, event.longitude))
+      : null;
   const { data: rawTicketTypes = [] } = useGetTicketTypesQuery(route.params.eventId);
   // Sorted into the canonical Early Bird -> General -> VIP order regardless of the order
   // tiers were created in — the same "maintain ticket types" reasoning as the category enum
@@ -1244,9 +1250,11 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const footerLabel = myActiveEnrollment
-    ? isMyEnrollmentPaid
-      ? 'Cancel Enrollment / Request Refund'
-      : 'Cancel Enrollment'
+    ? event.isCompleted
+      ? 'Event Completed'
+      : isMyEnrollmentPaid
+        ? 'Cancel Enrollment / Request Refund'
+        : 'Cancel Enrollment'
     : myActiveWaitlistEntry
       ? `On Waitlist (#${myActiveWaitlistEntry.position})`
       : notApprovedYet
@@ -1263,7 +1271,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                   ? 'Join Waitlist'
                   : 'Book Now';
   const footerDisabled = myActiveEnrollment
-    ? isCancellingEnrollment
+    ? event.isCompleted || isCancellingEnrollment
     : myActiveWaitlistEntry
       ? true
       : notApprovedYet ||
@@ -1271,7 +1279,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         !selectedTier ||
         selectedAvailability === 'not_started' ||
         selectedAvailability === 'ended' ||
-        event.status === 'completed';
+        event.isCompleted;
 
   const footerVisual: 'register' | 'waitlist' | 'sold_out' | 'text' =
     myActiveEnrollment ||
@@ -1281,7 +1289,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     !selectedTier ||
     selectedAvailability === 'not_started'
       ? 'text'
-      : event.status === 'completed' || selectedAvailability === 'ended'
+      : event.isCompleted || selectedAvailability === 'ended'
         ? 'sold_out'
         : selectedAvailability === 'sold_out'
           ? 'waitlist'
@@ -1310,11 +1318,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
-      {event.status === 'cancelled' && (
+      {event.status === 'cancelled' ? (
         <View style={[styles.cancelledBanner, { paddingTop: insets.top + spacing.sm }]}>
           <Text style={styles.cancelledBannerText}>This event has been cancelled.</Text>
         </View>
-      )}
+      ) : event.isCompleted ? (
+        <View style={[styles.completedBanner, { paddingTop: insets.top + spacing.sm }]}>
+          <Text style={styles.cancelledBannerText}>This event has ended.</Text>
+        </View>
+      ) : null}
       <ImageBackground
         source={coverImage ? { uri: coverImage } : undefined}
         style={[styles.hero, { paddingTop: insets.top }]}
@@ -1490,7 +1502,10 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.infoIconWrap}>
               <LocationPin color={colors.text} size={15} />
             </View>
-            <Text style={styles.infoLineText}>{event.venueName}</Text>
+            <Text style={styles.infoLineText}>
+              {event.venueName}
+              {venueDistance ? ` · ${venueDistance} away` : ''}
+            </Text>
           </View>
         </View>
 
@@ -2156,6 +2171,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     alignItems: 'center',
   },
   cancelledBannerText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  completedBanner: {
+    backgroundColor: colors.textSecondary ?? '#6B7280',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
 
   tierList: { gap: spacing.sm },
   tierRow: {
@@ -2296,6 +2317,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     fontFamily: 'ZalandoSansExpanded_700Bold',
     marginBottom: spacing.sm,
     textAlign: 'center',
+    // Shrink-to-content + auto margins, not full-width stretch: centers on the pill's own
+    // width rather than the wider card behind it.
+    alignSelf: 'center',
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
   ticketStubTitleOnVip: {
     color: colors.brandPink,

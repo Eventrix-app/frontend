@@ -14,4 +14,5 @@ export type MockEvent = {
   description?: string;
   attendeesAvailable?: number;
   distanceKm?: string;
+  isCompleted?: boolean;
 };

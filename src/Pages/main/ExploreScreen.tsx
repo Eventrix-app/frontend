@@ -38,6 +38,7 @@ const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [followingOnly, setFollowingOnly] = useState(false);
   const [filters, setFilters] = useState<EventFilters>({});
+  const [sortByDistance, setSortByDistance] = useState(false);
   const {
     events,
     loadMore,
@@ -52,6 +53,7 @@ const ExploreScreen: React.FC = () => {
     priceMax: filters.priceMax,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    sortBy: 'newest',
   });
   const {
     data: followedEvents = [],
@@ -77,22 +79,33 @@ const ExploreScreen: React.FC = () => {
     const source = followingOnly ? followedEvents : events;
     const mapped = source.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
     // Distance has no backend param yet (event lat/lng is barely populated until the map
-    // picker ships) — filtered client-side over whatever's already been fetched, so it
+    // picker ships) — filtered/sorted client-side over whatever's already been fetched, so it
     // organically starts covering the full catalog as more events get real coordinates.
-    if (filters.radiusKm === undefined || me?.latitude == null || me?.longitude == null) {
+    if (me?.latitude == null || me?.longitude == null) {
       return mapped;
     }
-    const radiusKm = filters.radiusKm;
+    const userLat = me.latitude;
+    const userLng = me.longitude;
     // Indexed once rather than re-scanned per card: the previous `source.find(...)` inside
     // the filter made this O(n²), so enabling the radius filter got quadratically slower as
-    // more pages were loaded in.
+    // more pages were loaded in. Also backs the distance sort below.
     const byId = new Map(source.map((e) => [e.id, e]));
-    return mapped.filter((event) => {
-      const backendEvent = byId.get(event.id);
-      if (!backendEvent?.latitude || !backendEvent?.longitude) return false;
-      return calculateDistanceKm(me.latitude!, me.longitude!, backendEvent.latitude, backendEvent.longitude) <= radiusKm;
-    });
-  }, [followingOnly, followedEvents, events, me?.latitude, me?.longitude, filters.radiusKm]);
+    const distanceOf = (eventId: string): number => {
+      const backendEvent = byId.get(eventId);
+      if (backendEvent?.latitude == null || backendEvent?.longitude == null) return Infinity;
+      return calculateDistanceKm(userLat, userLng, backendEvent.latitude, backendEvent.longitude);
+    };
+
+    let result = mapped;
+    if (filters.radiusKm !== undefined) {
+      const radiusKm = filters.radiusKm;
+      result = result.filter((event) => distanceOf(event.id) <= radiusKm);
+    }
+    if (sortByDistance) {
+      result = [...result].sort((a, b) => distanceOf(a.id) - distanceOf(b.id));
+    }
+    return result;
+  }, [followingOnly, followedEvents, events, me?.latitude, me?.longitude, filters.radiusKm, sortByDistance]);
 
   const [showInterestSheet, setShowInterestSheet] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
@@ -201,6 +214,13 @@ const ExploreScreen: React.FC = () => {
           onPress={() => setFollowingOnly((v) => !v)}
         >
           <Text style={[styles.chipLabel, followingOnly && styles.chipLabelActive]}>Following</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.chip, sortByDistance && styles.chipActive]}
+          onPress={() => setSortByDistance((v) => !v)}
+        >
+          <Text style={[styles.chipLabel, sortByDistance && styles.chipLabelActive]}>Nearest first</Text>
         </TouchableOpacity>
 
         {FILTER_CHIPS.map((chip) => {

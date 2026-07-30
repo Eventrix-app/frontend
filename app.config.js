@@ -44,6 +44,8 @@ module.exports = {
       bundleIdentifier: 'com.eventrix.app',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        NSLocationWhenInUseUsageDescription:
+          'Eventrix uses your location to show how far away events are and to let you filter events near you.',
       },
     },
     android: {
@@ -63,6 +65,8 @@ module.exports = {
         'android.permission.RECORD_AUDIO',
         'android.permission.READ_CALENDAR',
         'android.permission.WRITE_CALENDAR',
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_FINE_LOCATION',
       ],
       // Register the app's package-name URI scheme so Android redirects back here after
       // Google OAuth completes. expo-auth-session/providers/google generates the redirect
@@ -108,6 +112,13 @@ module.exports = {
         'expo-calendar',
         {
           calendarPermission: "Allow Eventrix to access your calendar to add events you're attending.",
+        },
+      ],
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'Allow Eventrix to use your location to show how far away events are.',
         },
       ],
       [

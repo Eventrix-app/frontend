@@ -11,8 +11,23 @@ export function getEventStartDateTime(event: { eventDate: string; startTime: str
   return new Date(`${event.eventDate}T${event.startTime}${IST_OFFSET}`);
 }
 
-export function getEventEndDateTime(event: { eventDate: string; startTime: string; endTime?: string | null }): Date {
-  return new Date(`${event.eventDate}T${event.endTime ?? event.startTime}${IST_OFFSET}`);
+export function getEventEndDateTime(event: {
+  eventDate: string;
+  eventEndDate?: string | null;
+  startTime: string;
+  endTime?: string | null;
+}): Date {
+  const endDate = event.eventEndDate ?? event.eventDate;
+  return new Date(`${endDate}T${event.endTime ?? event.startTime}${IST_OFFSET}`);
+}
+
+export function isEventOver(event: {
+  eventDate: string;
+  eventEndDate?: string | null;
+  startTime: string;
+  endTime?: string | null;
+}): boolean {
+  return getEventEndDateTime(event).getTime() < Date.now();
 }
 
 // en-CA formats as YYYY-MM-DD, which doubles as the civil-date key we need.

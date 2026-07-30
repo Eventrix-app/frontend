@@ -14,6 +14,7 @@ export interface PaginatedEventFilters {
   priceMax?: number;
   dateFrom?: string;
   dateTo?: string;
+  sortBy?: 'eventDate' | 'newest';
 }
 
 export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
@@ -36,6 +37,7 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
     priceMax: filters.priceMax,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    sortBy: filters.sortBy,
     page,
     limit: PAGE_SIZE,
   });
@@ -45,7 +47,7 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
     setPage(1);
     setPagesById(new Map());
     setHasMore(true);
-  }, [filters.categoryId, filters.isOnline, filters.search, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo]);
+  }, [filters.categoryId, filters.isOnline, filters.search, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo, filters.sortBy]);
 
   useEffect(() => {
     if (!data) return;

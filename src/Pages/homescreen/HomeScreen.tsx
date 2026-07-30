@@ -83,7 +83,7 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents();
+  const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents({ sortBy: 'newest' });
   // Real reels for the "Event Highlights" strip, replacing three bundled jpgs with invented
   // titles and view counts. Only the newest few — this is a teaser row into the Shorts tab,
   // not a feed.

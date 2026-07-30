@@ -15,6 +15,8 @@ export interface BackendEvent {
   latitude?: number;
   longitude?: number;
   eventDate: string;
+  // Nullable, defaults to eventDate for single-day events — see Backend's event-dates.util.ts.
+  eventEndDate?: string;
   startTime: string;
   endTime?: string;
   pricePerTicket?: number;
@@ -26,6 +28,10 @@ export interface BackendEvent {
   capacity?: number;
   totalCapacity?: number;
   availableTickets?: number;
+  // Computed at read time (withComputedFields on events.service.ts), never persisted —
+  // Event.status only ever advances to 'cancelled', so this is the only reliable signal
+  // that an event's end time has already passed.
+  isCompleted?: boolean;
   featured: boolean;
   isOnline: boolean;
   meetingLink?: string;
@@ -282,6 +288,7 @@ export const eventsApi = createApi({
         priceMax?: number;
         dateFrom?: string;
         dateTo?: string;
+        sortBy?: 'eventDate' | 'newest';
       }
     >({
       query: (filters) => {
@@ -295,6 +302,7 @@ export const eventsApi = createApi({
         if (filters.priceMax !== undefined) params.append('priceMax', String(filters.priceMax));
         if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
         if (filters.dateTo) params.append('dateTo', filters.dateTo);
+        if (filters.sortBy) params.append('sortBy', filters.sortBy);
         return `events?${params.toString()}`;
       },
       // GET /events returns a paginated wrapper ({events, total, page, totalPages}), not a bare array.

@@ -26,6 +26,7 @@ export interface InterestEvent {
   date?: string;
   distanceKm?: string;
   attendeesAvailable?: number;
+  isCompleted?: boolean;
 }
 
 interface Props {
@@ -119,6 +120,14 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
     >
       <View style={styles.imageWrap}>
         <FallbackImage source={resolveImageSource(event.image)} style={styles.image} resizeMode="cover" />
+
+        {event.isCompleted && (
+          <View style={styles.completedOverlay} pointerEvents="none">
+            <View style={styles.completedPill}>
+              <Text style={styles.completedPillText}>COMPLETED</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.topLeftCol}>
           {event.attendeesAvailable != null && (
@@ -266,6 +275,25 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  completedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  completedPill: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  completedPillText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   priceBadgeWrap: {
     position: 'absolute',

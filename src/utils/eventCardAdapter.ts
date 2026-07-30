@@ -1,5 +1,6 @@
 import { BackendEvent } from '../store/services/eventsApi';
 import { MockEvent } from '../data/mockEvents';
+import { isEventOver } from './eventDateTime';
 
 // A bare 'YYYY-MM-DD' string parses as UTC midnight (per the Date spec), so formatting it
 // with the device's local timezone can roll the displayed calendar date back or forward a
@@ -79,5 +80,9 @@ export function toCardEvent(event: BackendEvent, userLat?: number | null, userLn
     description: event.description,
     attendeesAvailable: event.availableTickets ?? undefined,
     distanceKm,
+    // Falls back to a client-side check for the handful of endpoints that don't run
+    // through withComputedFields (events.service.ts) yet, e.g. an organizer's public
+    // profile listing.
+    isCompleted: event.isCompleted ?? isEventOver(event),
   };
 }

@@ -41,12 +41,13 @@ export function prefetchPostLoginData(dispatch: AppDispatch): void {
   // Home's lat/lng-based distance labels are derived from it.
   dispatch(userApi.util.prefetch('getMe', undefined, { force: false }));
 
-  // The main feed. Home and Explore share this exact cache entry (page 1, no filters), so
-  // one prefetch covers the landing screen and the first tab the user is likely to open.
+  // The main feed. Home and Explore both request sortBy: 'newest' now (see
+  // usePaginatedEvents' callers) — matching that here is what makes this a warm cache hit
+  // instead of a wasted request; RTK Query keys strictly on the full query args.
   dispatch(
     eventsApi.util.prefetch(
       'getEvents',
-      { page: 1, limit: EVENTS_PAGE_SIZE },
+      { page: 1, limit: EVENTS_PAGE_SIZE, sortBy: 'newest' },
       { force: false },
     ),
   );

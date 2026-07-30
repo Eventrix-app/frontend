@@ -117,6 +117,10 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
                       <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
                         <Text style={styles.badgeText}>Event cancelled</Text>
                       </View>
+                    ) : event.isCompleted ? (
+                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                        <Text style={styles.badgeText}>Completed</Text>
+                      </View>
                     ) : (
                       <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
                         <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
