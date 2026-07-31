@@ -16,7 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
 import { Dots } from '../../components/Dots';
-import { useTheme } from '../../theme/ThemeContext';
+import { colorsLight } from '../../theme/colors.light';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Text } from '../../components/common/Text';
@@ -73,8 +73,7 @@ const LeftArrow = ({ color }: { color: string }) => (
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const [index, setIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colorsLight), []);
 
   // Screen-level slide transition
   const screenX = useRef(new Animated.Value(0)).current;
@@ -181,7 +180,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
       },
     ]}>
       <SafeAreaView style={styles.fill}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <StatusBar barStyle="dark-content" backgroundColor={colorsLight.white} />
 
         <View pointerEvents="none" style={styles.glow} />
 
@@ -199,7 +198,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
             'rgba(255, 51, 102, 0)',
             'rgba(255, 51, 102, 0.18)',
             'rgba(255, 51, 104, 0.95)',
-            colors.primaryDark,
+            colorsLight.primaryDark,
           ]}
           locations={[0, 0.25, 0.7, 1]}
           style={styles.gradient}
@@ -227,7 +226,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
                 style={({ pressed }) => [styles.btnOnGradient, { flex: 1, opacity: pressed ? 0.82 : 1 }]}
               >
                 <Text style={styles.btnOnGradientText}>Next</Text>
-                <RightArrow color={colors.primary} />
+                <RightArrow color={colorsLight.primary} />
               </Pressable>
             ) : (
               <>
@@ -243,7 +242,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
                   style={({ pressed }) => [styles.btnOnGradient, { flex: 1.2, opacity: pressed ? 0.82 : 1 }]}
                 >
                   <Text style={styles.btnOnGradientText}>Next</Text>
-                  <RightArrow color={colors.primary} />
+                  <RightArrow color={colorsLight.primary} />
                 </Pressable>
               </>
             )}
@@ -254,7 +253,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
   );
 };
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,

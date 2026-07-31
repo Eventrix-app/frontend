@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
-import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
+import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { EventHighlightCard, HighlightItem } from '../../components/events/EventHighlightCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
@@ -22,7 +22,7 @@ import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useDisplayAddress } from '../../hooks/useDisplayAddress';
-import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
@@ -106,6 +106,7 @@ const HomeScreen: React.FC = () => {
     [shortsFeed],
   );
   const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
+  const { data: categories = [] } = useGetCategoriesQuery();
   // toCardEvent runs over every loaded event and does distance maths per item, so it is
   // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
   // change, a notifications poll landing, a theme toggle).
@@ -181,8 +182,8 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('EventDetails', { eventId });
   }, [navigation]);
 
-  const openCategory = useCallback((categoryKey: string) => {
-    navigation.navigate('Search', { category: categoryKey });
+  const openCategory = useCallback((categoryId: string) => {
+    navigation.navigate('Search', { categoryId });
   }, [navigation]);
 
   // "View All Events" (bottom of the events sections) goes to the full Explore screen.
@@ -385,8 +386,8 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="Browse by Category" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {CATEGORIES.map((category) => (
-            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          {categories.map((category) => (
+            <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
           <ViewAllCategoryIconCard onPress={openInterestSheet} />
         </ScrollView>

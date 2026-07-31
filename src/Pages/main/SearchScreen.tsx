@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { CATEGORIES as CATEGORY_ICONS } from '../../components/events/CategoryIconCard';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -33,26 +32,7 @@ import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icon
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
-// Bridges the backend's category name (e.g. "Music") to the home-screen icon set, which is
-// keyed the same way lowercased ("music"). Ten categories now have artwork — Music, Tech,
-// Sports, Health, Education, Business, Art, Food, Gaming, Travel — and the lookup is
-// deliberately best-effort: any category whose name does not lowercase to one of those keys
-// simply gets no icon and stays text-only.
-//
-// The shared asset is a whole 104x104 card (label, border, glow and drop shadow all baked
-// into the bitmap), which is illegible shrunk to chip size — so the chip shows only the
-// artwork region of it. The artwork sits at x=27..77, y=34..84 on that canvas; scaling by
-// CHIP/ARTWORK and offsetting by that origin crops to it inside a fixed-size clipping
-// container. The card's white fill still sits behind the artwork, reading as a rounded tile.
-const CATEGORY_ICON_BY_NAME: Record<string, number> = Object.fromEntries(
-  CATEGORY_ICONS.map((c) => [c.key, c.icon]),
-);
-const iconForCategoryName = (name: string): number | undefined => CATEGORY_ICON_BY_NAME[name.toLowerCase()];
-
 const CHIP_ICON_SIZE = 20;
-const CANVAS = 104;
-const ARTWORK = { x: 27, y: 34, size: 50 };
-const CHIP_SCALE = CHIP_ICON_SIZE / ARTWORK.size;
 
 const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -61,15 +41,8 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Pre-selects the category chip when arriving from a category tap on Home/Explore
-  // (navigation.navigate('Search', { category })) — the route param is a category *name*
-  // (lowercased, e.g. 'music'), resolved below to a real categoryId once categories load.
-  const routeCategoryName = route.params?.category ?? null;
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!routeCategoryName || categoryId || categories.length === 0) return;
-    const match = categories.find((c) => c.name.toLowerCase() === routeCategoryName);
-    if (match) setCategoryId(match.id);
-  }, [routeCategoryName, categories, categoryId]);
+  // (navigation.navigate('Search', { categoryId })).
+  const [categoryId, setCategoryId] = useState<string | null>(route.params?.categoryId ?? null);
 
   // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
   // sent to the backend so search runs over the full catalog, not just already-loaded pages.
@@ -142,7 +115,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
         </TouchableOpacity>
         {categories.map((cat) => {
           const isSelected = categoryId === cat.id;
-          const icon = isSelected ? iconForCategoryName(cat.name) : undefined;
+          const icon = isSelected ? cat.iconUrl : undefined;
           return (
             <TouchableOpacity
               key={cat.id}
@@ -153,7 +126,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={[styles.chipContent, !!icon && styles.chipContentWithIcon]}>
                   {icon ? (
                     <View style={styles.chipIcon}>
-                      <Image source={icon} style={styles.chipIconImage} />
+                      <Image source={{ uri: icon }} style={styles.chipIconImage} resizeMode="contain" />
                     </View>
                   ) : null}
                   <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
@@ -326,10 +299,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     overflow: 'hidden',
   },
   chipIconImage: {
-    width: CANVAS * CHIP_SCALE,
-    height: CANVAS * CHIP_SCALE,
-    marginLeft: -ARTWORK.x * CHIP_SCALE,
-    marginTop: -ARTWORK.y * CHIP_SCALE,
+    width: CHIP_ICON_SIZE,
+    height: CHIP_ICON_SIZE,
   },
   chipActive: {
     backgroundColor: 'rgba(244,51,98,0.16)',

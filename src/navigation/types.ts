@@ -20,7 +20,7 @@ export type RootStackParamList = {
   AdminRedirect: undefined;
   EventDetails: { eventId: string };
   TicketDetails: { bookingId: string };
-  Search: { category?: string } | undefined;
+  Search: { categoryId?: string } | undefined;
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;

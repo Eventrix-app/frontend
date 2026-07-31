@@ -11,7 +11,7 @@ import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } fro
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { formatEventDate } from '../../utils/eventCardAdapter';
-import { getEventStartDateTime } from '../../utils/eventDateTime';
+import { isEventOver } from '../../utils/eventDateTime';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LeftArrow } from '../../components/common/Icons';
 import BookingListSkeleton from '../../components/common/BookingListSkeleton';
@@ -30,8 +30,7 @@ const TABS: { id: TabId; label: string }[] = [
 function bucketFor(enrollment: EnrollmentRecord): TabId {
   if (enrollment.status === 'cancelled' || enrollment.status === 'refunded') return 'cancelled';
   const event = enrollment.event;
-  const eventStart = event?.eventDate && event?.startTime ? getEventStartDateTime(event) : null;
-  if (eventStart && eventStart.getTime() < Date.now()) return 'previous';
+  if (event?.eventDate && event?.startTime && isEventOver(event)) return 'previous';
   return 'upcoming';
 }
 
@@ -44,9 +43,13 @@ function bucketFor(enrollment: EnrollmentRecord): TabId {
 // time means each status picks up the lighter variant the dark theme defines for it.
 type StatusTone = 'success' | 'warning' | 'error' | 'secondary';
 
-function statusDisplayFor(enrollment: EnrollmentRecord): { label: string; tone: StatusTone } {
+function statusDisplayFor(enrollment: EnrollmentRecord, eventOver: boolean): { label: string; tone: StatusTone } {
   if (enrollment.status === 'refunded') return { label: 'Refunded', tone: 'secondary' };
   if (enrollment.status === 'cancelled') return { label: 'Cancelled', tone: 'error' };
+  // Takes priority over Paid/Unpaid once the event's over — "did this event happen" is more
+  // relevant at that point than the payment state, and matches the "Event Completed" wording
+  // organizers/EventDetailsScreen already show for the same underlying isCompleted signal.
+  if (eventOver) return { label: 'Event Completed', tone: 'secondary' };
   if (enrollment.paymentStatus && enrollment.paymentStatus !== 'paid') {
     return { label: 'Unpaid', tone: 'warning' };
   }
@@ -251,8 +254,9 @@ const BookingsScreen: React.FC = () => {
               </View>
             ) : (
               bookings.map((booking) => {
-                const status = statusDisplayFor(booking);
                 const event = booking.event;
+                const eventOver = !!event?.eventDate && !!event?.startTime && isEventOver(event);
+                const status = statusDisplayFor(booking, eventOver);
                 return (
                   <TicketCard key={booking.id} styles={styles}>
                     <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>

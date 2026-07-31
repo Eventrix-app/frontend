@@ -18,7 +18,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setLocation, setManualCity } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
 import { spacing } from '../../theme/spacing';
-import { useTheme } from '../../theme/ThemeContext';
+import { colorsLight } from '../../theme/colors.light';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Text } from '../../components/common/Text';
 
@@ -34,8 +34,7 @@ const LocationAccessScreen: React.FC = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colorsLight), []);
 
   // ── Animation (identical to NotificationsModal) ──────────────────────────
   const slide = useRef(new Animated.Value(height)).current;
@@ -204,7 +203,7 @@ const LocationAccessScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               {isGeocoding ? (
-                <ActivityIndicator color={colors.primary} />
+                <ActivityIndicator color={colorsLight.primary} />
               ) : (
                 <Text style={styles.manualCityText}>
                   {cityInput.trim() ? 'Continue with city name' : 'Skip'}
@@ -224,7 +223,7 @@ const LocationAccessScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   // ── Shell (mirrors NotificationsModal exactly) ──────────────────────────
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {

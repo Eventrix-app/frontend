@@ -16,7 +16,7 @@ import { AnimatedToggle } from '../../components/AnimatedToggle';
 import { CheckBadge } from '../../components/CheckBadge';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { spacing } from '../../theme/spacing';
-import { useTheme } from '../../theme/ThemeContext';
+import { colorsLight } from '../../theme/colors.light';
 import { setNotificationPrefs } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState, store } from '../../store';
 import { Text } from '../../components/common/Text';
@@ -50,8 +50,7 @@ export const NotificationsModal: React.FC<ModalProps> = ({ visible, onClose, onC
     reelsAndCommunity: true,
     specialOffers: true,
   });
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colorsLight), []);
 
   useEffect(() => {
     if (persistedPrefs) {
@@ -148,7 +147,7 @@ export const NotificationsModal: React.FC<ModalProps> = ({ visible, onClose, onC
   );
 };
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

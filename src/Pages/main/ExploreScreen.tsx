@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
+import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
@@ -15,7 +15,7 @@ import { borderRadius } from '../../theme/borderRadius';
 import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
-import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
 import { calculateDistanceKm, toCardEvent } from '../../utils/eventCardAdapter';
@@ -63,6 +63,7 @@ const ExploreScreen: React.FC = () => {
     refetch: refetchFollowed,
   } = useGetFollowedEventsQuery(undefined, { skip: !followingOnly });
   const { data: me } = useGetMeQuery();
+  const { data: categories = [] } = useGetCategoriesQuery();
   const { data: notifications = [] } = useGetNotificationsQuery();
   const hasUnread = notifications.some((n) => !n.readAt);
   const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
@@ -123,8 +124,8 @@ const ExploreScreen: React.FC = () => {
     navigation.navigate('EventDetails', { eventId });
   }, [navigation]);
 
-  const openCategory = useCallback((categoryKey: string) => {
-    navigation.navigate('Search', { category: categoryKey });
+  const openCategory = useCallback((categoryId: string) => {
+    navigation.navigate('Search', { categoryId });
   }, [navigation]);
 
   const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
@@ -154,15 +155,15 @@ const ExploreScreen: React.FC = () => {
       <>
         <SectionHeader title="Browse by Category" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {CATEGORIES.map((category) => (
-            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          {categories.map((category) => (
+            <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
           <ViewAllCategoryIconCard onPress={openInterestSheet} />
         </ScrollView>
         <SectionHeader title="You Might Also Like" />
       </>
     ),
-    [styles.categoryRow, openCategory, openInterestSheet],
+    [styles.categoryRow, categories, openCategory, openInterestSheet],
   );
 
   return (
