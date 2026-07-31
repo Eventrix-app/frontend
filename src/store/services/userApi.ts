@@ -144,7 +144,7 @@ export const userApi = createApi({
     // deleteAccount above, which only deactivates the account. Requires proof of identity:
     // a password account passes currentPassword, a social-only account passes a freshly
     // obtained provider token instead. See Backend's UsersService.eraseMyData.
-    eraseMyData: builder.mutation<void, { currentPassword?: string; reauth?: { provider: 'google' | 'apple' | 'facebook'; token: string } }>({
+    eraseMyData: builder.mutation<void, { currentPassword?: string; reauth?: { provider: 'google'; token: string } }>({
       query: (body) => ({ url: 'users/me/data', method: 'DELETE', body }),
     }),
   }),

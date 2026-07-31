@@ -31,8 +31,8 @@ export interface User {
 }
 
 export interface SocialLoginCredentials {
-  provider: 'google' | 'apple' | 'facebook';
-  token: string; // id_token for Google/Apple, access_token for Facebook
+  provider: 'google';
+  token: string; // id_token
   deviceLabel?: string;
 }
 

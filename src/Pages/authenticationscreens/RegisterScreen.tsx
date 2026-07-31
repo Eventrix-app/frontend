@@ -191,7 +191,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         onRight={handleRegister}
       /> */}
 
-      <SocialLoginRow compact appleIconVariant="inverted" />
+      <SocialLoginRow compact />
       <LegalFooter />
     </AuthLayout>
   );

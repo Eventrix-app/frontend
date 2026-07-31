@@ -2,15 +2,10 @@
 // Google Maps SDK key can be injected from an env var at config-evaluation time instead of
 // being hardcoded/committed. Expo's CLI loads .env/.env.local into process.env before this
 // file runs, the same way it already does for the EXPO_PUBLIC_* vars baseQuery.ts reads.
-// Native social sign-in config. Both SDKs are native modules configured at build time, so
-// these values have to be resolvable when this file is evaluated (not at runtime) — hence
-// reading them here rather than inside the app.
+// Native Google sign-in config — a native module configured at build time, so this value
+// has to be resolvable when this file is evaluated (not at runtime) — hence reading it here
+// rather than inside the app.
 //
-// The Facebook scheme is fixed by the SDK: literally 'fb' + the app ID. It is what the
-// Facebook app / Custom Tab redirects back to, and the plugin writes it into the native
-// manifest for us.
-const FACEBOOK_APP_ID = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID ?? '';
-const FACEBOOK_CLIENT_TOKEN = process.env.EXPO_PUBLIC_FACEBOOK_CLIENT_TOKEN ?? '';
 // Google's iOS SDK needs the reversed iOS client ID registered as a URL scheme.
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ?? '';
 const GOOGLE_IOS_URL_SCHEME = GOOGLE_IOS_CLIENT_ID
@@ -130,7 +125,6 @@ module.exports = {
       ],
       'expo-video',
       'expo-secure-store',
-      'expo-web-browser',
       // Native Google sign-in — shows Android's own "Choose an account" system sheet
       // instead of handing off to a browser.
       //
@@ -144,22 +138,6 @@ module.exports = {
       ...(GOOGLE_IOS_URL_SCHEME
         ? [['@react-native-google-signin/google-signin', { iosUrlScheme: GOOGLE_IOS_URL_SCHEME }]]
         : []),
-      // Native Facebook login — uses the installed Facebook app when present, otherwise a
-      // Custom Tab. Either way the SDK owns the round trip, so there is no redirect_uri to
-      // whitelist under "Valid OAuth Redirect URIs" (Facebook rejects custom schemes there,
-      // which is what made the browser-based flow unworkable once Expo retired its proxy).
-      [
-        'react-native-fbsdk-next',
-        {
-          appID: FACEBOOK_APP_ID,
-          clientToken: FACEBOOK_CLIENT_TOKEN,
-          displayName: 'Eventrix',
-          scheme: FACEBOOK_APP_ID ? `fb${FACEBOOK_APP_ID}` : undefined,
-          isAutoInitEnabled: true,
-          advertiserIDCollectionEnabled: false,
-          autoLogAppEventsEnabled: false,
-        },
-      ],
     ],
     extra: {
       eas: {

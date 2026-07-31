@@ -1,8 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
 import { GoogleSignin, statusCodes, isErrorWithCode } from '@react-native-google-signin/google-signin';
-import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import HalfScreenModal from './halfscreenmodal';
 import Input from './Input';
 import Button from './Button';
@@ -11,18 +9,11 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useEraseMyDataMutation } from '../../store/services/userApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
-import {
-  APPLE_CLIENT_ID,
-  APPLE_REDIRECT_URI,
-  APPLE_DISCOVERY,
-} from '../../config/socialAuth';
 
-type Provider = 'google' | 'apple' | 'facebook';
+type Provider = 'google';
 
 const PROVIDER_LABEL: Record<Provider, string> = {
   google: 'Google',
-  apple: 'Apple',
-  facebook: 'Facebook',
 };
 
 interface Props {
@@ -45,27 +36,7 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
   const [eraseMyData, { isLoading }] = useEraseMyDataMutation();
   const [reauthing, setReauthing] = useState(false);
 
-  const linkedProvider = (authProviders.find((p) => p === 'google' || p === 'apple' || p === 'facebook') as Provider | undefined);
-
-  // Google/Facebook re-auth runs through the same native SDKs the sign-in screen uses (see
-  // SocialLoginRow) — same platform-native UI, and no dependence on a browser redirect
-  // finding its way back to the app. GoogleSignin.configure() is called there on mount; its
-  // config is process-wide, so it does not need repeating here.
-  const [, appleResponse, promptAppleAsync] = AuthSession.useAuthRequest(
-    { clientId: APPLE_CLIENT_ID, scopes: ['name', 'email'], redirectUri: APPLE_REDIRECT_URI || AuthSession.makeRedirectUri(), responseType: AuthSession.ResponseType.Code, extraParams: { response_mode: 'form_post' } },
-    APPLE_DISCOVERY,
-  );
-
-  const extractToken = (response: AuthSession.AuthSessionResult | null): string | undefined => {
-    if (!response || response.type !== 'success') return undefined;
-    return (
-      (response as any).authentication?.idToken ??
-      (response as any).authentication?.accessToken ??
-      (response as any).params?.id_token ??
-      (response as any).params?.access_token ??
-      (response as any).params?.code
-    );
-  };
+  const linkedProvider = (authProviders.find((p) => p === 'google') as Provider | undefined);
 
   const submitReauth = async (provider: Provider, token: string) => {
     try {
@@ -77,12 +48,6 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
       setReauthing(false);
     }
   };
-
-  React.useEffect(() => {
-    const token = extractToken(appleResponse);
-    if (token) void submitReauth('apple', token);
-    else if (appleResponse) setReauthing(false);
-  }, [appleResponse]);
 
   const reauthWithGoogle = async () => {
     try {
@@ -101,30 +66,9 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
     }
   };
 
-  const reauthWithFacebook = async () => {
-    try {
-      const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-      if (result.isCancelled) {
-        setReauthing(false);
-        return;
-      }
-      const session = await AccessToken.getCurrentAccessToken();
-      if (!session?.accessToken) {
-        setReauthing(false);
-        return;
-      }
-      await submitReauth('facebook', session.accessToken.toString());
-    } catch {
-      setReauthing(false);
-      showAlert('Could not delete your data', 'Re-authentication with Facebook failed. Please try again.');
-    }
-  };
-
   const handleReauthPress = () => {
     setReauthing(true);
     if (linkedProvider === 'google') void reauthWithGoogle();
-    else if (linkedProvider === 'facebook') void reauthWithFacebook();
-    else if (linkedProvider === 'apple') promptAppleAsync();
     else setReauthing(false);
   };
 
