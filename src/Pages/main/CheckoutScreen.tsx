@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import {
   useEnrollEventMutation,
   isWaitlistResult,
 } from '../../store/services/eventsApi';
+import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
@@ -34,11 +36,13 @@ import {
   PersonIcon,
   CheckCircleIcon,
   CloseCircleIcon,
+  PhoneIcon,
+  WhatsAppIcon,
+  ClipboardIcon,
 } from '../../components/common/Icons';
 import { PLATFORM_FEE_INR, GST_RATE, getGstInclusivePrice, getGstPortion } from '../../utils/pricing';
+import HalfScreenModal from '../../components/common/halfscreenmodal';
 
-// TODO: register 'Checkout' in RootStackParamList with this params shape once wired into
-// the navigator. Kept local/inline here so this file is self-contained.
 interface CheckoutRouteParams {
   eventId: string;
   ticketTypeId: string;
@@ -50,7 +54,6 @@ interface Props {
   route: { params: CheckoutRouteParams };
 }
 
-// TODO: mock — replace with a real promo-code lookup endpoint once one exists.
 const VALID_PROMO_CODES: Record<string, number> = {
   RUN50: 150,
 };
@@ -67,12 +70,26 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
 
+  // Organizer phone, used only by the "Need Help?" action in the overflow menu — same
+  // query EventDetailsScreen uses for its call/WhatsApp buttons.
+  const { data: organizerProfile } = useGetOrganizerProfileQuery(
+    event?.organizer?.id ?? '',
+    { skip: !event?.organizer?.id },
+  );
+  const organizerPhone = organizerProfile?.phone;
+
   const [selectedTierId, setSelectedTierId] = useState(ticketTypeId);
   const [quantity, setQuantity] = useState(initialQuantity);
   const [showTierPicker, setShowTierPicker] = useState(false);
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; amount: number } | null>(null);
+
   const [paymentIndex, setPaymentIndex] = useState(0);
+  const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+
+  // Overflow (⋮) menu state
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showRefundPolicy, setShowRefundPolicy] = useState(false);
 
   const selectedTier = ticketTypes.find((t) => t.id === selectedTierId) ?? null;
 
@@ -88,10 +105,6 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
-  // selectedTier.price is the organizer-entered, GST-exclusive amount — subtotal is the
-  // inclusive figure the ticket tab already showed, so this screen never surfaces a lower
-  // pre-tax number that then grows. gst below is the portion already inside subtotal, shown
-  // for transparency only; it is not added to totalPayable a second time.
   const unitPrice = selectedTier ? getGstInclusivePrice(selectedTier.price) : 0;
   const subtotal = unitPrice * quantity;
   const gst = selectedTier ? getGstPortion(selectedTier.price * quantity) : 0;
@@ -139,6 +152,43 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const handleCall = async () => {
+    if (!organizerPhone) {
+      showAlert('No phone number', "This organizer hasn't added a contact number yet.");
+      return;
+    }
+    const url = `tel:${organizerPhone}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        showAlert("Couldn't open dialer", 'Calling is not supported on this device.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      showAlert("Couldn't open dialer", 'Something went wrong. Please try again.');
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    if (!organizerPhone) {
+      showAlert('No phone number', "This organizer hasn't added a WhatsApp number yet.");
+      return;
+    }
+    const digits = organizerPhone.replace(/[^\d]/g, '');
+    const withCountry = digits.startsWith('91') && digits.length === 12
+      ? digits
+      : digits.length === 10
+        ? `91${digits}`
+        : digits;
+    const url = `https://wa.me/${withCountry}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      showAlert("Couldn't open WhatsApp", 'Make sure WhatsApp is installed on your device.');
+    }
+  };
+
   if (isLoadingEvent || isLoadingTiers || !event) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -155,7 +205,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <LeftArrow color={colors.text} size={20} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Checkout</Text>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowMoreMenu(true)}>
             <Text style={styles.headerMenuDots}>⋮</Text>
           </TouchableOpacity>
         </View>
@@ -169,6 +219,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => showPaymentPicker && setShowPaymentPicker(false)}
       >
         {/* Event Summary */}
         <Text style={styles.sectionLabel}>Event Summary</Text>
@@ -383,15 +434,48 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={[styles.payBar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity
-          style={styles.paymentMethodBtn}
-          onPress={() => setPaymentIndex((i) => (i + 1) % PAYMENT_METHODS.length)}
-        >
-          <Text style={styles.paymentMethodLabel}>Pay Using</Text>
-          <Text style={styles.paymentMethodValue}>{PAYMENT_METHODS[paymentIndex]} ▾</Text>
-        </TouchableOpacity>
+        <View style={styles.paymentMethodWrap}>
+          {showPaymentPicker && (
+            <View style={styles.paymentDropdown}>
+              {PAYMENT_METHODS.map((method, i) => {
+                const active = i === paymentIndex;
+                return (
+                  <TouchableOpacity
+                    key={method}
+                    style={styles.paymentDropdownItem}
+                    onPress={() => {
+                      setPaymentIndex(i);
+                      setShowPaymentPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.paymentDropdownText, active && styles.paymentDropdownTextActive]}>
+                      {method}
+                    </Text>
+                    {active && <CheckCircleIcon color={colors.brandPink} size={14} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.paymentMethodBtn}
+            onPress={() => setShowPaymentPicker((v) => !v)}
+          >
+            <Text style={styles.paymentMethodLabel}>Pay Using</Text>
+            <Text style={styles.paymentMethodValue} numberOfLines={1}>
+              {PAYMENT_METHODS[paymentIndex]} {showPaymentPicker ? '▲' : '▾'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity style={styles.payBtn} onPress={handlePay} disabled={isEnrolling || !selectedTier}>
+        <TouchableOpacity
+          style={styles.payBtn}
+          onPress={() => {
+            setShowPaymentPicker(false);
+            handlePay();
+          }}
+          disabled={isEnrolling || !selectedTier}
+        >
           {isEnrolling ? (
             <ActivityIndicator color={colors.white} />
           ) : (
@@ -399,6 +483,65 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Overflow (⋮) menu */}
+      <HalfScreenModal visible={showMoreMenu} onClose={() => setShowMoreMenu(false)} heightPercent={0.35}>
+        <View style={styles.moreMenu}>
+          <Text variant="h3" style={styles.moreMenuTitle}>More Options</Text>
+
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            onPress={() => {
+              setShowMoreMenu(false);
+              setShowRefundPolicy(true);
+            }}
+          >
+            <ClipboardIcon color={colors.text} size={20} />
+            <Text style={styles.moreMenuLabel}>Refund Policy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            onPress={() => {
+              setShowMoreMenu(false);
+              handleWhatsApp();
+            }}
+          >
+            <WhatsAppIcon color={colors.text} size={20} />
+            <Text style={styles.moreMenuLabel}>Need Help? Message on WhatsApp</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            onPress={() => {
+              setShowMoreMenu(false);
+              handleCall();
+            }}
+          >
+            <PhoneIcon color={colors.text} size={20} />
+            <Text style={styles.moreMenuLabel}>Call Organizer</Text>
+          </TouchableOpacity>
+        </View>
+      </HalfScreenModal>
+
+      {/* Refund Policy detail sheet */}
+      <HalfScreenModal visible={showRefundPolicy} onClose={() => setShowRefundPolicy(false)} heightPercent={0.4}>
+        <View style={styles.moreMenu}>
+          <Text variant="h3" style={styles.moreMenuTitle}>Refund Policy</Text>
+          {event.isPaid && event.refundPolicyType ? (
+            <>
+              <Text style={styles.refundTypeText}>{event.refundPolicyType.replace(/_/g, ' ')}</Text>
+              {event.refundPolicyText ? (
+                <Text style={styles.refundBodyText}>{event.refundPolicyText}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text style={styles.refundBodyText}>
+              No refund policy has been set for this event by the organizer.
+            </Text>
+          )}
+        </View>
+      </HalfScreenModal>
     </KeyboardAvoidingView>
   );
 };
@@ -606,8 +749,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
         },
       }),
     },
-    paymentMethodBtn: {
+    paymentMethodWrap: {
       flex: 1,
+      position: 'relative',
+    },
+    paymentMethodBtn: {
       borderWidth: 1,
       borderColor: colors.borderLight,
       borderRadius: borderRadius.md,
@@ -616,6 +762,38 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     paymentMethodLabel: { fontSize: 10, color: colors.brandPink, fontWeight: '700' },
     paymentMethodValue: { fontSize: 13, fontWeight: '600', color: colors.text, marginTop: 2 },
+    paymentDropdown: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: '100%',
+      marginBottom: spacing.xs,
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      borderRadius: borderRadius.md,
+      overflow: 'hidden',
+      ...Platform.select({
+        android: { elevation: 8 },
+        default: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
+        },
+      }),
+    },
+    paymentDropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+      paddingHorizontal: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderLight,
+    },
+    paymentDropdownText: { fontSize: 13, color: colors.text },
+    paymentDropdownTextActive: { color: colors.brandPink, fontWeight: '700' },
     payBtn: {
       backgroundColor: colors.brandPink,
       borderRadius: borderRadius.lg,
@@ -625,6 +803,27 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       justifyContent: 'center',
     },
     payBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+
+    // --- Overflow (⋮) menu + Refund Policy sheet ---
+    moreMenu: { padding: spacing.md },
+    moreMenuTitle: { marginBottom: spacing.sm },
+    moreMenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderLight,
+    },
+    moreMenuLabel: { fontSize: 15, fontWeight: '600', color: colors.text, flexShrink: 1 },
+    refundTypeText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.text,
+      textTransform: 'capitalize',
+      marginBottom: spacing.xs,
+    },
+    refundBodyText: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   });
 
 export default CheckoutScreen;
