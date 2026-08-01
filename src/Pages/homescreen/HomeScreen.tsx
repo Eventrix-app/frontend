@@ -10,8 +10,6 @@ import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/even
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { EventHighlightCard, HighlightItem } from '../../components/events/EventHighlightCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
-import HalfScreenModal from '../../components/common/halfscreenmodal';
-import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -67,7 +65,6 @@ const HomeScreen: React.FC = () => {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
-  const [showInterestSheet, setShowInterestSheet] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -191,9 +188,6 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Explore' as never);
   }, [navigation]);
 
-  // "View All" on categories opens the half-screen interest-selection popup.
-  const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
-  const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
   const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
 
   // Built once per data change rather than per render. `pullQuote` updates on every
@@ -386,10 +380,10 @@ const HomeScreen: React.FC = () => {
 
         <SectionHeader title="Browse by Category" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {categories.map((category) => (
+          {categories.slice(0, 5).map((category) => (
             <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
-          <ViewAllCategoryIconCard onPress={openInterestSheet} />
+          <ViewAllCategoryIconCard onPress={openExplore} />
         </ScrollView>
 
         <SectionHeader title="Based on Interest" />
@@ -418,14 +412,6 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
       </Animated.ScrollView>
-
-     <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
-      <InterestSelectionScreen
-    mode="sheet"
-    onComplete={closeInterestSheet}
-    onDismiss={closeInterestSheet}
-  />
-</HalfScreenModal>
     </View>
   );
 };
@@ -619,7 +605,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   categoryRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingBottom: spacing.sm,
   },
   footer: {

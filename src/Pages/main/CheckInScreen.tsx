@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -17,7 +19,12 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetEventEnrollmentsQuery, useCheckInMutation, EnrollmentRecord } from '../../store/services/eventsApi';
-import { acknowledgeDuplicates, cacheEnrollments, markCheckedInLocally } from '../../store/slices/checkInCacheSlice';
+import {
+  acknowledgeDuplicates,
+  cacheEnrollments,
+  clearEventCache,
+  markCheckedInLocally,
+} from '../../store/slices/checkInCacheSlice';
 import { AppDispatch, RootState } from '../../store';
 import { Text } from '../../components/common/Text';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -92,6 +99,23 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Keeps a live ref so the unmount cleanup below reads the latest queue instead of the
+  // one from whichever render first mounted this effect.
+  const pendingSyncRef = useRef(pendingSync);
+  pendingSyncRef.current = pendingSync;
+
+  // Once this event's check-in session ends, the cached roster (attendee names/emails)
+  // has done its job — drop it rather than leaving it on disk indefinitely. Skipped
+  // whenever there's still unsynced offline check-ins, since those need the cache to
+  // survive until they actually reach the server.
+  useEffect(() => {
+    return () => {
+      if (pendingSyncRef.current.length === 0) {
+        dispatch(clearEventCache({ eventId }));
+      }
+    };
+  }, [eventId, dispatch]);
 
   // Ask immediately on first open rather than waiting for a tap — this is a scan-first
   // screen, so surfacing the OS permission prompt right away matches what an organizer
@@ -252,7 +276,10 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Check In" onBack={() => navigation.goBack()} />
 
       {(isOffline || pendingSync.length > 0) && (
@@ -394,6 +421,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
               data={filtered}
               keyExtractor={(item) => item.id}
               renderItem={renderEnrollmentRow}
+              keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
                 <Text style={styles.emptyText}>
                   {searchQuery ? 'No matching attendees.' : 'No confirmed enrollments.'}
@@ -404,7 +432,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

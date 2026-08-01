@@ -16,6 +16,7 @@ import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 import {
   useFollowOrganizerMutation,
+  useGetMyVerificationStatusQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerProfileQuery,
   useUnfollowOrganizerMutation,
@@ -86,6 +87,7 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const { data: enrollments = [] } = useGetMyEnrollmentsQuery();
   const { data: favorites = [] } = useGetMyFavoritesQuery();
   const { data: myEvents = [] } = useGetMyEventsQuery();
+  const { data: verificationStatus } = useGetMyVerificationStatusQuery();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -117,6 +119,12 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   // reverse-geocoded address.
   const displayAddress = useDisplayAddress(me);
 
+  const verificationSubtitle: Record<'pending' | 'approved' | 'rejected', string> = {
+    pending: 'Pending review',
+    approved: 'Approved',
+    rejected: 'Rejected — resubmit',
+  };
+
   const menuItems: MenuItem[] = [
     { icon: 'edit-2', label: 'Edit Profile', onPress: (nav) => nav.navigate('EditProfile') },
     {
@@ -133,6 +141,18 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
       subtitle: `${createdEventsCount} event${createdEventsCount === 1 ? '' : 's'}`,
       onPress: (nav) => nav.navigate('MyEvents'),
     },
+    // Only shown once the user has actually applied for organizer verification — a plain
+    // participant who's never touched that flow has nothing to see here.
+    ...(verificationStatus && verificationStatus.status !== 'not_submitted'
+      ? [
+          {
+            icon: 'shield' as const,
+            label: 'Organizer Verification',
+            subtitle: verificationSubtitle[verificationStatus.status],
+            onPress: (nav: Props['navigation']) => nav.navigate('OrganizerVerification'),
+          },
+        ]
+      : []),
     { icon: 'bell', label: 'Notifications', onPress: (nav) => nav.navigate('Notifications') },
     { icon: 'settings', label: 'Settings', onPress: (nav) => nav.navigate('Settings') },
   ];

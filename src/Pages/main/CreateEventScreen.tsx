@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -30,7 +31,7 @@ import {
   ALLOWED_UPLOAD_CONTENT_TYPES,
   UploadContentType,
 } from '../../store/services/eventsApi';
-import { useGetCategoriesQuery } from '../../store/services/userApi';
+import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
 import { useRefreshMutation } from '../../store/services/authApi';
 import { useGetMyVerificationStatusQuery } from '../../store/services/organizerApi';
 import * as ImagePicker from 'expo-image-picker';
@@ -81,6 +82,9 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: verificationStatus, isLoading: isLoadingVerification } = useGetMyVerificationStatusQuery(undefined, {
     skip: isEdit || isAdmin,
   });
+  // Mirrors EventsService.createForUser's unconditional isEmailVerified check — only
+  // applies to a new event; editing an existing one doesn't hit that check server-side.
+  const { data: me, isLoading: isLoadingMe } = useGetMeQuery(undefined, { skip: isEdit });
 
   // Unverified/pending/rejected organizers never see the create-event form at all — they're
   // sent straight to the verification screen instead of a gate card with a "Get Verified"
@@ -88,11 +92,17 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   // back button returns to wherever the user was before tapping "Create Event", not into
   // this now-redirected screen.
   useEffect(() => {
-    if (isEdit || isAdmin || isLoadingVerification) return;
+    if (isEdit) return;
+    if (isLoadingMe) return;
+    if (!me?.isEmailVerified) {
+      navigation.replace('VerifyEmail', { reason: 'Verify your email address before creating an event.' });
+      return;
+    }
+    if (isAdmin || isLoadingVerification) return;
     if (verificationStatus?.status !== 'approved') {
       navigation.replace('OrganizerVerification');
     }
-  }, [isEdit, isAdmin, isLoadingVerification, verificationStatus, navigation]);
+  }, [isEdit, isAdmin, isLoadingVerification, isLoadingMe, me, verificationStatus, navigation]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -462,6 +472,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         () => navigation.navigate('MyEvents'),
       );
     } catch (e: any) {
+      // Client-side check above can be stale — the backend re-checks and rejects with the
+      // same requirement, so route the same way rather than surfacing a raw error alert.
+      if (e?.status === 403 && String(e?.data?.message ?? '').toLowerCase().includes('verify your email')) {
+        navigation.replace('VerifyEmail', { reason: 'Verify your email address before creating an event.' });
+        return;
+      }
       showAlert(
         asDraft ? "Couldn't save draft" : "Couldn't publish event",
         extractErrorMessage(e, 'Something went wrong. Please check your connection and try again.'),
@@ -486,10 +502,16 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title={isEdit ? 'Edit Event' : 'Create Event'} onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
+        keyboardShouldPersistTaps="handled"
+      >
         {isApprovedEdit && (
           <View style={styles.reviewNotice}>
             <Text style={styles.reviewNoticeText}>
@@ -792,7 +814,7 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
           setShowLocationPicker(false);
         }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

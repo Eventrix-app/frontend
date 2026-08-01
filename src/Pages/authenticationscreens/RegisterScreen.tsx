@@ -75,14 +75,15 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       prefetchPostLoginData(dispatch);
       if (!result.hasCompletedOnboarding) {
         // Push notification permission is requested at the end of onboarding
-        // (NotificationPreferencesScreen), not here.
-        navigation.navigate('Onboarding');
+        // (NotificationPreferencesScreen), not here. CompleteProfile (photo/name) comes
+        // first, then the existing Onboarding -> InterestSelection -> ... chain.
+        navigation.navigate('CompleteProfile');
       } else {
         registerForPushNotifications(dispatch);
         navigation.getParent()?.navigate('Main' as never);
       }
     } catch (err: any) {
-      console.error('Registration error details:', err);
+      if (__DEV__) console.error('Registration error details:', err);
       if (err.data && err.data.message) {
         if (Array.isArray(err.data.message)) {
           setErrorMessage(err.data.message.join(', '));

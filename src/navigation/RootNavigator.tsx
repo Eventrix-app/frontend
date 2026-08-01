@@ -29,6 +29,7 @@ import ErrorGenericScreen from '../Pages/screens/ErrorGenericScreen';
 import MyEventsScreen from '../Pages/main/MyEventsScreen';
 import CreateEventScreen from '../Pages/main/CreateEventScreen';
 import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScreen';
+import VerificationSubmittedScreen from '../Pages/main/VerificationSubmittedScreen';
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
@@ -232,6 +233,7 @@ const RootNavigator = () => {
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
         <Stack.Screen name="OrganizerVerification" component={OrganizerVerificationScreen} />
+        <Stack.Screen name="VerificationSubmitted" component={VerificationSubmittedScreen} />
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />

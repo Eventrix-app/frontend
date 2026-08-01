@@ -12,6 +12,7 @@ import {
 } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import secureStorage from './secureStorage';
+import checkInEncryptedStorage from './checkInEncryptedStorage';
 
 import authSlice from './slices/authSlice';
 import eventsSlice from './slices/eventsSlice';
@@ -51,10 +52,12 @@ const onboardingDraftPersistConfig = {
 };
 
 // Persisted so an organizer scanning tickets offline can kill/reopen the app without
-// losing the cached attendee list or any not-yet-synced check-ins.
+// losing the cached attendee list or any not-yet-synced check-ins. Encrypted at rest —
+// this cache holds a full attendee roster (name/email/ticket code) — see
+// checkInEncryptedStorage.ts.
 const checkInCachePersistConfig = {
   key: 'checkInCache',
-  storage: AsyncStorage,
+  storage: checkInEncryptedStorage,
 };
 
 const rootReducer = combineReducers({

@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
+import { CategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
@@ -108,7 +108,6 @@ const ExploreScreen: React.FC = () => {
     return result;
   }, [followingOnly, followedEvents, events, me?.latitude, me?.longitude, filters.radiusKm, sortByDistance]);
 
-  const [showInterestSheet, setShowInterestSheet] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -127,9 +126,6 @@ const ExploreScreen: React.FC = () => {
   const openCategory = useCallback((categoryId: string) => {
     navigation.navigate('Search', { categoryId });
   }, [navigation]);
-
-  const openInterestSheet = useCallback(() => setShowInterestSheet(true), []);
-  const closeInterestSheet = useCallback(() => setShowInterestSheet(false), []);
 
   const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
 
@@ -154,16 +150,15 @@ const ExploreScreen: React.FC = () => {
     () => (
       <>
         <SectionHeader title="Browse by Category" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+        <View style={styles.categoryGrid}>
           {categories.map((category) => (
             <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
-          <ViewAllCategoryIconCard onPress={openInterestSheet} />
-        </ScrollView>
+        </View>
         <SectionHeader title="You Might Also Like" />
       </>
     ),
-    [styles.categoryRow, categories, openCategory, openInterestSheet],
+    [styles.categoryGrid, categories, openCategory],
   );
 
   return (
@@ -290,14 +285,6 @@ const ExploreScreen: React.FC = () => {
           }
         />
       )}
-
-     <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
-      <InterestSelectionScreen
-    mode="sheet"
-    onComplete={closeInterestSheet}
-    onDismiss={closeInterestSheet}
-  />
-</HalfScreenModal>
 
       <HalfScreenModal visible={showFilterSheet} onClose={() => setShowFilterSheet(false)} heightPercent={0.75}>
         <FilterSheet value={filters} onApply={setFilters} onClose={() => setShowFilterSheet(false)} />
@@ -427,9 +414,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
-  categoryRow: {
+  categoryGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
   footer: {

@@ -24,7 +24,7 @@ export type RootStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;
-  VerifyEmail: undefined;
+  VerifyEmail: { reason?: string } | undefined;
   HelpCenter: undefined;
   LegalDocument: { doc: LegalDocumentKey };
   ActiveSessions: undefined;
@@ -34,6 +34,7 @@ export type RootStackParamList = {
   MyEvents: undefined;
   CreateEvent: { eventId?: string };
   OrganizerVerification: undefined;
+  VerificationSubmitted: undefined;
   ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };
   RefundApproval: undefined;
@@ -79,6 +80,7 @@ export type RootStackParamList = {
 
 export type AuthStackParamList = {
   Splash: undefined;
+  CompleteProfile: undefined;
   Onboarding: undefined;
   InterestSelection: undefined;
   LocationAccess: undefined;

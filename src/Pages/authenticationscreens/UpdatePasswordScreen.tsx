@@ -53,7 +53,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       await resetPassword({ token: otp.trim(), password }).unwrap();
       setIsSuccess(true);
     } catch (err: any) {
-      console.error('Reset password error:', err);
+      if (__DEV__) console.error('Reset password error:', err);
       if (err.data && err.data.message) {
         if (Array.isArray(err.data.message)) {
           setErrorMessage(err.data.message.join(', '));

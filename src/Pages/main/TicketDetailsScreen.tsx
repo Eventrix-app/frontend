@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Share, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -126,7 +126,10 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const isPaidBooking = Number(enrollment.totalAmount) > 0 && enrollment.paymentStatus === 'paid';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader
         title="Ticket Details"
         onBack={handleGoBack}
@@ -137,7 +140,10 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       />
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={[styles.ticketGlass, isCancelled && styles.ticketCancelled]}>
         <View style={styles.ticket}>
           <View style={styles.ticketHeader}>
@@ -269,7 +275,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

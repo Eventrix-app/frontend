@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -28,10 +28,11 @@ function errorMessageFrom(err: any, fallback: string): string {
   return fallback;
 }
 
-const VerifyEmailScreen: React.FC<Props> = ({ navigation }) => {
+const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const reason = route.params?.reason;
 
   const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
   const [sendOtp, { isLoading: isSending }] = useSendEmailVerificationOtpMutation();
@@ -105,9 +106,17 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Verify Email" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {reason ? (
+          <View style={styles.reasonBanner}>
+            <Text style={styles.reasonText}>{reason}</Text>
+          </View>
+        ) : null}
         <View style={styles.groupGlass}>
           <View style={styles.group}>
             <Text style={styles.label}>Email address</Text>
@@ -165,7 +174,7 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation }) => {
           </>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -177,6 +186,19 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   scroll: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  reasonBanner: {
+    backgroundColor: '#FFF6F8',
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  reasonText: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
   },
   groupGlass: {
     borderRadius: borderRadius.lg,

@@ -40,7 +40,7 @@ const AdminRedirectScreen: React.FC<Props> = () => {
         }
       }
     } catch (error) {
-      console.error('Error redirecting to admin dashboard:', error);
+      if (__DEV__) console.error('Error redirecting to admin dashboard:', error);
     }
   };
 

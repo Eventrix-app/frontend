@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -147,7 +148,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
@@ -167,6 +168,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Event Summary */}
         <Text style={styles.sectionLabel}>Event Summary</Text>
@@ -397,7 +399,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

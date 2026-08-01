@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -200,7 +200,10 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [caption, contentType, coords, dispatch, event?.title, eventId, locationName, mediaUri, navigation, overlay, tagDraft]);
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.neutralBg, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { backgroundColor: colors.neutralBg, paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="New Reel" onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
@@ -319,7 +322,7 @@ const ShareReelScreen: React.FC<Props> = ({ navigation, route }) => {
         onClose={() => setPickerOpen(false)}
         onConfirm={handleConfirmLocation}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

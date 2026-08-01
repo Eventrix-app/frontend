@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { RootStackParamList } from '../../navigation/types';
@@ -14,9 +13,8 @@ import { Text } from '../../components/common/Text';
 import { RootState } from '../../store';
 import { useGetMeQuery, useUpdateParticipantMutation } from '../../store/services/userApi';
 import EditProfileSkeleton from '../../components/common/EditProfileSkeleton';
-import { useGetUploadUrlMutation, ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType } from '../../store/services/eventsApi';
+import { useProfilePictureUpload } from '../../hooks/useProfilePictureUpload';
 import { showAlert } from '../../utils/crossPlatformAlert';
-import { extractErrorMessage } from '../../utils/apiError';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -25,13 +23,12 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const userId = useSelector((state: RootState) => state.auth.user?.id);
   const { data: me, isLoading: isLoadingMe } = useGetMeQuery();
   const [updateParticipant, { isLoading: isSaving }] = useUpdateParticipantMutation();
-  const [getUploadUrl] = useGetUploadUrlMutation();
+  const { isUploading: isUploadingPhoto, pickAndUploadPhoto } = useProfilePictureUpload(userId);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // A fast double-tap can fire before isSaving's re-render lands (same reasoning as
@@ -78,57 +75,11 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const initial = (firstName || me?.email || '?').charAt(0).toUpperCase();
 
-  const handlePickPhoto = async () => {
-    if (!userId || isUploadingPhoto) return;
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showAlert('Permission needed', 'Allow photo library access to change your profile photo.');
-      return;
-    }
-
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-    if (pickerResult.canceled || !pickerResult.assets.length) return;
-
-    const asset = pickerResult.assets[0];
-    if (!asset.uri) {
-      showAlert('Selection failed', 'Could not read the selected image.');
-      return;
-    }
-    const contentType = (ALLOWED_UPLOAD_CONTENT_TYPES.includes(asset.mimeType as UploadContentType)
-      ? asset.mimeType
-      : 'image/jpeg') as UploadContentType;
-
-    setIsUploadingPhoto(true);
-    try {
-      // Signed-URL round trip and the local file read are independent; only the PUT needs
-      // both, so they overlap instead of queueing.
-      const [{ uploadUrl, publicUrl }, fileBlob] = await Promise.all([
-        getUploadUrl({ purpose: 'profile-picture', contentType }).unwrap(),
-        fetch(asset.uri).then((r) => r.blob()),
-      ]);
-      const putResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: fileBlob,
-        headers: { 'Content-Type': contentType },
-      });
-      if (!putResponse.ok) throw new Error('Image upload to storage failed.');
-
-      await updateParticipant({ id: userId, body: { profileImageUrl: publicUrl } }).unwrap();
-    } catch (e: any) {
-      showAlert("Couldn't update photo", extractErrorMessage(e, 'Something went wrong. Please try again.'));
-    } finally {
-      setIsUploadingPhoto(false);
-    }
-  };
-
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Edit Profile" onBack={() => navigation.goBack()} />
 
       {/* The form is only rendered once it can be prefilled. Showing it while getMe is in
@@ -137,8 +88,11 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       {isLoadingMe ? (
         <EditProfileSkeleton />
       ) : (
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}>
-        <TouchableOpacity style={styles.avatarSection} onPress={handlePickPhoto} disabled={isUploadingPhoto}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TouchableOpacity style={styles.avatarSection} onPress={pickAndUploadPhoto} disabled={isUploadingPhoto}>
           <View style={styles.avatar}>
             {isUploadingPhoto ? (
               <ActivityIndicator color={colors.brandPink} />
@@ -191,7 +145,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

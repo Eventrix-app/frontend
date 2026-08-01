@@ -3,7 +3,9 @@ import {
   Animated,
   Dimensions,
   Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -137,7 +139,7 @@ const LocationAccessScreen: React.FC = () => {
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Dimmed backdrop — tap to go back */}
         <Animated.View style={[styles.backdrop, { opacity: fade }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -218,7 +220,7 @@ const LocationAccessScreen: React.FC = () => {
             ) : null}
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

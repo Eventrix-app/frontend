@@ -74,7 +74,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         navigation.getParent()?.navigate('Main' as never);
       }
     } catch (err: any) {
-      console.error('Login error details:', err);
+      if (__DEV__) console.error('Login error details:', err);
       // Check if email or password are incorrect (401 Unauthorized)
       if (
         err.status === 401 ||

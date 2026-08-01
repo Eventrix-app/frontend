@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
@@ -107,8 +107,7 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
         addressProofUrl: docs.addressProofUrl,
         panOrAadhaarUrl: docs.panOrAadhaarUrl,
       }).unwrap();
-      showAlert('Submitted for review', "We'll notify you once an admin has reviewed your details.");
-      navigation.goBack();
+      navigation.replace('VerificationSubmitted');
     } catch (e: any) {
       showAlert('Submission failed', extractErrorMessage(e, 'Something went wrong. Please try again.'));
     }
@@ -121,7 +120,10 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
   const showStatusOnly = !isLoadingStatus && status && status.status !== 'not_submitted' && !isResubmitting;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Organizer Verification" onBack={() => navigation.goBack()} />
 
       {isLoadingStatus ? (
@@ -162,7 +164,10 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.intro}>
             To organize events on Eventrix, we need to verify your identity. Upload the documents below — an admin
             will review them before you can create your first event.
@@ -212,7 +217,7 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

@@ -7,10 +7,10 @@ import { RootStackParamList } from './types';
 // event-cancelled push notification should land on the same screen for the same reason.
 //
 // Only wires the screens email templates actually need to link to (event details, a
-// booking's ticket, the notifications list, and the Bookings tab) rather than exposing
-// every screen in the app as a deep-linkable path — most screens (Settings, Edit Profile,
-// admin tooling) have no legitimate external entry point and shouldn't be reachable via a
-// bare URL.
+// booking's ticket, the notifications list, the Bookings tab, and Help Center) rather than
+// exposing every screen in the app as a deep-linkable path — most screens (Settings, Edit
+// Profile, admin tooling) have no legitimate external entry point and shouldn't be
+// reachable via a bare URL.
 export const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['eventrix://'],
   config: {
@@ -18,6 +18,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       EventDetails: 'event/:eventId',
       TicketDetails: 'booking/:bookingId',
       Notifications: 'notifications',
+      HelpCenter: 'help-center',
       // RootStackParamList types `Main`'s param as `{ screen?: keyof MainTabParamList }`
       // rather than React Navigation's `NavigatorScreenParams<MainTabParamList>` helper, so
       // TS can't automatically recognize it as a nested navigator here — same reason several

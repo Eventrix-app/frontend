@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -74,7 +75,10 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Search" onBack={() => navigation.goBack()} />
 
       <View style={styles.searchGlass}>
@@ -156,6 +160,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <MainEventCard event={item} onPress={() => openEvent(item.id)} />
           )}
@@ -206,7 +211,7 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           }
         />
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

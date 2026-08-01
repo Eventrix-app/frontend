@@ -135,6 +135,12 @@ const checkInCacheSlice = createSlice({
         d.acknowledged = true;
       });
     },
+    // Called when CheckInScreen unmounts with an empty pendingSync queue — the cached
+    // roster (attendee names/emails) has done its job and shouldn't keep sitting on disk
+    // once the organizer's check-in session for this event is over.
+    clearEventCache(state, action: PayloadAction<{ eventId: string }>) {
+      delete state[action.payload.eventId];
+    },
   },
 });
 
@@ -145,5 +151,6 @@ export const {
   markPendingSyncFailed,
   recordDuplicateEntry,
   acknowledgeDuplicates,
+  clearEventCache,
 } = checkInCacheSlice.actions;
 export default checkInCacheSlice.reducer;

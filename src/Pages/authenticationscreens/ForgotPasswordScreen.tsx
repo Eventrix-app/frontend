@@ -33,7 +33,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
       // On success, navigate to Update Password screen with email
       navigation.navigate('UpdatePassword', { email: email.trim().toLowerCase() });
     } catch (err: any) {
-      console.error('Forgot password error:', err);
+      if (__DEV__) console.error('Forgot password error:', err);
       if (err.data && err.data.message) {
         if (Array.isArray(err.data.message)) {
           setErrorMessage(err.data.message.join(', '));

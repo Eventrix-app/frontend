@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -49,7 +49,10 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Manage Ticket Types" onBack={() => navigation.goBack()} />
 
       {isLoading ? (
@@ -63,7 +66,7 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {ticketTypes.map((tier) =>
             tier.quantitySold > 0 ? (
               <LockedTierCard key={tier.id} tier={tier} />
@@ -86,7 +89,7 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
