@@ -79,10 +79,19 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
     // reflects a pull-to-refresh rather than an infinite-scroll page append.
     isRefreshing: isFetching && page === 1,
     isError,
-    refetch: () => {
+    // Deliberately does not rely on the [data, page] effect above to repopulate pagesById:
+    // RTK Query's default structural sharing keeps the *same* `data` reference across a
+    // refetch whenever the response is content-identical to what's already cached (the
+    // common case — a pull-to-refresh usually returns the same events back). That effect is
+    // keyed on `data` itself, so when the reference doesn't change, it never re-fires, and
+    // the empty Map set below would then stick forever — a pull-to-refresh that looked like
+    // it wiped the list and never brought it back. Awaiting the refetch's own settled result
+    // and writing it into state directly sidesteps that reference check entirely.
+    refetch: async () => {
       setPage(1);
       setPagesById(new Map());
-      refetch();
+      const result = await refetch();
+      setPagesById(result.data ? new Map([[1, result.data]]) : new Map());
     },
   };
 }

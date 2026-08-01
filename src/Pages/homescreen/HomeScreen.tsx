@@ -119,8 +119,13 @@ const HomeScreen: React.FC = () => {
     [cardEvents],
   );
   // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
-  // lives on the Explore screen via "View All Events" below.
-  const recommended = useMemo(() => cardEvents.slice(0, 15), [cardEvents]);
+  // lives on the Explore screen via "View All Events" below. Excludes whatever is already
+  // in the Featured carousel just above it — without this, any event both featured and
+  // recent (the common case) rendered twice on the same screen.
+  const recommended = useMemo(() => {
+    const featuredIds = new Set(featured.map((event) => event.id));
+    return cardEvents.filter((event) => !featuredIds.has(event.id)).slice(0, 15);
+  }, [cardEvents, featured]);
 
   // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
   // down together (via pullDistance below) and reveals a random health quote behind

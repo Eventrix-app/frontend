@@ -1719,14 +1719,22 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                               <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
                                 Price
                               </Text>
-                              <Text style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}>
+                              <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}
+                              >
                                 • {tier.price > 0 ? `₹${getGstInclusivePrice(tier.price)}` : 'Free'}
                               </Text>
 
                               <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
                                 Availability
                               </Text>
-                              <Text style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}>
+                              <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}
+                              >
                                 • {availabilityText}
                               </Text>
                             </View>
@@ -1739,6 +1747,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 {benefits.map((b, i) => (
                                   <Text
                                     key={i}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
                                     style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}
                                   >
                                     • {b}
@@ -2355,9 +2365,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   ticketStubBgImage: { resizeMode: 'stretch' },
   ticketStubContent: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: 4,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
     justifyContent: 'flex-start',
   },
   ticketStubTitle: {
@@ -2370,9 +2380,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     // just applied to the opposite category because the pill's fill is inverted from the
     // surrounding card on that one asset.
     color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 14,
     fontFamily: 'ZalandoSansExpanded_700Bold',
-    marginBottom: spacing.sm,
+    marginBottom: 4,
     textAlign: 'center',
     // Shrink-to-content + auto margins, not full-width stretch: centers on the pill's own
     // width rather than the wider card behind it.
@@ -2386,25 +2396,29 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   ticketStubBody: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   ticketStubCol: { flex: 1 },
+  // Fixed-height card + up to 6 organizer-entered benefit lines (CreateTicketTypeDto's cap)
+  // meant this content routinely ran taller than the 190px stub and got silently clipped by
+  // ticketStubWrap's overflow:hidden — shrunk enough (fonts, line-height, spacing, single-
+  // line benefit bullets below) that even a tier with all 6 benefits fits inside the art.
   ticketStubLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: 'Poppins_700Bold',
     color: 'rgba(255,255,255,0.85)',
-    marginTop: 8,
-    marginBottom: 2,
+    marginTop: 5,
+    marginBottom: 1,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   ticketStubBullet: {
-    fontSize: 14,
+    fontSize: 11,
     // Literal white — see ticketStubTitle's comment. This is the VIP-card default (solid
     // pink body); the light-card override just below is what earlybird.png/standard.png
     // actually need.
     color: '#FFFFFF',
-    lineHeight: 20,
+    lineHeight: 14,
     fontFamily: 'Poppins_600SemiBold',
   },
   // Applied on Early Bird/General, whose card body is light (earlybird.png/standard.png),

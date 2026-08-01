@@ -396,6 +396,60 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     return allSucceeded;
   };
 
+  // Cover image and gallery uploads (each a signed-URL round trip plus a storage PUT, and
+  // for the gallery one such round trip per item) run after the event row already exists
+  // and is already visible to admins — they must never hold up the success confirmation,
+  // which is what made "Submit for Approval" feel stuck for a long time even though the
+  // admin dashboard already had the event within seconds. Runs detached from handleSave
+  // (not awaited there) so the confirmation fires as soon as the event itself is saved.
+  const uploadPendingMediaInBackground = async (savedEvent: { id: string }) => {
+    if (!pendingImage && pendingGalleryItems.length === 0) return;
+
+    // A first-ever event grants the 'organizer' role server-side (EventsService.
+    // createForUser), but the access token already in memory was minted before that and
+    // still lacks it — the upload-url requests below would 403 on a stale role.
+    // Refreshing re-signs the token from current DB state so they carry the new role.
+    if (!isEdit) {
+      await refresh().unwrap().catch(() => {});
+    }
+
+    let imageWarning: string | null = null;
+
+    if (pendingImage) {
+      setIsUploadingCover(true);
+      try {
+        const publicUrl = await uploadPendingCoverImage();
+        await updateEvent({ id: savedEvent.id, body: { coverImageUrl: publicUrl } }).unwrap();
+        setCoverImageUrl(publicUrl);
+        setPendingImage(null);
+      } catch {
+        imageWarning = 'The cover image failed to upload — you can add it again from Edit.';
+      } finally {
+        setIsUploadingCover(false);
+      }
+    }
+
+    if (pendingGalleryItems.length > 0) {
+      setIsUploadingGallery(true);
+      try {
+        const allSucceeded = await uploadPendingGalleryItems(savedEvent.id);
+        if (allSucceeded) {
+          setPendingGalleryItems([]);
+        } else {
+          imageWarning = imageWarning
+            ? `${imageWarning}\n\nSome gallery items failed to upload — you can add them again from Edit.`
+            : 'Some gallery items failed to upload — you can add them again from Edit.';
+        }
+      } finally {
+        setIsUploadingGallery(false);
+      }
+    }
+
+    if (imageWarning) {
+      showAlert('Heads up', imageWarning);
+    }
+  };
+
   const handleSave = async (asDraft: boolean) => {
     if (isSubmittingRef.current) return;
     const err = validate();
@@ -404,51 +458,11 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
     isSubmittingRef.current = true;
     setSavingMode(asDraft ? 'draft' : 'publish');
 
-    let imageWarning: string | null = null;
-
     try {
       const payload = buildPayload(asDraft);
-      let savedEvent = isEdit
+      const savedEvent = isEdit
         ? await updateEvent({ id: eventId!, body: payload }).unwrap()
         : await createEvent(payload).unwrap();
-
-      // A first-ever event grants the 'organizer' role server-side (EventsService.
-      // createForUser), but the access token already in memory was minted before that and
-      // still lacks it — the upload-url requests below would 403 on a stale role.
-      // Refreshing re-signs the token from current DB state so they carry the new role.
-      if (!isEdit && (pendingImage || pendingGalleryItems.length > 0)) {
-        await refresh().unwrap().catch(() => {});
-      }
-
-      if (pendingImage) {
-        setIsUploadingCover(true);
-        try {
-          const publicUrl = await uploadPendingCoverImage();
-          savedEvent = await updateEvent({ id: savedEvent.id, body: { coverImageUrl: publicUrl } }).unwrap();
-          setCoverImageUrl(publicUrl);
-          setPendingImage(null);
-        } catch {
-          imageWarning = 'The cover image failed to upload — you can add it again from Edit.';
-        } finally {
-          setIsUploadingCover(false);
-        }
-      }
-
-      if (pendingGalleryItems.length > 0) {
-        setIsUploadingGallery(true);
-        try {
-          const allSucceeded = await uploadPendingGalleryItems(savedEvent.id);
-          if (allSucceeded) {
-            setPendingGalleryItems([]);
-          } else {
-            imageWarning = imageWarning
-              ? `${imageWarning}\n\nSome gallery items failed to upload — you can add them again from Edit.`
-              : 'Some gallery items failed to upload — you can add them again from Edit.';
-          }
-        } finally {
-          setIsUploadingGallery(false);
-        }
-      }
 
       const successTitle = isApprovedEdit
         ? 'Changes Saved'
@@ -466,11 +480,23 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
       // Navigating only happens once the user dismisses this dialog — that ordering is
       // deliberate: it's the confirmation that the save actually succeeded, and it stops
       // the screen from silently sitting on the (still-tappable, pre-fix) form afterward.
-      showAlert(
-        successTitle,
-        imageWarning ? `${successMessage}\n\n${imageWarning}` : successMessage,
-        () => navigation.navigate('MyEvents'),
-      );
+      // A brand-new event resets the stack (rather than just navigating) so CreateEvent is
+      // no longer sitting underneath My Events — otherwise the back button would return to
+      // this same filled-in form and a second tap on Publish/Submit would create a
+      // duplicate event. Editing an existing event has no such risk (it's an idempotent
+      // PATCH), so that path keeps the simpler push-and-back-to-the-edit-screen behavior.
+      showAlert(successTitle, successMessage, () => {
+        if (isEdit) {
+          navigation.navigate('MyEvents');
+        } else {
+          navigation.reset({
+            index: 1,
+            routes: [{ name: 'Main', params: { screen: 'Home' } }, { name: 'MyEvents' }],
+          });
+        }
+      });
+
+      void uploadPendingMediaInBackground(savedEvent);
     } catch (e: any) {
       // Client-side check above can be stale — the backend re-checks and rejects with the
       // same requirement, so route the same way rather than surfacing a raw error alert.
