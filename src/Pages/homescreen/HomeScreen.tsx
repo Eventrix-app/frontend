@@ -428,6 +428,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   headerShift: {
     flexShrink: 0,
+    // Subtle depth so the header reads as sitting above the scroll content rather than
+    // fusing flat into it — matches the shadow language already used on cards elsewhere.
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
   },
   scrollFlex: {
     flex: 1,
@@ -531,7 +538,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingHorizontal: spacing.md,
     height: 48,
     gap: 8,
-    shadowColor: '#000',
+    // Was hardcoded '#000' — themed so this reads correctly in both light and dark mode
+    // rather than always rendering a plain black shadow regardless of theme.
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -583,7 +592,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,   // was: spacing.md — a touch more breathing room before "Browse by Category"
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     overflow: 'hidden',
@@ -612,7 +621,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,   // was: spacing.sm — a bit more separation before "Based on Interest"
   },
   footer: {
     alignItems: 'center',
@@ -631,7 +640,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderColor: colors.brandPink,
     borderRadius: 14,
     paddingVertical: spacing.sm + 2,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,   // was: spacing.sm — a touch more separation from "You Might Also Like" cards above it
   },
   viewAllText: {
     color: colors.brandPink,

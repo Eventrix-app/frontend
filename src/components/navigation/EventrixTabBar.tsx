@@ -93,23 +93,24 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: '100%',
   },
   bar: {
-    flexDirection: 'row',
-    height: 60,
-    backgroundColor: colors.white,
-    paddingTop: spacing.sm,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 2,
-  },
- indicator: {
+  flexDirection: 'row',
+  height: 60,
+  backgroundColor: colors.white,
+  // paddingTop removed — that gap now lives per-tab instead (see `tab` below)
+},
+tab: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  paddingHorizontal: 2,
+  paddingTop: spacing.sm,   // was on `bar` — moved here so it doesn't affect the indicator's own top:0 positioning
+},
+indicator: {
   position: 'absolute',
-  top: -spacing.sm,     // was: top: 0 — pulls it up into bar's paddingTop, flush with the navbar's top edge
+  top: 0.6,               // was: 6 — a bit higher, closer to the top edge
   alignSelf: 'center',
-  width: '70%',
+  width: '62%',         // was: '55%' — slightly wider/more visible
   height: 4,
   backgroundColor: colors.brandPink,
   borderBottomLeftRadius: 1000,
