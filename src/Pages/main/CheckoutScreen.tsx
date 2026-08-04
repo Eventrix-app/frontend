@@ -24,13 +24,11 @@ import {
   isWaitlistResult,
   EnrollmentRecord,
 } from '../../store/services/eventsApi';
-import { useInitiatePayUOrderMutation, PayUInitiateResponse } from '../../store/services/paymentsApi';
-import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import {
-  useGetFeeEstimateQuery,
   useInitiatePayUNativeOrderMutation,
   useVerifyPayUNativeMutation,
 } from '../../store/services/paymentsApi';
+import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { openPayUCheckout } from '../../services/payuNativeService';
 import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
 import { showAlert } from '../../utils/crossPlatformAlert';
@@ -39,11 +37,7 @@ import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { LeftArrow, PhoneIcon, WhatsAppIcon, ClipboardIcon } from '../../components/common/Icons';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
-import PayUCheckoutModal from '../../components/payments/PayUCheckoutModal';
-
-// The deployed backend base URL — surl/furl for PayU's return callback must point here.
-// Stripped of any trailing slash to match the pattern the backend registers.
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/$/, '');
+import { GST_RATE, PLATFORM_FEE_INR, getGstPortion } from '../../utils/pricing';
 
 interface CheckoutRouteParams {
   eventId: string;
@@ -66,22 +60,15 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
   const dispatch = useDispatch<AppDispatch>();
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
-<<<<<<< HEAD
-  const [initiatePayUOrder, { isLoading: isInitiatingPayU }] = useInitiatePayUOrderMutation();
-=======
   const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
   const [verifyPayUNative] = useVerifyPayUNativeMutation();
 
   // If a non-cancelled enrollment for this event already exists (a fresh booking just made,
   // or one left over from a previous abandoned/failed payment attempt), this screen switches
-  // into "resume payment" mode against that exact enrollment instead of creating a new one —
-  // EventsService.enroll() would otherwise reject a second attempt with a conflict, and
-  // without this there was previously no way to retry a failed payment at all.
+  // into "resume payment" mode against that exact enrollment instead of creating a new one.
   const { activeEnrollment } = useMyEventEnrollment(eventId);
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
 
-  // Organizer phone, used only by the "Need Help?" action in the overflow menu — same
-  // query EventDetailsScreen uses for its call/WhatsApp buttons.
+  // Organizer phone, used only by the "Need Help?" action in the overflow menu.
   const { data: organizerProfile } = useGetOrganizerProfileQuery(
     event?.organizer?.id ?? '',
     { skip: !event?.organizer?.id },
@@ -92,19 +79,12 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const [quantity, setQuantity] = useState(initialQuantity);
   const [showTierPicker, setShowTierPicker] = useState(false);
 
-  // PayU checkout modal state — payuParams is set right before the modal opens and cleared
-  // when it closes so there's never a stale set of params visible to a reopened modal.
-  const [payuParams, setPayuParams] = useState<PayUInitiateResponse | null>(null);
-  const [showPayuModal, setShowPayuModal] = useState(false);
-
   // Overflow (⋮) menu state
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
 
   // True from the moment the native PayU checkout sheet is asked to open until a terminal
-  // event (success/failure/cancelled/error) resolves — the sheet renders outside this
-  // component's tree entirely, so unlike the old WebView modal there's no `order` state to
-  // hold, just this single in-flight flag.
+  // event (success/failure/cancelled/error) resolves.
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const isResuming = !!activeEnrollment;
@@ -126,65 +106,20 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
-<<<<<<< HEAD
   // The ticket price is the base price; GST (18%) is added on top in the Order Summary.
-  const unitPrice = selectedTier ? selectedTier.price : 0;
-  const subtotal = unitPrice * quantity;
-  // GST added on top of the ticket subtotal.
-  const gst = selectedTier ? getGstPortion(selectedTier.price * quantity) : 0;
-  const promoDiscount = appliedPromo?.amount ?? 0;
-  const totalPayable = Math.max(subtotal + gst + PLATFORM_FEE_INR - promoDiscount, 0);
-=======
   const tierPrice = activeEnrollment?.ticketType?.price ?? selectedTier?.price ?? 0;
   const subtotal = tierPrice * effectiveQuantity;
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
-
-  // Before an enrollment exists yet, preview the exact buyer-facing total enroll() will
-  // compute — reuses the same FeeCalculationService the backend uses for the organizer's own
-  // live payout preview elsewhere, so this can never drift from what's actually charged. Once
-  // a real enrollment exists (resuming), its own totalAmount is already the authoritative
-  // number and this estimate is skipped entirely.
-  const { data: feeEstimate } = useGetFeeEstimateQuery(
-    { ticketPrice: subtotal, feePayer: event?.feePayer, organizerId: event?.organizer?.id },
-    { skip: isResuming || subtotal <= 0 || !event },
-  );
-
+  // GST added on top of the ticket subtotal.
+  const gst = getGstPortion(subtotal);
   const totalPayable = activeEnrollment
     ? Number(activeEnrollment.totalAmount)
-    : feeEstimate?.buyerPrice ?? subtotal;
-  const serviceFee = Math.max(totalPayable - subtotal, 0);
+    : Math.max(subtotal + gst + PLATFORM_FEE_INR, 0);
 
   const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment;
 
   const handlePay = async () => {
     if (!event) return;
     try {
-<<<<<<< HEAD
-      // Step 1: Create the enrollment on the backend.
-      // For paid events this sets paymentStatus: 'pending' and totalAmount.
-      const result = await enrollEvent({
-        eventId: event.id,
-        ticketTypeId: selectedTier.id,
-        quantity,
-      }).unwrap();
-
-      // Step 2a: Waitlist — no payment needed, just inform the user.
-      if (isWaitlistResult(result)) {
-        showAlert(
-          "You're on the Waitlist",
-          `You're #${result.position} in line for "${selectedTier.name}". We'll confirm your spot automatically if one opens up.`,
-          () => navigation.navigate('Bookings' as any),
-        );
-        return;
-      }
-
-      // Step 2b: Free ticket — already confirmed, no payment gateway needed.
-      if (!(Number(result.totalAmount) > 0)) {
-        showAlert('Booked!', 'Your spot is confirmed. Enjoy the event!', () =>
-          navigation.navigate('Bookings' as any),
-        );
-        return;
-=======
       let enrollment: EnrollmentRecord;
 
       if (activeEnrollment) {
@@ -238,9 +173,6 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             navigation.navigate('Bookings' as any),
           );
         } catch {
-          // The SDK reported success but our own server-side verification couldn't confirm
-          // it immediately (e.g. an unrecognized payuResponse shape) — never tell the user it
-          // failed when PayU itself said it succeeded; point them at My Bookings instead.
           showAlert(
             'Payment received',
             "We received your payment but couldn't confirm it immediately — check My Bookings shortly.",
@@ -254,54 +186,12 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           "Couldn't complete payment",
           ('errorMsg' in result && result.errorMsg) || 'Something went wrong. Please try again.',
         );
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
       }
-
-      // Step 2c: Paid ticket — enrollment is confirmed but paymentStatus is 'pending'.
-      // Call PayU initiate to get the txnid + hash, then open the checkout modal.
-      const payuData = await initiatePayUOrder({ enrollmentId: result.id }).unwrap();
-      setPayuParams(payuData);
-      setShowPayuModal(true);
     } catch (e: any) {
-<<<<<<< HEAD
-      showAlert(
-        "Couldn't start payment",
-        extractErrorMessage(e, 'Something went wrong. Please try again.'),
-      );
-=======
       showAlert("Couldn't complete payment", extractErrorMessage(e, 'Something went wrong. Please try again.'));
     } finally {
       setIsProcessingPayment(false);
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
     }
-  };
-
-  const handlePayUSuccess = () => {
-    setShowPayuModal(false);
-    setPayuParams(null);
-    showAlert('Payment Successful!', 'Your ticket is confirmed.', () =>
-      navigation.navigate('Bookings' as any),
-    );
-  };
-
-  const handlePayUFailure = () => {
-    setShowPayuModal(false);
-    setPayuParams(null);
-    showAlert(
-      'Payment Failed',
-      'Your payment was not completed. Please try again or use a different payment method.',
-    );
-  };
-
-  const handlePayUDismiss = () => {
-    setShowPayuModal(false);
-    setPayuParams(null);
-    // User closed the modal manually — enrollment exists but payment is still pending.
-    // They can tap Pay again to retry with a fresh txnid.
-    showAlert(
-      'Payment Cancelled',
-      'You closed the payment screen. Tap Pay to try again.',
-    );
   };
 
   const handleCall = async () => {
@@ -414,12 +304,12 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
               >
                 <Text style={styles.tierPickerText} numberOfLines={1}>
                   {selectedTier
-                    ? `${selectedTier.name} - ${selectedTier.price > 0 ? `₹${selectedTier.price}` : 'Free'}`
+                    ? `${selectedTier.name} - ${selectedTier.price > 0 ? `\u20b9${selectedTier.price}` : 'Free'}`
                     : activeEnrollment?.ticketType
-                      ? `${activeEnrollment.ticketType.name} - ₹${activeEnrollment.ticketType.price}`
+                      ? `${activeEnrollment.ticketType.name} - \u20b9${activeEnrollment.ticketType.price}`
                       : 'Select a ticket'}
                 </Text>
-                {!isResuming && <Text style={styles.tierPickerChevron}>{showTierPicker ? '▲' : '▼'}</Text>}
+                {!isResuming && <Text style={styles.tierPickerChevron}>{showTierPicker ? '\u25b2' : '\u25bc'}</Text>}
               </TouchableOpacity>
               {showTierPicker && !isResuming && (
                 <View style={styles.tierDropdown}>
@@ -434,7 +324,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
                       }}
                     >
                       <Text style={styles.tierDropdownText}>
-                        {tier.name} - {tier.price > 0 ? `₹${tier.price}` : 'Free'}
+                        {tier.name} - {tier.price > 0 ? `\u20b9${tier.price}` : 'Free'}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -450,7 +340,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
                   onPress={() => adjustQuantity(-1)}
                   disabled={isResuming || effectiveQuantity <= min}
                 >
-                  <Text style={styles.stepperBtnText}>−</Text>
+                  <Text style={styles.stepperBtnText}>{'\u2212'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{String(effectiveQuantity).padStart(2, '0')}</Text>
                 <TouchableOpacity
@@ -475,7 +365,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.tierInfoRow}>
                 <Text style={styles.tierInfoLabel}>Price</Text>
                 <Text style={styles.tierInfoValue}>
-                  {selectedTier && selectedTier.price > 0 ? `₹${selectedTier.price} per ticket` : 'Free'}
+                  {selectedTier && selectedTier.price > 0 ? `\u20b9${selectedTier.price} per ticket` : 'Free'}
                 </Text>
               </View>
             </>
@@ -487,9 +377,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.tierTotalLabel}>Total</Text>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.tierTotalSub}>
-                (₹{tierPrice} x {effectiveQuantity})
+                ({'\u20b9'}{tierPrice} x {effectiveQuantity})
               </Text>
-              <Text style={styles.tierTotalValue}>₹{subtotal}</Text>
+              <Text style={styles.tierTotalValue}>{'\u20b9'}{subtotal}</Text>
             </View>
           </View>
         </View>
@@ -499,47 +389,37 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.card}>
           <View style={styles.toPayRow}>
             <Text style={styles.toPayLabel}>To Pay</Text>
-            <Text style={styles.toPayFinal}>₹{totalPayable}</Text>
+            <Text style={styles.toPayFinal}>{'\u20b9'}{totalPayable}</Text>
           </View>
 
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x ₹{tierPrice})</Text>
-            <Text style={styles.orderValue}>₹{subtotal}</Text>
+            <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x {'\u20b9'}{tierPrice})</Text>
+            <Text style={styles.orderValue}>{'\u20b9'}{subtotal}</Text>
           </View>
-<<<<<<< HEAD
           <View style={styles.orderRow}>
             <Text style={styles.orderLabel}>Platform Fee</Text>
-            <Text style={styles.orderValue}>₹{PLATFORM_FEE_INR}</Text>
+            <Text style={styles.orderValue}>{'\u20b9'}{PLATFORM_FEE_INR}</Text>
           </View>
           <View style={styles.orderRow}>
             <Text style={styles.orderLabel}>GST ({Math.round(GST_RATE * 100)}%)</Text>
-            <Text style={styles.orderValue}>₹{gst}</Text>
+            <Text style={styles.orderValue}>{'\u20b9'}{gst}</Text>
           </View>
-          {promoDiscount > 0 && (
-=======
-          {serviceFee > 0 && (
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
-            <View style={styles.orderRow}>
-              <Text style={styles.orderLabel}>Service Fee</Text>
-              <Text style={styles.orderValue}>₹{serviceFee}</Text>
-            </View>
-          )}
 
           <View style={styles.divider} />
 
           <View style={styles.orderRow}>
             <Text style={styles.totalPayableLabel}>Total Payable</Text>
-            <Text style={styles.totalPayableValue}>₹{totalPayable}</Text>
+            <Text style={styles.totalPayableValue}>{'\u20b9'}{totalPayable}</Text>
           </View>
         </View>
 
         <View style={styles.footerLinksWrap}>
-          <Text style={styles.footerCopyright}>All Rights Reserved. © Eventrix</Text>
+          <Text style={styles.footerCopyright}>All Rights Reserved. {'\u00a9'} Eventrix</Text>
           <View style={styles.footerLinksRow}>
             <Text style={styles.footerLink}>Terms of use</Text>
-            <Text style={styles.footerLinkDot}> • </Text>
+            <Text style={styles.footerLinkDot}> {'\u2022'} </Text>
             <Text style={styles.footerLink}>Privacy Policy</Text>
-            <Text style={styles.footerLinkDot}> • </Text>
+            <Text style={styles.footerLinkDot}> {'\u2022'} </Text>
             <Text style={styles.footerLink}>Contact Us</Text>
           </View>
           <Text style={styles.footerBrand}>Eventrix</Text>
@@ -550,23 +430,13 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={[styles.payBar, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={styles.payBtn}
-<<<<<<< HEAD
-          onPress={() => {
-            setShowPaymentPicker(false);
-            handlePay();
-          }}
-          disabled={isEnrolling || isInitiatingPayU || !selectedTier}
-        >
-          {isEnrolling || isInitiatingPayU ? (
-=======
           onPress={handlePay}
           disabled={isPaying || (!isResuming && !selectedTier)}
         >
           {isPaying ? (
->>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
             <ActivityIndicator color={colors.white} />
           ) : (
-            <Text style={styles.payBtnText}>Pay ₹{totalPayable}</Text>
+            <Text style={styles.payBtnText}>Pay {'\u20b9'}{totalPayable}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -629,18 +499,6 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       </HalfScreenModal>
-
-      {/* PayU payment gateway modal — only rendered when params are ready */}
-      {payuParams && (
-        <PayUCheckoutModal
-          visible={showPayuModal}
-          params={payuParams}
-          surlBase={API_BASE_URL}
-          onSuccess={handlePayUSuccess}
-          onFailure={handlePayUFailure}
-          onDismiss={handlePayUDismiss}
-        />
-      )}
     </KeyboardAvoidingView>
   );
 };
@@ -799,9 +657,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       left: 0,
       right: 0,
       bottom: 0,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
       paddingHorizontal: spacing.md,
       paddingTop: spacing.sm,
       backgroundColor: colors.white,
@@ -828,7 +683,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     payBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
-    // --- Overflow (⋮) menu + Refund Policy sheet ---
     moreMenu: { padding: spacing.md },
     moreMenuTitle: { marginBottom: spacing.sm },
     moreMenuItem: {
