@@ -22,6 +22,7 @@ import {
   useEnrollEventMutation,
   isWaitlistResult,
 } from '../../store/services/eventsApi';
+import { useInitiatePayUOrderMutation, PayUInitiateResponse } from '../../store/services/paymentsApi';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
@@ -42,6 +43,11 @@ import {
 } from '../../components/common/Icons';
 import { PLATFORM_FEE_INR, GST_RATE, getGstInclusivePrice, getGstPortion } from '../../utils/pricing';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
+import PayUCheckoutModal from '../../components/payments/PayUCheckoutModal';
+
+// The deployed backend base URL — surl/furl for PayU's return callback must point here.
+// Stripped of any trailing slash to match the pattern the backend registers.
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/$/, '');
 
 interface CheckoutRouteParams {
   eventId: string;
@@ -69,6 +75,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: event, isLoading: isLoadingEvent } = useGetEventByIdQuery(eventId);
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
+  const [initiatePayUOrder, { isLoading: isInitiatingPayU }] = useInitiatePayUOrderMutation();
 
   // Organizer phone, used only by the "Need Help?" action in the overflow menu — same
   // query EventDetailsScreen uses for its call/WhatsApp buttons.
@@ -86,6 +93,11 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [paymentIndex, setPaymentIndex] = useState(0);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+
+  // PayU checkout modal state — payuParams is set right before the modal opens and cleared
+  // when it closes so there's never a stale set of params visible to a reopened modal.
+  const [payuParams, setPayuParams] = useState<PayUInitiateResponse | null>(null);
+  const [showPayuModal, setShowPayuModal] = useState(false);
 
   // Overflow (⋮) menu state
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -105,11 +117,13 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
-  const unitPrice = selectedTier ? getGstInclusivePrice(selectedTier.price) : 0;
+  // The ticket price is the base price; GST (18%) is added on top in the Order Summary.
+  const unitPrice = selectedTier ? selectedTier.price : 0;
   const subtotal = unitPrice * quantity;
+  // GST added on top of the ticket subtotal.
   const gst = selectedTier ? getGstPortion(selectedTier.price * quantity) : 0;
   const promoDiscount = appliedPromo?.amount ?? 0;
-  const totalPayable = Math.max(subtotal + PLATFORM_FEE_INR - promoDiscount, 0);
+  const totalPayable = Math.max(subtotal + gst + PLATFORM_FEE_INR - promoDiscount, 0);
 
   const handleApplyPromo = () => {
     const code = promoInput.trim().toUpperCase();
@@ -130,26 +144,71 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const handlePay = async () => {
     if (!event || !selectedTier) return;
     try {
+      // Step 1: Create the enrollment on the backend.
+      // For paid events this sets paymentStatus: 'pending' and totalAmount.
       const result = await enrollEvent({
         eventId: event.id,
         ticketTypeId: selectedTier.id,
         quantity,
       }).unwrap();
 
+      // Step 2a: Waitlist — no payment needed, just inform the user.
       if (isWaitlistResult(result)) {
         showAlert(
           "You're on the Waitlist",
           `You're #${result.position} in line for "${selectedTier.name}". We'll confirm your spot automatically if one opens up.`,
           () => navigation.navigate('Bookings' as any),
         );
-      } else {
-        showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
+        return;
+      }
+
+      // Step 2b: Free ticket — already confirmed, no payment gateway needed.
+      if (!(Number(result.totalAmount) > 0)) {
+        showAlert('Booked!', 'Your spot is confirmed. Enjoy the event!', () =>
           navigation.navigate('Bookings' as any),
         );
+        return;
       }
+
+      // Step 2c: Paid ticket — enrollment is confirmed but paymentStatus is 'pending'.
+      // Call PayU initiate to get the txnid + hash, then open the checkout modal.
+      const payuData = await initiatePayUOrder({ enrollmentId: result.id }).unwrap();
+      setPayuParams(payuData);
+      setShowPayuModal(true);
     } catch (e: any) {
-      showAlert("Couldn't complete payment", extractErrorMessage(e, 'Something went wrong. Please try again.'));
+      showAlert(
+        "Couldn't start payment",
+        extractErrorMessage(e, 'Something went wrong. Please try again.'),
+      );
     }
+  };
+
+  const handlePayUSuccess = () => {
+    setShowPayuModal(false);
+    setPayuParams(null);
+    showAlert('Payment Successful!', 'Your ticket is confirmed.', () =>
+      navigation.navigate('Bookings' as any),
+    );
+  };
+
+  const handlePayUFailure = () => {
+    setShowPayuModal(false);
+    setPayuParams(null);
+    showAlert(
+      'Payment Failed',
+      'Your payment was not completed. Please try again or use a different payment method.',
+    );
+  };
+
+  const handlePayUDismiss = () => {
+    setShowPayuModal(false);
+    setPayuParams(null);
+    // User closed the modal manually — enrollment exists but payment is still pending.
+    // They can tap Pay again to retry with a fresh txnid.
+    showAlert(
+      'Payment Cancelled',
+      'You closed the payment screen. Tap Pay to try again.',
+    );
   };
 
   const handleCall = async () => {
@@ -401,7 +460,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.orderValue}>₹{PLATFORM_FEE_INR}</Text>
           </View>
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>GST ({Math.round(GST_RATE * 100)}%) — included above</Text>
+            <Text style={styles.orderLabel}>GST ({Math.round(GST_RATE * 100)}%)</Text>
             <Text style={styles.orderValue}>₹{gst}</Text>
           </View>
           {promoDiscount > 0 && (
@@ -474,9 +533,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             setShowPaymentPicker(false);
             handlePay();
           }}
-          disabled={isEnrolling || !selectedTier}
+          disabled={isEnrolling || isInitiatingPayU || !selectedTier}
         >
-          {isEnrolling ? (
+          {isEnrolling || isInitiatingPayU ? (
             <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.payBtnText}>Pay ₹{totalPayable}</Text>
@@ -542,6 +601,18 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       </HalfScreenModal>
+
+      {/* PayU payment gateway modal — only rendered when params are ready */}
+      {payuParams && (
+        <PayUCheckoutModal
+          visible={showPayuModal}
+          params={payuParams}
+          surlBase={API_BASE_URL}
+          onSuccess={handlePayUSuccess}
+          onFailure={handlePayUFailure}
+          onDismiss={handlePayUDismiss}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };

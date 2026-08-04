@@ -13,6 +13,57 @@ export interface FeeBreakdown {
   organizerPayout: number;
 }
 
+// Returned by POST /payments/payu/initiate — every field is fed directly into the
+// self-submitting HTML form that opens PayU's hosted checkout page inside a WebView.
+export interface PayUInitiateResponse {
+  txnid: string;
+  amount: number;
+  productinfo: string;
+  firstname: string;
+  email: string;
+  phone: string;
+  key: string;
+  hash: string;
+  // The URL the form POSTs to, e.g. https://test.payu.in/_payment
+  actionUrl: string;
+}
+
+// Result of POST /payments/payu/verify-native — used by the native SDK path.
+export interface PayUVerifyNativeResponse {
+  success: boolean;
+}
+
+// Mirrors the shape returned by GET /payments/invoices/:enrollmentId on the backend.
+// All monetary amounts are in rupees (not paise) and are already rounded to 2 decimal places.
+export interface TaxInvoice {
+  invoiceNumber: string;
+  invoiceDate: string;
+  // Booking / enrollment identifiers
+  enrollmentId: string;
+  bookingReference: string;
+  // Event details
+  eventTitle: string;
+  eventDate: string;
+  venueName: string;
+  // Ticket line-item
+  ticketTypeName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotalBeforeTax: number;
+  // GST breakdown (18% Indian GST on platform convenience fee and ticket price)
+  gstRate: number;
+  gstAmount: number;
+  platformFeeAmount: number;
+  // Total amount charged to the buyer
+  totalAmountPaid: number;
+  // Payer / recipient details
+  buyerName: string;
+  buyerEmail: string;
+  // Organizer details for B2B invoices
+  organizerName: string;
+  organizerGstin?: string;
+}
+
 export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed' | 'failed';
 
 export interface RefundRecord {
@@ -45,6 +96,25 @@ export const paymentsApi = createApi({
   endpoints: (builder) => ({
     getFeeEstimate: builder.query<FeeBreakdown, number>({
       query: (ticketPrice) => `payments/fee-estimate?ticketPrice=${ticketPrice}`,
+    }),
+    getInvoiceData: builder.query<TaxInvoice, string>({
+      // enrollmentId — GET /payments/invoices/:enrollmentId
+      query: (enrollmentId) => `payments/invoices/${enrollmentId}`,
+    }),
+    initiatePayUOrder: builder.mutation<PayUInitiateResponse, { enrollmentId: string }>({
+      query: (body) => ({ url: 'payments/payu/initiate', method: 'POST', body }),
+    }),
+    verifyPayUNative: builder.mutation<PayUVerifyNativeResponse, {
+      txnid: string;
+      mihpayid: string;
+      status: 'success' | 'failure';
+      amount: string;
+      productinfo: string;
+      firstname: string;
+      email: string;
+      hash: string;
+    }>({
+      query: (body) => ({ url: 'payments/payu/verify-native', method: 'POST', body }),
     }),
     requestRefund: builder.mutation<RefundRecord, { enrollmentId: string; reason?: string }>({
       query: (body) => ({ url: 'payments/refunds', method: 'POST', body }),
@@ -82,6 +152,9 @@ export const paymentsApi = createApi({
 
 export const {
   useGetFeeEstimateQuery,
+  useGetInvoiceDataQuery,
+  useInitiatePayUOrderMutation,
+  useVerifyPayUNativeMutation,
   useRequestRefundMutation,
   useGetPendingRefundsQuery,
   useApproveRefundMutation,

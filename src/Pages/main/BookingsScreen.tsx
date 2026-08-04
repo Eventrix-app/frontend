@@ -8,6 +8,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
+import { useGetInvoiceDataQuery } from '../../store/services/paymentsApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { formatEventDate } from '../../utils/eventCardAdapter';
@@ -17,6 +18,7 @@ import { NotificationBell, LeftArrow } from '../../components/common/Icons';
 import BookingListSkeleton from '../../components/common/BookingListSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
+import HalfScreenModal from '../../components/common/halfscreenmodal';
 
 type TabId = 'upcoming' | 'previous' | 'waitlist' | 'cancelled';
 
@@ -56,6 +58,148 @@ function statusDisplayFor(enrollment: EnrollmentRecord, eventOver: boolean): { l
   const amount = enrollment.totalAmount != null ? ` ₹${enrollment.totalAmount}` : '';
   return { label: `Paid${amount}`, tone: 'success' };
 }
+
+// Formats a decimal/float rupee value to two decimal places for invoice display.
+function fmtRupees(amount: number): string {
+  return `₹${Number(amount).toFixed(2)}`;
+}
+
+// Per-card invoice button + modal — self-contained so the RTK Query instance is
+// scoped to each card and the fetch is deferred until the user taps "Tax Invoice".
+// Showing the modal is the fetch trigger: `skip` is true until tapped, so all cards
+// on screen don't simultaneously fire invoice requests on mount.
+const InvoiceBadge: React.FC<{
+  enrollmentId: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+  styles: ReturnType<typeof createStyles>;
+}> = ({ enrollmentId, colors, styles }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const { data: invoice, isLoading, isError } = useGetInvoiceDataQuery(enrollmentId, {
+    skip: !modalVisible,
+  });
+
+  const handlePress = () => setModalVisible(true);
+
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.invoiceBtn}
+        onPress={handlePress}
+        hitSlop={6}
+        accessibilityLabel="Download Tax Invoice"
+        accessibilityRole="button"
+      >
+        <Text style={styles.invoiceBtnText}>🧾 Tax Invoice</Text>
+      </TouchableOpacity>
+
+      <HalfScreenModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        heightPercent={0.72}
+      >
+        <View style={styles.invoiceSheet}>
+          <View style={styles.invoiceSheetHeader}>
+            <Text variant="h3" style={styles.invoiceSheetTitle}>Tax Invoice</Text>
+            <Text style={styles.invoiceSheetBadge}>GST 18%</Text>
+          </View>
+
+          {isLoading && (
+            <Text style={styles.invoiceLoading}>Loading invoice…</Text>
+          )}
+
+          {isError && (
+            <Text style={styles.invoiceError}>
+              Could not load invoice. Please check your connection and try again.
+            </Text>
+          )}
+
+          {invoice && (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Invoice meta */}
+              <View style={styles.invoiceMetaRow}>
+                <View style={styles.invoiceMetaCol}>
+                  <Text style={styles.invoiceMetaLabel}>Invoice No.</Text>
+                  <Text style={styles.invoiceMetaValue}>{invoice.invoiceNumber}</Text>
+                </View>
+                <View style={styles.invoiceMetaCol}>
+                  <Text style={styles.invoiceMetaLabel}>Date</Text>
+                  <Text style={styles.invoiceMetaValue}>
+                    {new Date(invoice.invoiceDate).toLocaleDateString('en-IN', {
+                      day: '2-digit', month: 'short', year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Event */}
+              <View style={styles.invoiceSectionDivider} />
+              <Text style={styles.invoiceFieldLabel}>Event</Text>
+              <Text style={styles.invoiceFieldValue}>{invoice.eventTitle}</Text>
+              <Text style={styles.invoiceFieldSub}>
+                {formatEventDate(invoice.eventDate)} · {invoice.venueName}
+              </Text>
+
+              {/* Buyer */}
+              <View style={styles.invoiceSectionDivider} />
+              <Text style={styles.invoiceFieldLabel}>Bill To</Text>
+              <Text style={styles.invoiceFieldValue}>{invoice.buyerName}</Text>
+              <Text style={styles.invoiceFieldSub}>{invoice.buyerEmail}</Text>
+
+              {/* Organizer */}
+              <View style={styles.invoiceSectionDivider} />
+              <Text style={styles.invoiceFieldLabel}>Supplied By</Text>
+              <Text style={styles.invoiceFieldValue}>{invoice.organizerName}</Text>
+              {invoice.organizerGstin ? (
+                <Text style={styles.invoiceFieldSub}>GSTIN: {invoice.organizerGstin}</Text>
+              ) : null}
+
+              {/* Line items */}
+              <View style={styles.invoiceSectionDivider} />
+              <Text style={styles.invoiceFieldLabel}>Description</Text>
+              <View style={styles.invoiceLineItem}>
+                <Text style={styles.invoiceLineDesc} numberOfLines={2}>
+                  {invoice.ticketTypeName} × {invoice.quantity}
+                </Text>
+                <Text style={styles.invoiceLineAmt}>{fmtRupees(invoice.unitPrice * invoice.quantity)}</Text>
+              </View>
+
+              {/* Breakdown */}
+              <View style={styles.invoiceSectionDivider} />
+              <View style={styles.invoiceBreakdownRow}>
+                <Text style={styles.invoiceBreakdownLabel}>Subtotal (excl. GST)</Text>
+                <Text style={styles.invoiceBreakdownValue}>{fmtRupees(invoice.subtotalBeforeTax)}</Text>
+              </View>
+              <View style={styles.invoiceBreakdownRow}>
+                <Text style={styles.invoiceBreakdownLabel}>Platform Fee</Text>
+                <Text style={styles.invoiceBreakdownValue}>{fmtRupees(invoice.platformFeeAmount)}</Text>
+              </View>
+              <View style={styles.invoiceBreakdownRow}>
+                <Text style={styles.invoiceBreakdownLabel}>
+                  GST @ {Math.round(invoice.gstRate * 100)}%
+                </Text>
+                <Text style={styles.invoiceBreakdownValue}>{fmtRupees(invoice.gstAmount)}</Text>
+              </View>
+              <View style={[styles.invoiceSectionDivider, { marginVertical: 6 }]} />
+              <View style={styles.invoiceTotalRow}>
+                <Text style={styles.invoiceTotalLabel}>Total Paid</Text>
+                <Text style={styles.invoiceTotalValue}>{fmtRupees(invoice.totalAmountPaid)}</Text>
+              </View>
+
+              {/* Ref */}
+              <View style={styles.invoiceSectionDivider} />
+              <Text style={[styles.invoiceFieldSub, { textAlign: 'center', marginTop: 8 }]}>
+                Booking Ref: {invoice.bookingReference}
+              </Text>
+              <Text style={[styles.invoiceFieldSub, { textAlign: 'center', marginBottom: 16 }]}>
+                This is a computer-generated invoice and does not require a signature.
+              </Text>
+            </ScrollView>
+          )}
+        </View>
+      </HalfScreenModal>
+    </>
+  );
+};
 
 // Ticket-stub shaped card, built with plain Views instead of a background image —
 // the "notches" are circles positioned at the card's left/right edges, colored to
@@ -280,17 +424,29 @@ const BookingsScreen: React.FC = () => {
                     <View style={styles.stubDivider} />
 
                     <View style={styles.footerRow}>
-                      <Text style={styles.footerLabel}>
-                        Status: <Text style={{ color: colors[status.tone], fontWeight: '700' }}>{status.label}</Text>
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.viewTicketBtn}
-                        onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
-                      >
-                        <Text style={styles.viewTicketText}>View Ticket</Text>
-                        <Text style={styles.viewTicketArrow}>→</Text>
-                      </TouchableOpacity>
-                    </View>
+                        <Text style={styles.footerLabel}>
+                          Status: <Text style={{ color: colors[status.tone], fontWeight: '700' }}>{status.label}</Text>
+                        </Text>
+                        <View style={styles.footerActions}>
+                          {/* Show invoice button for confirmed + paid bookings only */}
+                          {booking.status === 'confirmed' &&
+                            booking.paymentStatus === 'paid' &&
+                            Number(booking.totalAmount) > 0 && (
+                              <InvoiceBadge
+                                enrollmentId={booking.id}
+                                colors={colors}
+                                styles={styles}
+                              />
+                            )}
+                          <TouchableOpacity
+                            style={styles.viewTicketBtn}
+                            onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
+                          >
+                            <Text style={styles.viewTicketText}>View Ticket</Text>
+                            <Text style={styles.viewTicketArrow}>→</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                   </TicketCard>
                 );
               })
@@ -560,12 +716,171 @@ notchLeft: {
     fontWeight: '700',
     color: colors.brandPink,
   },
+  footerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   resultsText: {
     fontSize: 12,
     color: colors.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: spacing.md,
+  },
+
+  // ─── Invoice modal styles ────────────────────────────────────────────────────
+  invoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  invoiceBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  invoiceSheet: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+  invoiceSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  invoiceSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  invoiceSheetBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.brandPink,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.brandPink,
+    overflow: 'hidden',
+  },
+  invoiceLoading: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    marginTop: spacing.xl,
+    fontSize: 14,
+  },
+  invoiceError: {
+    textAlign: 'center',
+    color: colors.error,
+    marginTop: spacing.xl,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  invoiceMetaRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  invoiceMetaCol: {
+    flex: 1,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+  },
+  invoiceMetaLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  invoiceMetaValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  invoiceSectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderLight,
+    marginVertical: spacing.sm,
+  },
+  invoiceFieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  invoiceFieldValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  invoiceFieldSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  invoiceLineItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginTop: 4,
+  },
+  invoiceLineDesc: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  invoiceLineAmt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  invoiceBreakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  invoiceBreakdownLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  invoiceBreakdownValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  invoiceTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  invoiceTotalLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.brandPink,
+  },
+  invoiceTotalValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.brandPink,
   },
 });
 

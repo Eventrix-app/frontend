@@ -1,7 +1,7 @@
-// Ticket prices are organizer-entered, GST-exclusive amounts (TicketTypeRecord.price / DB
-// column ticket_types.price). Every buyer-facing surface shows the GST-inclusive figure
-// instead — the exclusive amount is never displayed on its own, so a price never appears to
-// change between the ticket tab and checkout.
+// Ticket prices are organizer-entered, buyer-facing amounts (TicketTypeRecord.price / DB
+// column ticket_types.price). GST is already embedded inside the price — use getGstPortion()
+// to extract the GST component for the breakdown display, and never call getGstInclusivePrice()
+// on a ticket price (that would add 18% on top of an already-inclusive amount).
 export const GST_RATE = 0.18;
 
 // Flat, not a percentage — applied once per order in CheckoutScreen, not per ticket.
