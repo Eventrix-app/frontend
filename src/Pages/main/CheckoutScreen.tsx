@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import {
   KeyboardAvoidingView,
   Linking,
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import type { AppDispatch } from '../../store';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -21,27 +22,22 @@ import {
   useGetTicketTypesQuery,
   useEnrollEventMutation,
   isWaitlistResult,
+  EnrollmentRecord,
 } from '../../store/services/eventsApi';
 import { useInitiatePayUOrderMutation, PayUInitiateResponse } from '../../store/services/paymentsApi';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
+import {
+  useGetFeeEstimateQuery,
+  useInitiatePayUNativeOrderMutation,
+  useVerifyPayUNativeMutation,
+} from '../../store/services/paymentsApi';
+import { openPayUCheckout } from '../../services/payuNativeService';
+import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
-import {
-  LeftArrow,
-  TicketIcon,
-  CalendarIcon,
-  ClockIcon,
-  LocationPin,
-  PersonIcon,
-  CheckCircleIcon,
-  CloseCircleIcon,
-  PhoneIcon,
-  WhatsAppIcon,
-  ClipboardIcon,
-} from '../../components/common/Icons';
-import { PLATFORM_FEE_INR, GST_RATE, getGstInclusivePrice, getGstPortion } from '../../utils/pricing';
+import { LeftArrow, PhoneIcon, WhatsAppIcon, ClipboardIcon } from '../../components/common/Icons';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
 import PayUCheckoutModal from '../../components/payments/PayUCheckoutModal';
 
@@ -60,22 +56,29 @@ interface Props {
   route: { params: CheckoutRouteParams };
 }
 
-const VALID_PROMO_CODES: Record<string, number> = {
-  RUN50: 150,
-};
-
-const PAYMENT_METHODS = ['Google Pay', 'PhonePe', 'Paytm', 'UPI', 'Credit / Debit Card'];
-
 const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { eventId, ticketTypeId, quantity: initialQuantity } = route.params;
+  const { eventId, ticketTypeId: initialTicketTypeId, quantity: initialQuantity } = route.params;
 
   const { data: event, isLoading: isLoadingEvent } = useGetEventByIdQuery(eventId);
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
+  const dispatch = useDispatch<AppDispatch>();
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
+<<<<<<< HEAD
   const [initiatePayUOrder, { isLoading: isInitiatingPayU }] = useInitiatePayUOrderMutation();
+=======
+  const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
+  const [verifyPayUNative] = useVerifyPayUNativeMutation();
+
+  // If a non-cancelled enrollment for this event already exists (a fresh booking just made,
+  // or one left over from a previous abandoned/failed payment attempt), this screen switches
+  // into "resume payment" mode against that exact enrollment instead of creating a new one —
+  // EventsService.enroll() would otherwise reject a second attempt with a conflict, and
+  // without this there was previously no way to retry a failed payment at all.
+  const { activeEnrollment } = useMyEventEnrollment(eventId);
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
 
   // Organizer phone, used only by the "Need Help?" action in the overflow menu — same
   // query EventDetailsScreen uses for its call/WhatsApp buttons.
@@ -85,14 +88,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   );
   const organizerPhone = organizerProfile?.phone;
 
-  const [selectedTierId, setSelectedTierId] = useState(ticketTypeId);
+  const [selectedTierId, setSelectedTierId] = useState(initialTicketTypeId);
   const [quantity, setQuantity] = useState(initialQuantity);
   const [showTierPicker, setShowTierPicker] = useState(false);
-  const [promoInput, setPromoInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; amount: number } | null>(null);
-
-  const [paymentIndex, setPaymentIndex] = useState(0);
-  const [showPaymentPicker, setShowPaymentPicker] = useState(false);
 
   // PayU checkout modal state — payuParams is set right before the modal opens and cleared
   // when it closes so there's never a stale set of params visible to a reopened modal.
@@ -103,7 +101,17 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
 
-  const selectedTier = ticketTypes.find((t) => t.id === selectedTierId) ?? null;
+  // True from the moment the native PayU checkout sheet is asked to open until a terminal
+  // event (success/failure/cancelled/error) resolves — the sheet renders outside this
+  // component's tree entirely, so unlike the old WebView modal there's no `order` state to
+  // hold, just this single in-flight flag.
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const isResuming = !!activeEnrollment;
+  const effectiveTierId = activeEnrollment?.ticketType?.id ?? selectedTierId;
+  const effectiveQuantity = activeEnrollment?.quantity ?? quantity;
+
+  const selectedTier = ticketTypes.find((t) => t.id === effectiveTierId) ?? null;
 
   const remaining =
     selectedTier?.quantityTotal == null
@@ -114,9 +122,11 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const max = Math.min(selectedTier?.maxPerOrder ?? Infinity, remaining ?? Infinity);
 
   const adjustQuantity = (delta: number) => {
+    if (isResuming) return;
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
+<<<<<<< HEAD
   // The ticket price is the base price; GST (18%) is added on top in the Order Summary.
   const unitPrice = selectedTier ? selectedTier.price : 0;
   const subtotal = unitPrice * quantity;
@@ -124,26 +134,32 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const gst = selectedTier ? getGstPortion(selectedTier.price * quantity) : 0;
   const promoDiscount = appliedPromo?.amount ?? 0;
   const totalPayable = Math.max(subtotal + gst + PLATFORM_FEE_INR - promoDiscount, 0);
+=======
+  const tierPrice = activeEnrollment?.ticketType?.price ?? selectedTier?.price ?? 0;
+  const subtotal = tierPrice * effectiveQuantity;
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
 
-  const handleApplyPromo = () => {
-    const code = promoInput.trim().toUpperCase();
-    if (!code) return;
-    const amount = VALID_PROMO_CODES[code];
-    if (!amount) {
-      showAlert('Invalid code', "That promo code doesn't exist or has expired.");
-      return;
-    }
-    setAppliedPromo({ code, amount });
-  };
+  // Before an enrollment exists yet, preview the exact buyer-facing total enroll() will
+  // compute — reuses the same FeeCalculationService the backend uses for the organizer's own
+  // live payout preview elsewhere, so this can never drift from what's actually charged. Once
+  // a real enrollment exists (resuming), its own totalAmount is already the authoritative
+  // number and this estimate is skipped entirely.
+  const { data: feeEstimate } = useGetFeeEstimateQuery(
+    { ticketPrice: subtotal, feePayer: event?.feePayer, organizerId: event?.organizer?.id },
+    { skip: isResuming || subtotal <= 0 || !event },
+  );
 
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoInput('');
-  };
+  const totalPayable = activeEnrollment
+    ? Number(activeEnrollment.totalAmount)
+    : feeEstimate?.buyerPrice ?? subtotal;
+  const serviceFee = Math.max(totalPayable - subtotal, 0);
+
+  const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment;
 
   const handlePay = async () => {
-    if (!event || !selectedTier) return;
+    if (!event) return;
     try {
+<<<<<<< HEAD
       // Step 1: Create the enrollment on the backend.
       // For paid events this sets paymentStatus: 'pending' and totalAmount.
       const result = await enrollEvent({
@@ -168,6 +184,77 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           navigation.navigate('Bookings' as any),
         );
         return;
+=======
+      let enrollment: EnrollmentRecord;
+
+      if (activeEnrollment) {
+        enrollment = activeEnrollment;
+      } else {
+        if (!selectedTier) return;
+        const result = await enrollEvent({
+          eventId: event.id,
+          ticketTypeId: selectedTier.id,
+          quantity,
+        }).unwrap();
+
+        if (isWaitlistResult(result)) {
+          showAlert(
+            "You're on the Waitlist",
+            `You're #${result.position} in line for "${selectedTier.name}". We'll confirm your spot automatically if one opens up.`,
+            () => navigation.navigate('Bookings' as any),
+          );
+          return;
+        }
+        enrollment = result;
+      }
+
+      // Free event, or an enrollment that's already settled — nothing to pay.
+      if (enrollment.paymentStatus === 'paid' || !(Number(enrollment.totalAmount) > 0)) {
+        showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
+          navigation.navigate('Bookings' as any),
+        );
+        return;
+      }
+
+      const order = await initiatePayUNativeOrder({ enrollmentId: enrollment.id }).unwrap();
+
+      setIsProcessingPayment(true);
+      const result = await openPayUCheckout(dispatch, order);
+
+      if (result.status === 'success') {
+        try {
+          const parsed = result.payuResponse ? JSON.parse(result.payuResponse) : {};
+          await verifyPayUNative({
+            txnid: parsed.txnid ?? order.transactionId,
+            mihpayid: parsed.mihpayid,
+            status: parsed.status === 'success' ? 'success' : 'failure',
+            amount: String(parsed.amount ?? (typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount)),
+            productinfo: parsed.productinfo ?? order.productInfo,
+            firstname: parsed.firstname ?? order.firstName,
+            email: parsed.email ?? order.email,
+            hash: parsed.hash,
+          }).unwrap();
+          showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
+            navigation.navigate('Bookings' as any),
+          );
+        } catch {
+          // The SDK reported success but our own server-side verification couldn't confirm
+          // it immediately (e.g. an unrecognized payuResponse shape) — never tell the user it
+          // failed when PayU itself said it succeeded; point them at My Bookings instead.
+          showAlert(
+            'Payment received',
+            "We received your payment but couldn't confirm it immediately — check My Bookings shortly.",
+            () => navigation.navigate('Bookings' as any),
+          );
+        }
+      } else if (result.status === 'cancelled') {
+        showAlert('Payment not completed', 'You can try again anytime from My Bookings.');
+      } else {
+        showAlert(
+          "Couldn't complete payment",
+          ('errorMsg' in result && result.errorMsg) || 'Something went wrong. Please try again.',
+        );
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
       }
 
       // Step 2c: Paid ticket — enrollment is confirmed but paymentStatus is 'pending'.
@@ -176,10 +263,16 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
       setPayuParams(payuData);
       setShowPayuModal(true);
     } catch (e: any) {
+<<<<<<< HEAD
       showAlert(
         "Couldn't start payment",
         extractErrorMessage(e, 'Something went wrong. Please try again.'),
       );
+=======
+      showAlert("Couldn't complete payment", extractErrorMessage(e, 'Something went wrong. Please try again.'));
+    } finally {
+      setIsProcessingPayment(false);
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
     }
   };
 
@@ -269,7 +362,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.headerSubtitle}>
-          Please review your tickets and confirm your details before payment.
+          {isResuming
+            ? 'Complete your payment to confirm this booking.'
+            : 'Please review your tickets and confirm your details before payment.'}
         </Text>
       </View>
 
@@ -278,7 +373,6 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={() => showPaymentPicker && setShowPaymentPicker(false)}
       >
         {/* Event Summary */}
         <Text style={styles.sectionLabel}>Event Summary</Text>
@@ -314,17 +408,20 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.tierPickerCol}>
               <Text style={styles.fieldLabel}>Ticket Type</Text>
               <TouchableOpacity
-                style={styles.tierPickerBtn}
-                onPress={() => setShowTierPicker((v) => !v)}
+                style={[styles.tierPickerBtn, isResuming && styles.tierPickerBtnLocked]}
+                onPress={() => !isResuming && setShowTierPicker((v) => !v)}
+                disabled={isResuming}
               >
                 <Text style={styles.tierPickerText} numberOfLines={1}>
                   {selectedTier
                     ? `${selectedTier.name} - ${selectedTier.price > 0 ? `₹${selectedTier.price}` : 'Free'}`
-                    : 'Select a ticket'}
+                    : activeEnrollment?.ticketType
+                      ? `${activeEnrollment.ticketType.name} - ₹${activeEnrollment.ticketType.price}`
+                      : 'Select a ticket'}
                 </Text>
-                <Text style={styles.tierPickerChevron}>{showTierPicker ? '▲' : '▼'}</Text>
+                {!isResuming && <Text style={styles.tierPickerChevron}>{showTierPicker ? '▲' : '▼'}</Text>}
               </TouchableOpacity>
-              {showTierPicker && (
+              {showTierPicker && !isResuming && (
                 <View style={styles.tierDropdown}>
                   {ticketTypes.map((tier) => (
                     <TouchableOpacity
@@ -351,15 +448,15 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={styles.stepperBtn}
                   onPress={() => adjustQuantity(-1)}
-                  disabled={quantity <= min}
+                  disabled={isResuming || effectiveQuantity <= min}
                 >
                   <Text style={styles.stepperBtnText}>−</Text>
                 </TouchableOpacity>
-                <Text style={styles.stepperValue}>{String(quantity).padStart(2, '0')}</Text>
+                <Text style={styles.stepperValue}>{String(effectiveQuantity).padStart(2, '0')}</Text>
                 <TouchableOpacity
                   style={styles.stepperBtn}
                   onPress={() => adjustQuantity(1)}
-                  disabled={quantity >= max}
+                  disabled={isResuming || effectiveQuantity >= max}
                 >
                   <Text style={styles.stepperBtnText}>+</Text>
                 </TouchableOpacity>
@@ -367,18 +464,22 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
-          <View style={styles.tierInfoRow}>
-            <Text style={styles.tierInfoLabel}>{selectedTier?.name ?? 'Ticket'} Availability</Text>
-            <Text style={styles.tierInfoValue}>
-              {remaining !== null ? `${remaining} tickets left` : 'Available'}
-            </Text>
-          </View>
-          <View style={styles.tierInfoRow}>
-            <Text style={styles.tierInfoLabel}>Price</Text>
-            <Text style={styles.tierInfoValue}>
-              {selectedTier && selectedTier.price > 0 ? `₹${selectedTier.price} per ticket` : 'Free'}
-            </Text>
-          </View>
+          {!isResuming && (
+            <>
+              <View style={styles.tierInfoRow}>
+                <Text style={styles.tierInfoLabel}>{selectedTier?.name ?? 'Ticket'} Availability</Text>
+                <Text style={styles.tierInfoValue}>
+                  {remaining !== null ? `${remaining} tickets left` : 'Available'}
+                </Text>
+              </View>
+              <View style={styles.tierInfoRow}>
+                <Text style={styles.tierInfoLabel}>Price</Text>
+                <Text style={styles.tierInfoValue}>
+                  {selectedTier && selectedTier.price > 0 ? `₹${selectedTier.price} per ticket` : 'Free'}
+                </Text>
+              </View>
+            </>
+          )}
 
           <View style={styles.divider} />
 
@@ -386,56 +487,11 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.tierTotalLabel}>Total</Text>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.tierTotalSub}>
-                (₹{selectedTier?.price ?? 0} x {quantity})
+                (₹{tierPrice} x {effectiveQuantity})
               </Text>
               <Text style={styles.tierTotalValue}>₹{subtotal}</Text>
             </View>
           </View>
-        </View>
-
-        {/* Promo Code */}
-        <Text style={styles.sectionLabel}>Promo Code</Text>
-        <View style={styles.card}>
-          <View style={styles.promoRow}>
-            <View style={styles.promoInputWrap}>
-              <Text style={styles.promoHash}>#</Text>
-              <TextInput
-                style={styles.promoInput}
-                value={promoInput}
-                onChangeText={setPromoInput}
-                placeholder="Enter promo code"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="characters"
-                editable={!appliedPromo}
-              />
-              {!!promoInput && !appliedPromo && (
-                <TouchableOpacity onPress={() => setPromoInput('')} hitSlop={6}>
-                  <CloseCircleIcon color={colors.textSecondary} size={16} />
-                </TouchableOpacity>
-              )}
-              {appliedPromo && (
-                <TouchableOpacity onPress={handleRemovePromo} hitSlop={6}>
-                  <CloseCircleIcon color={colors.textSecondary} size={16} />
-                </TouchableOpacity>
-              )}
-            </View>
-            <TouchableOpacity
-              style={[styles.applyBtn, !!appliedPromo && styles.applyBtnDisabled]}
-              onPress={handleApplyPromo}
-              disabled={!!appliedPromo}
-            >
-              <Text style={styles.applyBtnText}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-
-          {appliedPromo && (
-            <View style={styles.promoAppliedRow}>
-              <CheckCircleIcon color="#059669" size={14} />
-              <Text style={styles.promoAppliedText}>
-                Promo code '{appliedPromo.code}' applied. You saved ₹{appliedPromo.amount}.
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* Order Summary */}
@@ -443,18 +499,14 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.card}>
           <View style={styles.toPayRow}>
             <Text style={styles.toPayLabel}>To Pay</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              {promoDiscount > 0 && (
-                <Text style={styles.toPayOriginal}>₹{subtotal + PLATFORM_FEE_INR}</Text>
-              )}
-              <Text style={styles.toPayFinal}>₹{totalPayable}</Text>
-            </View>
+            <Text style={styles.toPayFinal}>₹{totalPayable}</Text>
           </View>
 
           <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Tickets ({quantity} x ₹{unitPrice})</Text>
+            <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x ₹{tierPrice})</Text>
             <Text style={styles.orderValue}>₹{subtotal}</Text>
           </View>
+<<<<<<< HEAD
           <View style={styles.orderRow}>
             <Text style={styles.orderLabel}>Platform Fee</Text>
             <Text style={styles.orderValue}>₹{PLATFORM_FEE_INR}</Text>
@@ -464,9 +516,12 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.orderValue}>₹{gst}</Text>
           </View>
           {promoDiscount > 0 && (
+=======
+          {serviceFee > 0 && (
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
             <View style={styles.orderRow}>
-              <Text style={styles.orderLabel}>Promo Discount</Text>
-              <Text style={styles.orderDiscountValue}>− ₹{promoDiscount}</Text>
+              <Text style={styles.orderLabel}>Service Fee</Text>
+              <Text style={styles.orderValue}>₹{serviceFee}</Text>
             </View>
           )}
 
@@ -493,42 +548,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={[styles.payBar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={styles.paymentMethodWrap}>
-          {showPaymentPicker && (
-            <View style={styles.paymentDropdown}>
-              {PAYMENT_METHODS.map((method, i) => {
-                const active = i === paymentIndex;
-                return (
-                  <TouchableOpacity
-                    key={method}
-                    style={styles.paymentDropdownItem}
-                    onPress={() => {
-                      setPaymentIndex(i);
-                      setShowPaymentPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.paymentDropdownText, active && styles.paymentDropdownTextActive]}>
-                      {method}
-                    </Text>
-                    {active && <CheckCircleIcon color={colors.brandPink} size={14} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-          <TouchableOpacity
-            style={styles.paymentMethodBtn}
-            onPress={() => setShowPaymentPicker((v) => !v)}
-          >
-            <Text style={styles.paymentMethodLabel}>Pay Using</Text>
-            <Text style={styles.paymentMethodValue} numberOfLines={1}>
-              {PAYMENT_METHODS[paymentIndex]} {showPaymentPicker ? '▲' : '▾'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <TouchableOpacity
           style={styles.payBtn}
+<<<<<<< HEAD
           onPress={() => {
             setShowPaymentPicker(false);
             handlePay();
@@ -536,6 +558,12 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           disabled={isEnrolling || isInitiatingPayU || !selectedTier}
         >
           {isEnrolling || isInitiatingPayU ? (
+=======
+          onPress={handlePay}
+          disabled={isPaying || (!isResuming && !selectedTier)}
+        >
+          {isPaying ? (
+>>>>>>> 31126aa90557a91fa31cae4660de61b3c3ac1b69
             <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.payBtnText}>Pay ₹{totalPayable}</Text>
@@ -683,6 +711,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       paddingHorizontal: spacing.sm,
       paddingVertical: 10,
     },
+    tierPickerBtnLocked: { opacity: 0.6 },
     tierPickerText: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
     tierPickerChevron: { fontSize: 10, color: colors.textSecondary, marginLeft: 4 },
     tierDropdown: {
@@ -738,36 +767,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       marginVertical: spacing.sm,
     },
 
-    promoRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-    promoInputWrap: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderWidth: 1,
-      borderColor: colors.brandPink,
-      borderRadius: borderRadius.md,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 10,
-    },
-    promoHash: { fontSize: 14, fontWeight: '700', color: colors.brandPink },
-    promoInput: { flex: 1, fontSize: 13, color: colors.text, padding: 0 },
-    applyBtn: {
-      backgroundColor: colors.brandPink,
-      borderRadius: borderRadius.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 12,
-    },
-    applyBtnDisabled: { opacity: 0.5 },
-    applyBtnText: { color: colors.white, fontWeight: '700', fontSize: 13 },
-    promoAppliedRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: spacing.sm,
-    },
-    promoAppliedText: { fontSize: 12, color: '#059669', flexShrink: 1 },
-
     toPayRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -775,7 +774,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       marginBottom: spacing.sm,
     },
     toPayLabel: { fontSize: 13, color: colors.textSecondary },
-    toPayOriginal: { fontSize: 13, color: colors.textSecondary, textDecorationLine: 'line-through' },
     toPayFinal: { fontSize: 18, fontWeight: '700', color: colors.text },
 
     orderRow: {
@@ -785,7 +783,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     orderLabel: { fontSize: 13, color: colors.textSecondary },
     orderValue: { fontSize: 13, fontWeight: '600', color: colors.text },
-    orderDiscountValue: { fontSize: 13, fontWeight: '600', color: '#059669' },
     totalPayableLabel: { fontSize: 15, fontWeight: '700', color: colors.brandPink },
     totalPayableValue: { fontSize: 17, fontWeight: '700', color: colors.brandPink },
 
@@ -820,52 +817,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
         },
       }),
     },
-    paymentMethodWrap: {
-      flex: 1,
-      position: 'relative',
-    },
-    paymentMethodBtn: {
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      borderRadius: borderRadius.md,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 8,
-    },
-    paymentMethodLabel: { fontSize: 10, color: colors.brandPink, fontWeight: '700' },
-    paymentMethodValue: { fontSize: 13, fontWeight: '600', color: colors.text, marginTop: 2 },
-    paymentDropdown: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: '100%',
-      marginBottom: spacing.xs,
-      backgroundColor: colors.white,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      borderRadius: borderRadius.md,
-      overflow: 'hidden',
-      ...Platform.select({
-        android: { elevation: 8 },
-        default: {
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 10,
-        },
-      }),
-    },
-    paymentDropdownItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 10,
-      paddingHorizontal: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderLight,
-    },
-    paymentDropdownText: { fontSize: 13, color: colors.text },
-    paymentDropdownTextActive: { color: colors.brandPink, fontWeight: '700' },
     payBtn: {
+      flex: 1,
       backgroundColor: colors.brandPink,
       borderRadius: borderRadius.lg,
       paddingVertical: 16,

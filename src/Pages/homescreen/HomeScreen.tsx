@@ -121,10 +121,15 @@ const HomeScreen: React.FC = () => {
   // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
   // lives on the Explore screen via "View All Events" below. Excludes whatever is already
   // in the Featured carousel just above it — without this, any event both featured and
-  // recent (the common case) rendered twice on the same screen.
+  // recent (the common case) rendered twice on the same screen. Falls back to the
+  // unfiltered list when there's no non-featured inventory left (a near-empty catalog
+  // where every current event happens to be featured) — a still-empty feed below the
+  // carousel reads as "no events at all", which is worse than one visible repeat.
   const recommended = useMemo(() => {
     const featuredIds = new Set(featured.map((event) => event.id));
-    return cardEvents.filter((event) => !featuredIds.has(event.id)).slice(0, 15);
+    const nonFeatured = cardEvents.filter((event) => !featuredIds.has(event.id));
+    const pool = nonFeatured.length > 0 ? nonFeatured : cardEvents;
+    return pool.slice(0, 15);
   }, [cardEvents, featured]);
 
   // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed

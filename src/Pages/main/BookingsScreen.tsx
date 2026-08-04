@@ -424,6 +424,7 @@ const BookingsScreen: React.FC = () => {
                     <View style={styles.stubDivider} />
 
                     <View style={styles.footerRow}>
+                    <View style={styles.footerRow}>
                         <Text style={styles.footerLabel}>
                           Status: <Text style={{ color: colors[status.tone], fontWeight: '700' }}>{status.label}</Text>
                         </Text>
@@ -438,13 +439,29 @@ const BookingsScreen: React.FC = () => {
                                 styles={styles}
                               />
                             )}
-                          <TouchableOpacity
-                            style={styles.viewTicketBtn}
-                            onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
-                          >
-                            <Text style={styles.viewTicketText}>View Ticket</Text>
-                            <Text style={styles.viewTicketArrow}>→</Text>
-                          </TouchableOpacity>
+                          {status.label === 'Unpaid' ? (
+                            <TouchableOpacity
+                              style={styles.viewTicketBtn}
+                              onPress={() =>
+                                navigation.navigate('Checkout', {
+                                  eventId: booking.eventId,
+                                  ticketTypeId: booking.ticketType?.id ?? '',
+                                  quantity: booking.quantity,
+                                })
+                              }
+                            >
+                              <Text style={styles.viewTicketText}>Complete Payment</Text>
+                              <Text style={styles.viewTicketArrow}>→</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.viewTicketBtn}
+                              onPress={() => navigation.navigate('TicketDetails', { bookingId: booking.id })}
+                            >
+                              <Text style={styles.viewTicketText}>View Ticket</Text>
+                              <Text style={styles.viewTicketArrow}>→</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
                   </TicketCard>
@@ -481,15 +498,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  // Centered on the whole bar rather than reserving each side's icon-group width — that
-  // symmetric reservation (130px both sides, to offset the wider right-hand icon group)
-  // left too little room for "My Bookings" itself and clipped it to "My Bookin...".
-  // Centering on the full bar trades a few px of true-center precision for headroom the
-  // title actually needs.
+  // Centering on the full bar (left: 0, right: 0) put the title at the bar's true
+  // geometric midpoint, but the right side carries 3 icon buttons (search/bell/avatar,
+  // 36px + 8px gaps each ≈ 124px) against just 1 on the left (the 36px back button) — so a
+  // dead-center title reads as crowded against the search icon and roomy against the back
+  // arrow. Insetting *only* the right edge (not left, which is what previously squeezed
+  // both sides down to "My Bookin..." — see the old comment this replaced) shifts the
+  // wrap's own center left by half that ~88px imbalance without shrinking the room "My
+  // Bookings" actually needs.
   titleAbsoluteWrap: {
     position: 'absolute',
     left: 0,
-    right: 0,
+    right: 88,
     top: 0,
     bottom: 0,
     alignItems: 'center',

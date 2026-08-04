@@ -5,28 +5,27 @@ import { RightArrow } from '../common/Icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Category } from '../../store/services/userApi';
-import { useNaturalImageSize } from '../../hooks/useNaturalImageSize';
 
 const FALLBACK_ICON = require('../../../assets/shared/placeholders/image-frame.png');
-const FALLBACK_SIZE = Image.resolveAssetSource(FALLBACK_ICON);
+
+// Fixed box rather than the organizer's raw uploaded pixel size (200-1000px+, whatever
+// they happened to export) — rendering icons at that native size is what forced Explore's
+// horizontal-wrap grid down to one icon per row (reading as a vertical stack) and blew out
+// Home's category rail. `resizeMode="contain"` keeps each icon's own aspect ratio inside
+// this box instead of stretching/cropping it.
+const ICON_SIZE = 84;
 
 interface Props {
   item: Category;
   onPress?: (id: string) => void;
 }
 
-// Renders the category icon only, at its own uploaded pixel size — no title, no forced
-// crop/stretch box. Row/grid spacing is handled by the parent container's `gap`, not by
-// giving every icon a shared size here.
 export const CategoryIconCard: React.FC<Props> = React.memo(({ item, onPress }) => {
-  const remoteSize = useNaturalImageSize(item.iconUrl);
-  const size = item.iconUrl ? remoteSize : FALLBACK_SIZE;
-  if (!size) return null;
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={() => onPress?.(item.id)}>
       <Image
         source={item.iconUrl ? { uri: item.iconUrl } : FALLBACK_ICON}
-        style={{ width: size.width, height: size.height }}
+        style={styles.icon}
         resizeMode="contain"
         accessibilityLabel={item.name}
       />
@@ -50,6 +49,10 @@ export const ViewAllCategoryIconCard: React.FC<ViewAllProps> = React.memo(({ onP
   );
 });
 ViewAllCategoryIconCard.displayName = 'ViewAllCategoryIconCard';
+
+const styles = StyleSheet.create({
+  icon: { width: ICON_SIZE, height: ICON_SIZE },
+});
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   viewAllButton: {

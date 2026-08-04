@@ -43,6 +43,11 @@ export interface BackendEvent {
   rejectionReason?: string;
   refundPolicyType?: string;
   refundPolicyText?: string;
+  // Already returned by the backend (Event.feePayer, default 'organizer') — determines
+  // whether checkout needs to show a Service Fee line on top of the raw ticket price. No
+  // create/edit-event UI sets this today, so 'organizer' (no buyer-side markup) is the only
+  // value reachable in practice, but CheckoutScreen still reads it rather than assuming.
+  feePayer?: 'organizer' | 'participant';
   status: string;
   createdAt: string;
   updatedAt: string;

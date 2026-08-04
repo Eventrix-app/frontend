@@ -20,6 +20,11 @@ export type RootStackParamList = {
   AdminRedirect: undefined;
   EventDetails: { eventId: string };
   TicketDetails: { bookingId: string };
+  // Tax invoice for a settled booking. Takes the enrollment id under its real name (unlike
+  // TicketDetails' legacy `bookingId` alias) since that is exactly what
+  // GET /payments/invoice/:enrollmentId expects. Only reachable from a paid booking —
+  // the endpoint 400s on anything still pending.
+  InvoiceDetail: { enrollmentId: string };
   Search: { categoryId?: string } | undefined;
   Profile: undefined;
   EditProfile: undefined;

@@ -297,7 +297,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   priceBadgeWrap: {
     position: 'absolute',
-    right: spacing.md,
+    right: spacing.xs,
     top: IMAGE_HEIGHT - BADGE_HEIGHT * BADGE_OVER_IMAGE,
     zIndex: 3,
     elevation: 8,
@@ -305,7 +305,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   priceBadge: {
     minWidth: 68,
     height: BADGE_HEIGHT,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     // Square on top: that edge is buried against the artwork, so rounding it only notched
     // the image.
     borderTopLeftRadius: 0,
@@ -319,8 +319,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     // The gradient's top-left tint is light enough that plain white loses contrast, hence
     // the text shadow below.
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     fontStyle: 'italic',
     letterSpacing: 0.3,
     textShadowColor: 'rgba(120,6,36,0.45)',
