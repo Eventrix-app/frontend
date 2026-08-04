@@ -35,7 +35,6 @@ import {
   useGetMyFavoritesQuery,
   useAddFavoriteMutation,
   useRemoveFavoriteMutation,
-  useGetMyEnrollmentsQuery,
   useGetMyWaitlistQuery,
   useCancelEnrollmentMutation,
   isWaitlistResult,
@@ -54,10 +53,10 @@ import {
   useDeleteReviewMutation,
   useCancelEventMutation,
 } from '../../store/services/eventsApi';
+import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { TICKET_CATEGORIES } from '../../utils/ticketCategories';
-import { GST_RATE, PLATFORM_FEE_INR, getGstInclusivePrice } from '../../utils/pricing';
 import { DATE_DISPLAY_FORMATTER } from '../../utils/dateFormat';
 import { formatEventDate, formatEventTime, calculateDistanceKm, formatDistanceKm } from '../../utils/eventCardAdapter';
 import { useGetMeQuery } from '../../store/services/userApi';
@@ -65,8 +64,6 @@ import { daysUntilEventDate, getEventStartDateTime, getEventEndDateTime } from '
 import { Text } from '../../components/common/Text';
 import {
   LeftArrow,
-  MenuOpenIcon,
-  MenuCloseIcon,
   EventBusyIcon,
   CloseCircleIcon,
   ClipboardIcon,
@@ -84,12 +81,11 @@ import {
   BanIcon,
   PhotoIcon,
   InfoIcon,
-  IconProps,
 } from '../../components/common/Icons';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { useCreateReportMutation, useBlockUserMutation } from '../../store/services/moderationApi';
 import { useChatSocket } from '../../hooks/useChatSocket';
-import HalfScreenModal from '../../components/common/halfscreenmodal';
+import FabMenu from '../../components/common/FabMenu';
 import EventDetailsSkeleton from '../../components/common/EventDetailsSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
@@ -228,7 +224,6 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
   const [deleteScheduleItem] = useDeleteScheduleItemMutation();
   const [time, setTime] = useState('');
   const [title, setTitle] = useState('');
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -247,7 +242,6 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
       }).unwrap();
       setTime('');
       setTitle('');
-      setShowAddDialog(false);
     } catch (err) {
       showAlert('Could not add schedule item', extractErrorMessage(err, 'Please try again.'));
     }
@@ -278,28 +272,18 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
 
   return (
     <View style={styles.tabContent}>
+      {/* Inline composer, matching AnnouncementsTab's reviewComposer pattern (Post an
+          Announcement) — a HalfScreenModal buried this behind an extra tap and its own
+          sheet-open animation for what's otherwise a two-field form the owner reaches for
+          often; every other owner-only composer on this screen is already inline. */}
       {isOwner && (
-        <TouchableOpacity
-          style={styles.scheduleAddBtn}
-          onPress={() => setShowAddDialog(true)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.scheduleAddBtnText}>+ Add Schedule Item</Text>
-        </TouchableOpacity>
-      )}
-
-      <HalfScreenModal
-        visible={showAddDialog}
-        onClose={() => setShowAddDialog(false)}
-        heightPercent={0.5}
-      >
-        <View style={styles.scheduleDialog}>
+        <View style={styles.reviewComposer}>
           <Text style={styles.sectionLabel}>Add Schedule Item</Text>
           <TextInput
             style={styles.chatInput}
             value={time}
             onChangeText={setTime}
-            placeholder="e.g. 7:00 PM"
+            placeholder="Time (e.g. 7:30 PM)"
             placeholderTextColor={colors.textSecondary}
           />
           <TextInput
@@ -313,7 +297,7 @@ const ScheduleTab: React.FC<{ eventId: string; isOwner: boolean }> = ({ eventId,
             <Text style={styles.chatSendBtnText}>{isAdding ? 'Adding…' : 'Add to Schedule'}</Text>
           </TouchableOpacity>
         </View>
-      </HalfScreenModal>
+      )}
 
       {schedule.length === 0 ? (
         <Text style={styles.emptyTabText}>No schedule yet.</Text>
@@ -955,7 +939,6 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<DetailsTab>('about');
   const [descExpanded, setDescExpanded] = useState(false);
-  const [showOrganizerMenu, setShowOrganizerMenu] = useState(false);
   const [footerHeight, setFooterHeight] = useState(100);
   const authUser = useSelector((state: RootState) => state.auth.user);
   const { colors, theme } = useTheme();
@@ -986,7 +969,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
   const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
   const [cancelEvent, { isLoading: isCancelling }] = useCancelEventMutation();
-  const { data: myEnrollments = [] } = useGetMyEnrollmentsQuery(undefined, { skip: !authUser });
+  const { activeEnrollment: myActiveEnrollment, isPaid: isMyEnrollmentPaid, needsPayment: myEnrollmentNeedsPayment } =
+    useMyEventEnrollment(event?.id, { skip: !authUser });
   const { data: myWaitlist = [] } = useGetMyWaitlistQuery(undefined, { skip: !authUser });
   const [cancelEnrollment, { isLoading: isCancellingEnrollment }] = useCancelEnrollmentMutation();
   const { data: organizerProfile } = useGetOrganizerProfileQuery(
@@ -1207,14 +1191,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const notApprovedYet = event.isPaid && event.approvalStatus !== 'approved';
   const selectedAvailability = selectedTier ? tierAvailability(selectedTier) : null;
 
-  const myActiveEnrollment = myEnrollments.find(
-    (e) => e.eventId === event.id && e.status !== 'cancelled' && e.status !== 'refunded',
-  );
   const myActiveWaitlistEntry = !myActiveEnrollment
     ? myWaitlist.find((w) => w.eventId === event.id && w.status === 'waiting')
     : undefined;
-  const isMyEnrollmentPaid =
-    !!myActiveEnrollment && Number(myActiveEnrollment.totalAmount) > 0 && myActiveEnrollment.paymentStatus === 'paid';
 
   const handleDownloadTicket = async () => {
     if (!myActiveEnrollment || isDownloadingTicket) return;
@@ -1273,6 +1252,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     if (myActiveEnrollment) {
       if (isMyEnrollmentPaid) {
         navigation.navigate('TicketDetails', { bookingId: myActiveEnrollment.id });
+      } else if (myEnrollmentNeedsPayment && !event.isCompleted) {
+        // A real charge is outstanding on this booking (first attempt, or a previous
+        // payment attempt was cancelled/failed) — resume payment against the same
+        // enrollment rather than the old behavior of only ever offering to cancel it.
+        navigation.navigate('Checkout', {
+          eventId: event.id,
+          ticketTypeId: myActiveEnrollment.ticketType?.id ?? '',
+          quantity: myActiveEnrollment.quantity,
+        });
       } else {
         handleCancelMyEnrollment();
       }
@@ -1302,7 +1290,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       ? 'Event Completed'
       : isMyEnrollmentPaid
         ? 'Cancel Enrollment / Request Refund'
-        : 'Cancel Enrollment'
+        : myEnrollmentNeedsPayment
+          ? 'Complete Payment'
+          : 'Cancel Enrollment'
     : myActiveWaitlistEntry
       ? `On Waitlist (#${myActiveWaitlistEntry.position})`
       : notApprovedYet
@@ -1724,7 +1714,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 ellipsizeMode="tail"
                                 style={[styles.ticketStubBullet, !isVip && styles.ticketStubBulletOnLight]}
                               >
-                                • {tier.price > 0 ? `₹${getGstInclusivePrice(tier.price)}` : 'Free'}
+                                • {tier.price > 0 ? `₹${tier.price}` : 'Free'}
                               </Text>
 
                               <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
@@ -1766,8 +1756,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.gstNoteRow}>
                   <InfoIcon color={colors.textSecondary} size={14} />
                   <Text style={styles.gstNoteText}>
-                    Prices shown include GST ({Math.round(GST_RATE * 100)}%). A ₹{PLATFORM_FEE_INR} platform fee
-                    applies at checkout. Need{' '}
+                    Price shown is what you'll pay at checkout. Need{' '}
                     <Text style={styles.gstNoteLink} onPress={() => navigation.navigate('HelpCenter')}>
                       help?
                     </Text>
@@ -1883,59 +1872,47 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Text style={styles.bookText}>{footerLabel}</Text>
               )}
             </TouchableOpacity>
+            {myEnrollmentNeedsPayment && !event.isCompleted && (
+              <TouchableOpacity
+                onPress={handleCancelMyEnrollment}
+                disabled={isCancellingEnrollment}
+                style={styles.cancelInsteadLink}
+              >
+                <Text style={styles.cancelInsteadText}>Cancel booking instead</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
 
       {isOwner && (
-        <TouchableOpacity
-          style={[styles.organizerMenuFab, { bottom: insets.bottom + spacing.md }]}
-          onPress={() => setShowOrganizerMenu((v) => !v)}
-          accessibilityLabel={showOrganizerMenu ? 'Close organizer menu' : 'Open organizer menu'}
-        >
-          {showOrganizerMenu ? <MenuCloseIcon color="#FFFFFF" size={22} /> : <MenuOpenIcon color="#FFFFFF" size={22} />}
-        </TouchableOpacity>
-      )}
-
-      {isOwner && (
-        <HalfScreenModal visible={showOrganizerMenu} onClose={() => setShowOrganizerMenu(false)} heightPercent={0.5}>
-          <View style={styles.organizerMenu}>
-            <Text variant="h3" style={styles.organizerMenuTitle}>Organizer Menu</Text>
-            {([
-              { label: 'Manage Event', Icon: ClipboardIcon, onPress: () => navigation.navigate('MyEvents') },
-              {
-                label: 'Manage Ticket Types',
-                Icon: TicketIcon,
-                onPress: () => navigation.navigate('ManageTicketTypes', { eventId: event.id }),
-              },
-              ...(event.approvalStatus === 'approved'
-                ? [{ label: 'Check In Attendees', Icon: CheckCircleIcon, onPress: () => navigation.navigate('CheckIn', { eventId: event.id }) }]
-                : []),
-              { label: 'Edit Schedule', Icon: CalendarIcon, onPress: () => setActiveTab('schedule') },
-              { label: 'Post Announcement', Icon: MegaphoneIcon, onPress: () => setActiveTab('announcements') },
-              ...(event.status !== 'cancelled'
-                ? [{ label: 'Cancel Event', Icon: BanIcon, onPress: handleCancelEvent, destructive: true }]
-                : []),
-            ] as { label: string; Icon: React.FC<IconProps>; onPress: () => void; destructive?: boolean }[]).map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={styles.organizerMenuItem}
-                onPress={() => {
-                  setShowOrganizerMenu(false);
-                  item.onPress();
-                }}
-              >
-                <item.Icon
-                  color={item.destructive ? colors.error : colors.text}
-                  size={20}
-                />
-                <Text style={[styles.organizerMenuLabel, item.destructive && styles.organizerMenuLabelDestructive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </HalfScreenModal>
+        <FabMenu
+          style={{ left: spacing.md, bottom: insets.bottom + spacing.md }}
+          openAccessibilityLabel="Open organizer menu"
+          closeAccessibilityLabel="Close organizer menu"
+          items={[
+            { key: 'manage-event', label: 'Manage Event', Icon: ClipboardIcon, onPress: () => navigation.navigate('MyEvents') },
+            {
+              key: 'manage-tickets',
+              label: 'Manage Ticket Types',
+              Icon: TicketIcon,
+              onPress: () => navigation.navigate('ManageTicketTypes', { eventId: event.id }),
+            },
+            ...(event.approvalStatus === 'approved'
+              ? [{
+                  key: 'check-in',
+                  label: 'Check In Attendees',
+                  Icon: CheckCircleIcon,
+                  onPress: () => navigation.navigate('CheckIn', { eventId: event.id }),
+                }]
+              : []),
+            { key: 'edit-schedule', label: 'Edit Schedule', Icon: CalendarIcon, onPress: () => setActiveTab('schedule') },
+            { key: 'post-announcement', label: 'Post Announcement', Icon: MegaphoneIcon, onPress: () => setActiveTab('announcements') },
+            ...(event.status !== 'cancelled'
+              ? [{ key: 'cancel-event', label: 'Cancel Event', Icon: BanIcon, onPress: handleCancelEvent, destructive: true }]
+              : []),
+          ]}
+        />
       )}
     </View>
   );
@@ -1969,7 +1946,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    // Dark scrim, not a translucent white tint — this sits over an arbitrary organizer-
+    // uploaded cover photo (unlike the guaranteed brandPink gradient behind this same
+    // rgba(255,255,255,0.25) pattern on Home/Profile's headers), so a white icon needs a
+    // background that darkens whatever photo is behind it to stay legible. A light tint
+    // does nothing for contrast when the photo itself is already light near this corner.
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1984,7 +1966,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2132,11 +2114,16 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   quickInfoValue: { fontSize: 13, fontWeight: '600', color: colors.text },
 
   tabBarScroll: { flexGrow: 0, marginBottom: spacing.md },
-  tabBarRow: { gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  tabItem: { paddingBottom: spacing.sm, marginRight: spacing.md },
-  tabItemActive: { borderBottomWidth: 2, borderBottomColor: colors.brandPink },
+  tabBarRow: { gap: spacing.sm },
+  tabItem: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  tabItemActive: { backgroundColor: colors.brandPink },
   tabLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '600' },
-  tabLabelActive: { color: colors.brandPink },
+  tabLabelActive: { color: colors.white },
 
   tabContent: { paddingTop: spacing.xs },
   bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
@@ -2171,8 +2158,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   chatInput: {
     flex: 1,
+    // A border alone (colors.borderLight, '#F3F4F6' in light mode) was nearly invisible
+    // against the modal sheet behind it (colors.white, literal white in light mode) —
+    // barely a shade apart, so the field read as blank space rather than an input.
+    // colors.borderLight as a *fill* wasn't enough of a jump from white either (still only
+    // a few percent darker — the same near-invisible gap, just moved from the border to the
+    // fill, which is why the placeholder text inside it kept reading as invisible too).
+    // rgba(0,0,0,0.06) is the same flat-gray-chip treatment already used for pills
+    // elsewhere in this app (MyEventsScreen's status filters, CreateEventScreen's category/
+    // refund pills) — proven to read clearly against a white surface.
+    backgroundColor: 'rgba(0,0,0,0.06)',
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
     borderRadius: borderRadius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -2193,23 +2190,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginBottom: spacing.md,
     gap: spacing.sm,
   },
-  scheduleAddBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.brandPink,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  scheduleAddBtnText: {
-    color: colors.brandPink,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  scheduleDialog: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-  },
   reviewComposerStars: { flexDirection: 'row', gap: spacing.xs },
   reviewComposerInput: { minHeight: 70, textAlignVertical: 'top' },
   reviewSubmitBtn: {
@@ -2218,19 +2198,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
-  organizerMenu: { padding: spacing.md },
-  organizerMenuTitle: { marginBottom: spacing.sm },
-  organizerMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderLight,
-  },
-  organizerMenuIcon: { fontSize: 20 },
-  organizerMenuLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  organizerMenuLabelDestructive: { color: colors.error },
   cancelledBanner: {
     backgroundColor: colors.error,
     paddingHorizontal: spacing.md,
@@ -2346,6 +2313,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     }),
   },
   bookText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+  cancelInsteadLink: { alignItems: 'center', paddingTop: spacing.sm },
+  cancelInsteadText: { color: colors.textSecondary, fontSize: 13, textDecorationLine: 'underline' },
 
   ticketStubList: { gap: spacing.md },
   ticketStubWrap: {
@@ -2366,7 +2335,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   ticketStubContent: {
     flex: 1,
     paddingHorizontal: spacing.md,
-    paddingTop: 4,
+    // Measured directly off the stub art (vip.png/earlybird.png/standard.png, all 361x150):
+    // the pill header's own pixel band sits at roughly y=0-32, vertically centered around
+    // ~11% of the image height — on this 190px-tall card that's ~21px from the top. A 4px
+    // paddingTop put the title's own line-box center closer to ~13px, visibly above the
+    // pill's true center; 12px lands the title in the pill instead of just inside its top edge.
+    paddingTop: 8,
     paddingBottom: spacing.sm,
     justifyContent: 'flex-start',
   },
@@ -2380,15 +2354,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     // just applied to the opposite category because the pill's fill is inverted from the
     // surrounding card on that one asset.
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'ZalandoSansExpanded_700Bold',
-    marginBottom: 4,
-    textAlign: 'center',
-    // Shrink-to-content + auto margins, not full-width stretch: centers on the pill's own
-    // width rather than the wider card behind it.
-    alignSelf: 'center',
-    marginLeft: 'auto',
-    marginRight: 'auto',
+    paddingBottom: 8,
+    width: '100%',
+    marginLeft: spacing.xxl+spacing.xxl+spacing.md, 
   },
   ticketStubTitleOnVip: {
     color: colors.brandPink,

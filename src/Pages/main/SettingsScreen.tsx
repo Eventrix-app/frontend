@@ -332,7 +332,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity style={styles.logoutWrap} onPress={handleLogout}>
           <View style={styles.logoutBtn}>
             <View style={styles.logoutContent}>
-              <Text style={styles.logoutText}>Log Out</Text>
+              {/* numberOfLines={1}: without it, a larger device font-scale setting could
+                  wrap "Log Out" onto two lines, and logoutBtn's fixed height + overflow:
+                  hidden then clipped the second line — leaving only "Log" visible. Forcing
+                  one line makes it shrink/ellipsize instead of silently losing "Out". */}
+              <Text style={styles.logoutText} numberOfLines={1}>Log Out</Text>
             </View>
           </View>
         </TouchableOpacity>
