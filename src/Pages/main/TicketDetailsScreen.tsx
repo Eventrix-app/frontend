@@ -196,6 +196,18 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
               {Number(enrollment.totalAmount) === 0 ? 'Free' : `₹${enrollment.totalAmount}`}
             </Text>
           </View>
+
+          {/* Same isPaidBooking gate the refund flow uses — GET /payments/invoice/:id 400s
+              on anything that isn't paymentStatus 'paid', and a free booking has no invoice
+              to issue at all, so the link simply isn't offered in either case. */}
+          {isPaidBooking ? (
+            <TouchableOpacity
+              style={styles.invoiceLink}
+              onPress={() => navigation.navigate('InvoiceDetail', { enrollmentId })}
+            >
+              <Text style={styles.invoiceLinkText}>View invoice</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         </View>
       </ScrollView>
@@ -370,6 +382,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 14, color: colors.textSecondary },
   totalValue: { fontSize: 20, fontWeight: '700', color: colors.brandPink },
+  invoiceLink: { alignSelf: 'flex-start', paddingTop: spacing.sm },
+  invoiceLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.brandPink,
+    textDecorationLine: 'underline',
+  },
   footer: {
     position: 'absolute',
     left: 0,

@@ -12,6 +12,7 @@ import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import EventDetailsScreen from '../Pages/main/EventDetailsScreen';
 import TicketDetailsScreen from '../Pages/main/TicketDetailsScreen';
+import InvoiceDetailScreen from '../Pages/main/InvoiceDetailScreen';
 import SearchScreen from '../Pages/main/SearchScreen';
 import ProfileScreen from '../Pages/main/ProfileScreen';
 import EditProfileScreen from '../Pages/main/EditProfileScreen';
@@ -217,6 +218,7 @@ const RootNavigator = () => {
         <Stack.Screen name="AdminRedirect" component={AdminRedirectScreen} />
         <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
         <Stack.Screen name="TicketDetails" component={TicketDetailsScreen} />
+        <Stack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />

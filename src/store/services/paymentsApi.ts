@@ -7,10 +7,33 @@ export interface FeeBreakdown {
   feePayer: 'organizer' | 'participant';
   platformCommissionAmount: number;
   gatewayFeeAmount: number;
+  // GST on the platform's commission (not on the ticket price). 0 whenever the backend's
+  // TAX_GST_RATE is unset, which is the default — so anything rendering this must treat 0
+  // as "no tax line", not "tax of zero".
+  gstAmount: number;
+  // buyerPrice minus gstAmount. Only differs from buyerPrice when the participant absorbs
+  // fees; when the organizer does, both collapse to the bare ticket price.
+  subtotalBeforeTax: number;
   buyerPrice: number;
   // What the organizer receives per ticket, net of commission + gateway fee — the number
   // the Create Event flow's live payout preview surfaces per tier.
   organizerPayout: number;
+}
+
+// GET /payments/invoice/:enrollmentId. Not a stored document — the backend recomputes this
+// from the enrollment + the organizer's CURRENT commission config on every request (see
+// PaymentsService.getInvoiceData), so it is a live view of the booking, not a frozen record.
+export interface InvoiceData {
+  invoiceNumber: string;
+  issueDate: string;
+  bookingReference: string;
+  event: { id: string; title: string; eventDate: string; venueName: string };
+  organizer: { companyName: string };
+  participant: { fullName: string; email: string };
+  ticketType: string;
+  quantity: number;
+  currency: string;
+  breakdown: FeeBreakdown;
 }
 
 export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed' | 'failed';
@@ -156,6 +179,12 @@ export const paymentsApi = createApi({
         }
       },
     }),
+    // Tax invoice for a settled booking. 400s for anything not yet paymentStatus 'paid' and
+    // 403s for someone else's booking, so callers should only reach it from a confirmed,
+    // paid enrollment (see TicketDetailsScreen's isPaidBooking gate).
+    getInvoice: builder.query<InvoiceData, string>({
+      query: (enrollmentId) => `payments/invoice/${enrollmentId}`,
+    }),
     requestRefund: builder.mutation<RefundRecord, { enrollmentId: string; reason?: string }>({
       query: (body) => ({ url: 'payments/refunds', method: 'POST', body }),
       // requestRefund lives on paymentsApi but the data it stales is eventsApi's
@@ -192,6 +221,7 @@ export const paymentsApi = createApi({
 
 export const {
   useGetFeeEstimateQuery,
+  useGetInvoiceQuery,
   useRequestRefundMutation,
   useGetPendingRefundsQuery,
   useApproveRefundMutation,
