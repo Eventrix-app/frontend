@@ -7,7 +7,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { useGetInvoiceQuery, InvoiceData } from '../../store/services/paymentsApi';
+import { useGetInvoiceDataQuery, TaxInvoice } from '../../store/services/paymentsApi';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
@@ -17,49 +17,23 @@ type Props = NativeStackScreenProps<RootStackParamList, 'InvoiceDetail'>;
 interface LineItem {
   label: string;
   amount: number;
-  // Rendered muted + prefixed with "−" — used for the amounts deducted from the organizer's
-  // side rather than added to the buyer's total.
-  deduction?: boolean;
 }
 
-// Derives the printable line items from the raw fee breakdown. Which fees are even VISIBLE
-// to the buyer depends on feePayer, and getting this wrong is worse than showing nothing:
-//
-//   participant — the buyer genuinely paid commission + gateway + GST on top of the ticket,
-//     so each is its own line and they sum to buyerPrice.
-//   organizer — the buyer paid exactly the ticket price. The platform's cut came out of the
-//     organizer's side and is none of the buyer's business, so the invoice shows a single
-//     ticket line. Listing the fees here would imply the buyer was charged them.
-function buildLineItems(breakdown: InvoiceData['breakdown'], gstRatePercent: number | null): LineItem[] {
-  const items: LineItem[] = [{ label: 'Ticket price', amount: breakdown.ticketPrice }];
-
-  if (breakdown.feePayer !== 'participant') return items;
-
-  if (breakdown.platformCommissionAmount > 0) {
-    items.push({ label: 'Platform fee', amount: breakdown.platformCommissionAmount });
+// The server already applies the feePayer rule: under feePayer=organizer the buyer paid
+// exactly the ticket price, so platformFeeAmount and gstAmount come back as 0 — they were
+// genuinely not charged, not merely hidden. Rendering only non-zero lines therefore shows
+// the buyer precisely what they paid for, with no client-side pricing logic of its own.
+function buildLineItems(invoice: TaxInvoice): LineItem[] {
+  const items: LineItem[] = [
+    { label: `Ticket price (${invoice.quantity} × ₹${invoice.unitPrice.toFixed(2)})`, amount: invoice.subtotalBeforeTax - invoice.platformFeeAmount },
+  ];
+  if (invoice.platformFeeAmount > 0) {
+    items.push({ label: 'Platform & processing fee', amount: invoice.platformFeeAmount });
   }
-  if (breakdown.gatewayFeeAmount > 0) {
-    items.push({ label: 'Payment gateway fee', amount: breakdown.gatewayFeeAmount });
-  }
-  if (breakdown.gstAmount > 0) {
-    items.push({
-      // The rate is shown only when it can be derived exactly from the two amounts —
-      // a hardcoded "18%" would be a lie the moment TAX_GST_RATE changes server-side.
-      label: gstRatePercent !== null ? `GST (${gstRatePercent}% on platform fee)` : 'GST on platform fee',
-      amount: breakdown.gstAmount,
-    });
+  if (invoice.gstAmount > 0) {
+    items.push({ label: `GST (${invoice.gstRate}% on platform fee)`, amount: invoice.gstAmount });
   }
   return items;
-}
-
-// GST is charged on the commission, not the ticket — so the displayable rate is recoverable
-// from the breakdown itself rather than needing its own API field. Returns null when the
-// commission is 0 (nothing to divide by) or the result isn't a clean rate worth printing.
-function deriveGstRate(breakdown: InvoiceData['breakdown']): number | null {
-  if (breakdown.gstAmount <= 0 || breakdown.platformCommissionAmount <= 0) return null;
-  const rate = (breakdown.gstAmount / breakdown.platformCommissionAmount) * 100;
-  const rounded = Math.round(rate * 100) / 100;
-  return Number.isFinite(rounded) && rounded > 0 ? rounded : null;
 }
 
 const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -68,25 +42,22 @@ const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { enrollmentId } = route.params;
 
-  const { data: invoice, isLoading, isError, error, refetch } = useGetInvoiceQuery(enrollmentId);
+  const { data: invoice, isLoading, isError, error, refetch } = useGetInvoiceDataQuery(enrollmentId);
 
-  const gstRatePercent = invoice ? deriveGstRate(invoice.breakdown) : null;
-  const lineItems = invoice ? buildLineItems(invoice.breakdown, gstRatePercent) : [];
+  const lineItems = invoice ? buildLineItems(invoice) : [];
+  const money = (amount: number) => `₹${amount.toFixed(2)}`;
 
-  const money = (amount: number) => `${invoice?.currency === 'INR' ? '₹' : `${invoice?.currency ?? ''} `}${amount.toFixed(2)}`;
-
-  // No PDF generation yet — sharing the invoice as text keeps this useful for the common
-  // case (forwarding it to an employer or accountant) without pulling in a print/PDF
-  // dependency for a document this short.
+  // No PDF generation yet — sharing as text keeps this useful for the common case
+  // (forwarding to an employer or accountant) without a print/PDF dependency.
   const handleShare = async () => {
     if (!invoice) return;
     const body = [
       `Invoice ${invoice.invoiceNumber}`,
-      `${invoice.event.title}`,
+      invoice.eventTitle,
       `Booking ${invoice.bookingReference}`,
       '',
       ...lineItems.map((item) => `${item.label}: ${money(item.amount)}`),
-      `Total paid: ${money(invoice.breakdown.buyerPrice)}`,
+      `Total paid: ${money(invoice.totalAmountPaid)}`,
     ].join('\n');
     try {
       await Share.share({ message: body });
@@ -108,9 +79,7 @@ const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <ScreenHeader title="Invoice" onBack={() => navigation.goBack()} />
         <View style={[styles.center, styles.errorWrap]}>
-          <Text style={styles.errorText}>
-            {extractErrorMessage(error, "We couldn't load this invoice.")}
-          </Text>
+          <Text style={styles.errorText}>{extractErrorMessage(error, "We couldn't load this invoice.")}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
@@ -143,26 +112,29 @@ const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             <View style={styles.invoiceHeadColRight}>
               <Text style={styles.metaLabel}>Issued</Text>
-              <Text style={styles.metaValue}>{formatEventDate(invoice.issueDate)}</Text>
+              <Text style={styles.metaValue}>{formatEventDate(invoice.invoiceDate)}</Text>
             </View>
           </View>
 
           <View style={styles.divider} />
 
           <Text style={styles.sectionLabel}>Billed To</Text>
-          <Text style={styles.partyName}>{invoice.participant.fullName}</Text>
-          <Text style={styles.partySub}>{invoice.participant.email}</Text>
+          <Text style={styles.partyName}>{invoice.buyerName}</Text>
+          <Text style={styles.partySub}>{invoice.buyerEmail}</Text>
 
           <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>From</Text>
-          <Text style={styles.partyName}>{invoice.organizer.companyName}</Text>
+          <Text style={styles.partyName}>{invoice.organizerName}</Text>
+          {/* Omitted entirely for organizers below the GST registration threshold, rather
+              than rendered as an empty field. */}
+          {invoice.organizerGstin ? <Text style={styles.partySub}>GSTIN: {invoice.organizerGstin}</Text> : null}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Booking</Text>
-          <Row label="Event" value={invoice.event.title} styles={styles} />
-          <Row label="Date" value={formatEventDate(invoice.event.eventDate)} styles={styles} />
-          <Row label="Venue" value={invoice.event.venueName} styles={styles} />
-          <Row label="Ticket type" value={invoice.ticketType} styles={styles} />
+          <Row label="Event" value={invoice.eventTitle} styles={styles} />
+          <Row label="Date" value={formatEventDate(invoice.eventDate)} styles={styles} />
+          <Row label="Venue" value={invoice.venueName} styles={styles} />
+          <Row label="Ticket type" value={invoice.ticketTypeName} styles={styles} />
           <Row label="Quantity" value={`${invoice.quantity}`} styles={styles} />
           <Row label="Reference" value={invoice.bookingReference} styles={styles} />
         </View>
@@ -177,12 +149,12 @@ const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           ))}
 
-          {invoice.breakdown.gstAmount > 0 && invoice.breakdown.feePayer === 'participant' ? (
+          {invoice.gstAmount > 0 ? (
             <>
               <View style={styles.divider} />
               <View style={styles.lineRow}>
                 <Text style={styles.lineLabel}>Subtotal before tax</Text>
-                <Text style={styles.lineAmount}>{money(invoice.breakdown.subtotalBeforeTax)}</Text>
+                <Text style={styles.lineAmount}>{money(invoice.subtotalBeforeTax)}</Text>
               </View>
             </>
           ) : null}
@@ -191,10 +163,10 @@ const InvoiceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total paid</Text>
-            <Text style={styles.totalValue}>{money(invoice.breakdown.buyerPrice)}</Text>
+            <Text style={styles.totalValue}>{money(invoice.totalAmountPaid)}</Text>
           </View>
 
-          {invoice.breakdown.feePayer !== 'participant' ? (
+          {invoice.platformFeeAmount === 0 ? (
             <Text style={styles.footnote}>
               Platform and payment processing fees for this booking were covered by the organizer.
             </Text>
@@ -259,12 +231,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     invoiceHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     invoiceHeadCol: { flexShrink: 1 },
     invoiceHeadColRight: { alignItems: 'flex-end' },
-    invoiceNumberLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.brandPink,
-      letterSpacing: 1,
-    },
+    invoiceNumberLabel: { fontSize: 11, fontWeight: '700', color: colors.brandPink, letterSpacing: 1 },
     invoiceNumber: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
     metaLabel: { fontSize: 11, color: colors.textSecondary },
     metaValue: { fontSize: 13, fontWeight: '600', color: colors.text, marginTop: 2 },
@@ -299,12 +266,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     totalLabel: { fontSize: 15, fontWeight: '700', color: colors.brandPink },
     totalValue: { fontSize: 18, fontWeight: '700', color: colors.brandPink },
 
-    footnote: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      lineHeight: 16,
-      marginTop: spacing.sm,
-    },
+    footnote: { fontSize: 11, color: colors.textSecondary, lineHeight: 16, marginTop: spacing.sm },
     disclaimer: {
       fontSize: 11,
       color: colors.textSecondary,

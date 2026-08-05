@@ -25,6 +25,7 @@ import {
   EnrollmentRecord,
 } from '../../store/services/eventsApi';
 import {
+  useGetCheckoutEstimateQuery,
   useInitiatePayUNativeOrderMutation,
   useVerifyPayUNativeMutation,
 } from '../../store/services/paymentsApi';
@@ -37,7 +38,6 @@ import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { LeftArrow, PhoneIcon, WhatsAppIcon, ClipboardIcon } from '../../components/common/Icons';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
-import { GST_RATE, PLATFORM_FEE_INR, getGstPortion } from '../../utils/pricing';
 
 interface CheckoutRouteParams {
   eventId: string;
@@ -106,16 +106,27 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     setQuantity((q) => Math.min(Math.max(q + delta, min), Math.max(max, min)));
   };
 
-  // The ticket price is the base price; GST (18%) is added on top in the Order Summary.
   const tierPrice = activeEnrollment?.ticketType?.price ?? selectedTier?.price ?? 0;
   const subtotal = tierPrice * effectiveQuantity;
-  // GST added on top of the ticket subtotal.
-  const gst = getGstPortion(subtotal);
-  const totalPayable = activeEnrollment
-    ? Number(activeEnrollment.totalAmount)
-    : Math.max(subtotal + gst + PLATFORM_FEE_INR, 0);
 
-  const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment;
+  // Fees are NEVER computed client-side. Which fees apply, and to whom, depends on the
+  // event's feePayer and the organizer's own commission rate — neither of which the app can
+  // know. This endpoint runs the same FeeCalculationService call enroll() will, so the total
+  // shown here is exactly what gets charged. Skipped when resuming, where the enrollment
+  // already carries the authoritative amount.
+  const { data: estimate, isLoading: isLoadingEstimate } = useGetCheckoutEstimateQuery(
+    { ticketTypeId: effectiveTierId, quantity: effectiveQuantity },
+    { skip: isResuming || !effectiveTierId || subtotal <= 0 },
+  );
+
+  const totalPayable = activeEnrollment ? Number(activeEnrollment.totalAmount) : estimate?.total ?? subtotal;
+  // Only the fees the buyer is actually being charged — empty under feePayer=organizer.
+  const feeLines = activeEnrollment ? [] : estimate?.lines ?? [];
+  // Until the estimate lands, the total is provisional (it falls back to the bare subtotal),
+  // so paying on a stale number is prevented rather than displayed as if it were final.
+  const isEstimatePending = !isResuming && subtotal > 0 && !estimate;
+
+  const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment || isLoadingEstimate;
 
   const handlePay = async () => {
     if (!event) return;
@@ -396,14 +407,14 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x {'\u20b9'}{tierPrice})</Text>
             <Text style={styles.orderValue}>{'\u20b9'}{subtotal}</Text>
           </View>
-          <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>Platform Fee</Text>
-            <Text style={styles.orderValue}>{'\u20b9'}{PLATFORM_FEE_INR}</Text>
-          </View>
-          <View style={styles.orderRow}>
-            <Text style={styles.orderLabel}>GST ({Math.round(GST_RATE * 100)}%)</Text>
-            <Text style={styles.orderValue}>{'\u20b9'}{gst}</Text>
-          </View>
+          {/* Server-supplied. No fee rows at all when the organizer absorbs them \u2014 showing a
+              "Platform Fee" the buyer isn't paying would misstate what they're being charged. */}
+          {feeLines.map((line) => (
+            <View key={line.label} style={styles.orderRow}>
+              <Text style={styles.orderLabel}>{line.label}</Text>
+              <Text style={styles.orderValue}>{'\u20b9'}{line.amount.toFixed(2)}</Text>
+            </View>
+          ))}
 
           <View style={styles.divider} />
 
@@ -431,7 +442,10 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.payBtn}
           onPress={handlePay}
-          disabled={isPaying || (!isResuming && !selectedTier)}
+          // Blocked while the estimate is outstanding: totalPayable falls back to the bare
+          // subtotal until it arrives, and the user must never tap "Pay ₹X" on a number that
+          // isn't the one about to be charged.
+          disabled={isPaying || isEstimatePending || (!isResuming && !selectedTier)}
         >
           {isPaying ? (
             <ActivityIndicator color={colors.white} />

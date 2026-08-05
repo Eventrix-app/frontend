@@ -11,6 +11,12 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000
 export function createFallbackBaseQuery(withAuth = false): BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> {
   return fetchBaseQuery({
     baseUrl: API_URL,
+    // Without this, a request that is accepted but never answered (a silently dropped
+    // mobile connection, a hung upstream) has no client-side deadline at all. The worst
+    // case is payment-adjacent: initiatePayUNativeOrder hanging leaves the Pay button
+    // spinning with no error and no recovery short of backgrounding the app. 30s is well
+    // clear of a slow-but-real request while still failing in human time.
+    timeout: 30000,
     prepareHeaders: withAuth
       ? (headers, { getState }) => {
           const token = (getState() as RootState).auth.token;

@@ -19,19 +19,26 @@ export interface FeeBreakdown {
   organizerPayout: number;
 }
 
-// GET /payments/invoice/:enrollmentId
-export interface InvoiceData {
-  invoiceNumber: string;
-  issueDate: string;
-  bookingReference: string;
-  event: { id: string; title: string; eventDate: string; venueName: string };
-  organizer: { companyName: string };
-  participant: { fullName: string; email: string };
-  ticketType: string;
+// GET /payments/checkout-estimate — the authoritative pre-booking total. Computed by the
+// same FeeCalculationService call EventsService.enroll() makes, so `total` is exactly what
+// will be persisted as enrollment.totalAmount and charged by PayU.
+//
+// `lines` contains ONLY fees the buyer actually pays, and is empty under
+// feePayer=organizer, where the buyer is charged the bare ticket price and the organizer
+// absorbs everything. Never reconstruct any of this client-side: which fees apply depends on
+// the event's feePayer and the organizer's own commission rate, neither of which the app
+// knows. A hardcoded platform fee / GST rate here will silently disagree with the charge.
+export interface CheckoutEstimate {
+  ticketTypeId: string;
+  unitPrice: number;
   quantity: number;
+  subtotal: number;
+  feePayer: 'organizer' | 'participant';
   currency: string;
-  breakdown: FeeBreakdown;
+  lines: { label: string; amount: number }[];
+  total: number;
 }
+
 
 // Mirrors the shape returned by GET /payments/invoices/:enrollmentId on the backend.
 // All monetary amounts are in rupees (not paise) and are already rounded to 2 decimal places.
@@ -176,8 +183,12 @@ export const paymentsApi = createApi({
         }
       },
     }),
-    getInvoice: builder.query<InvoiceData, string>({
-      query: (enrollmentId) => `payments/invoice/${enrollmentId}`,
+    // Buyer-facing checkout total. Distinct from getFeeEstimate above, which is the
+    // organizer-facing payout preview and 403s for anyone querying an organizer that isn't
+    // their own — this one takes no organizerId at all, so an attendee can call it.
+    getCheckoutEstimate: builder.query<CheckoutEstimate, { ticketTypeId: string; quantity: number }>({
+      query: ({ ticketTypeId, quantity }) =>
+        `payments/checkout-estimate?ticketTypeId=${encodeURIComponent(ticketTypeId)}&quantity=${quantity}`,
     }),
     getInvoiceData: builder.query<TaxInvoice, string>({
       query: (enrollmentId) => `payments/invoices/${enrollmentId}`,
@@ -214,13 +225,13 @@ export const paymentsApi = createApi({
 
 export const {
   useGetFeeEstimateQuery,
+  useGetCheckoutEstimateQuery,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
   useInitiatePayUOrderMutation,
   useInitiatePayUNativeOrderMutation,
   useSignPayUHashMutation,
   useVerifyPayUNativeMutation,
-  useGetInvoiceQuery,
   useGetInvoiceDataQuery,
   useRequestRefundMutation,
   useGetPendingRefundsQuery,

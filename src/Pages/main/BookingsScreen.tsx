@@ -424,7 +424,6 @@ const BookingsScreen: React.FC = () => {
                     <View style={styles.stubDivider} />
 
                     <View style={styles.footerRow}>
-                    <View style={styles.footerRow}>
                         <Text style={styles.footerLabel}>
                           Status: <Text style={{ color: colors[status.tone], fontWeight: '700' }}>{status.label}</Text>
                         </Text>
