@@ -34,6 +34,9 @@ export interface CheckoutEstimate {
   quantity: number;
   subtotal: number;
   feePayer: 'organizer' | 'participant';
+  // True when the tier is priced at 0. The buyer still pays a flat registration fee, so the
+  // UI has to explain why a "free" event is asking for money rather than looking broken.
+  isFreeEvent: boolean;
   currency: string;
   lines: { label: string; amount: number }[];
   total: number;

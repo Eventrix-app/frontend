@@ -16,6 +16,7 @@ import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 import {
   useFollowOrganizerMutation,
+  useGetMyBankAccountQuery,
   useGetMyVerificationStatusQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerProfileQuery,
@@ -88,6 +89,11 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const { data: favorites = [] } = useGetMyFavoritesQuery();
   const { data: myEvents = [] } = useGetMyEventsQuery();
   const { data: verificationStatus } = useGetMyVerificationStatusQuery();
+  // Skipped for anyone who isn't an approved organizer — the endpoint 404s without an
+  // organizer profile, and the menu row it feeds is hidden in that case anyway.
+  const { data: bankAccount } = useGetMyBankAccountQuery(undefined, {
+    skip: verificationStatus?.status !== 'approved',
+  });
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -150,6 +156,27 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
             label: 'Organizer Verification',
             subtitle: verificationSubtitle[verificationStatus.status],
             onPress: (nav: Props['navigation']) => nav.navigate('OrganizerVerification'),
+          },
+        ]
+      : []),
+    // Gated on APPROVED, not merely submitted: there is no point collecting bank details
+    // from someone whose identity has not been established, and the subtitle deliberately
+    // reads from the bank account's own status rather than the KYC one — the two are
+    // independent, and conflating them would tell an approved organizer they are ready to be
+    // paid when no account exists.
+    ...(verificationStatus?.status === 'approved'
+      ? [
+          {
+            icon: 'credit-card' as const,
+            label: 'Payout Account',
+            subtitle: bankAccount
+              ? bankAccount.isPayoutReady
+                ? `•••• ${bankAccount.accountNumberLast4} — verified`
+                : bankAccount.status === 'rejected'
+                  ? 'Rejected — resubmit'
+                  : 'Awaiting verification'
+              : 'Not set up — required to get paid',
+            onPress: (nav: Props['navigation']) => nav.navigate('PayoutBankAccount'),
           },
         ]
       : []),

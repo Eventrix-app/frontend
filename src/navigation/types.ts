@@ -40,6 +40,10 @@ export type RootStackParamList = {
   CreateEvent: { eventId?: string };
   OrganizerVerification: undefined;
   VerificationSubmitted: undefined;
+  // Where the organizer's event earnings are sent. Separate from OrganizerVerification
+  // because the two have independent lifecycles — KYC approval says who you are, this says
+  // where the money goes, and changing a bank account must not reopen identity review.
+  PayoutBankAccount: undefined;
   ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };
   RefundApproval: undefined;

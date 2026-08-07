@@ -116,7 +116,9 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   // already carries the authoritative amount.
   const { data: estimate, isLoading: isLoadingEstimate } = useGetCheckoutEstimateQuery(
     { ticketTypeId: effectiveTierId, quantity: effectiveQuantity },
-    { skip: isResuming || !effectiveTierId || subtotal <= 0 },
+    // NOT skipped when subtotal is 0: a free event still charges a flat registration
+    // fee, so the estimate is the only thing that knows the real total.
+    { skip: isResuming || !effectiveTierId },
   );
 
   const totalPayable = activeEnrollment ? Number(activeEnrollment.totalAmount) : estimate?.total ?? subtotal;
@@ -124,7 +126,10 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const feeLines = activeEnrollment ? [] : estimate?.lines ?? [];
   // Until the estimate lands, the total is provisional (it falls back to the bare subtotal),
   // so paying on a stale number is prevented rather than displayed as if it were final.
-  const isEstimatePending = !isResuming && subtotal > 0 && !estimate;
+  // Free events included: they now carry a real chargeable total, so the estimate gates
+  // them too. Paying on the fallback subtotal (0) would skip the registration fee entirely.
+  const isEstimatePending = !isResuming && !estimate;
+  const isFreeEvent = estimate?.isFreeEvent ?? subtotal <= 0;
 
   const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment || isLoadingEstimate;
 
@@ -655,6 +660,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     orderLabel: { fontSize: 13, color: colors.textSecondary },
     orderValue: { fontSize: 13, fontWeight: '600', color: colors.text },
+    freeEventBanner: {
+      backgroundColor: colors.muted,
+      borderRadius: borderRadius.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    freeEventTitle: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 2 },
+    freeEventBody: { fontSize: 12, lineHeight: 17, color: colors.textSecondary },
     totalPayableLabel: { fontSize: 15, fontWeight: '700', color: colors.brandPink },
     totalPayableValue: { fontSize: 17, fontWeight: '700', color: colors.brandPink },
 

@@ -37,11 +37,70 @@ export interface SubmitVerificationPayload {
   upiId: string;
 }
 
+// Where this organizer's payouts are sent. Mirrors BankAccountSummary in
+// bank-account.service.ts — note what is NOT here: the account number (only its last four
+// digits) and the holder name. Both are encrypted at rest and never leave the server, so
+// there is nothing for the app to redact.
+export interface BankAccountSummary {
+  id: string;
+  accountNumberLast4: string;
+  ifscCode: string;
+  bankName: string;
+  branchName?: string | null;
+  accountType: 'savings' | 'current';
+  // pending — awaiting admin review; verified — details checked against KYC, but NOT yet
+  // payable; penny_drop_verified — a ₹1 test transfer landed, the only payable state;
+  // rejected — see rejectionReason.
+  status: 'pending' | 'verified' | 'penny_drop_verified' | 'rejected';
+  rejectionReason?: string | null;
+  verifiedAt?: string | null;
+  pennyDropAt?: string | null;
+  // The single flag the UI should branch on. Do not reimplement it from `status` — the rule
+  // is "admin-verified AND penny-dropped", and duplicating it here is how the app ends up
+  // telling an organizer they will be paid when the server disagrees.
+  isPayoutReady: boolean;
+  createdAt: string;
+}
+
+export interface SubmitBankAccountPayload {
+  accountNumber: string;
+  // Compared server-side. Indian account numbers carry no checksum, so a re-entry is the
+  // only thing standing between a typo and an irreversible transfer to a stranger.
+  confirmAccountNumber: string;
+  accountHolderName: string;
+  ifscCode: string;
+  bankName: string;
+  branchName?: string;
+  accountType?: 'savings' | 'current';
+  // The PAN NUMBER, not the card image (that is panOrAadhaarUrl in the KYC flow above).
+  // Optional until TDS withholding ships.
+  panNumber?: string;
+}
+
 export const organizerApi = createApi({
   reducerPath: 'organizerApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['OrganizerProfile', 'MyFollowing', 'FollowedEvents', 'OrganizerEvents', 'MyVerificationStatus'],
+  tagTypes: [
+    'OrganizerProfile',
+    'MyFollowing',
+    'FollowedEvents',
+    'OrganizerEvents',
+    'MyVerificationStatus',
+    'MyBankAccount',
+  ],
   endpoints: (builder) => ({
+    // null when nothing has been submitted yet — a fresh organizer, not an error.
+    getMyBankAccount: builder.query<BankAccountSummary | null, void>({
+      query: () => 'organizers/bank-account/me',
+      providesTags: ['MyBankAccount'],
+    }),
+    // PUT: resubmitting replaces the account rather than adding a second one. The server
+    // deactivates the previous row instead of overwriting it, so past payouts stay traceable
+    // to the account they actually went to — and the new one always restarts at `pending`.
+    submitBankAccount: builder.mutation<BankAccountSummary, SubmitBankAccountPayload>({
+      query: (body) => ({ url: 'organizers/bank-account/me', method: 'PUT', body }),
+      invalidatesTags: ['MyBankAccount'],
+    }),
     getMyVerificationStatus: builder.query<VerificationStatus, void>({
       query: () => 'organizers/verification/me',
       providesTags: ['MyVerificationStatus'],
@@ -137,4 +196,6 @@ export const {
   useUnfollowOrganizerMutation,
   useGetMyVerificationStatusQuery,
   useSubmitVerificationMutation,
+  useGetMyBankAccountQuery,
+  useSubmitBankAccountMutation,
 } = organizerApi;
