@@ -94,6 +94,31 @@ module.exports = {
       favicon: './assets/app/favicon.jpg',
     },
     plugins: [
+      // PayU's Android SDK pulls in `in.payu:phonepe-intent`, which depends on
+      // `phonepe.intentsdk.android.release:IntentSDK` — an artifact PhonePe publishes ONLY to
+      // their own Maven server, not to Google's repo or Maven Central. Without this the
+      // Android build fails at :app:processDebugResources with "Could not find
+      // phonepe.intentsdk.android.release:IntentSDK", and the error names the missing
+      // artifact rather than the missing repository, which sends you looking for a version
+      // problem that isn't there.
+      //
+      // Declared as a config plugin rather than edited into android/build.gradle because
+      // android/ is generated (gitignored, CNG workflow): a hand-edit there survives until
+      // the next prebuild and never reaches EAS Build at all, so the cloud AAB build would
+      // keep failing exactly the same way while the local one looked fixed.
+      [
+        'expo-build-properties',
+        {
+          android: {
+            extraMavenRepos: [
+              'https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android',
+            ],
+          },
+        },
+      ],
+      // Lets the app's own android:theme win over the one PayU's checkout UI declares on
+      // <application>; without it the manifest merger fails the Android build outright.
+      './plugins/withPayuManifestTheme',
       '@react-native-community/datetimepicker',
       'expo-splash-screen',
       'expo-font',
