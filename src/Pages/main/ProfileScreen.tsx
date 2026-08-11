@@ -178,6 +178,15 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
               : 'Not set up — required to get paid',
             onPress: (nav: Props['navigation']) => nav.navigate('PayoutBankAccount'),
           },
+          // Sits directly under the account it pays into: "where the money goes" followed by
+          // "what has actually gone". Gated on the same approval, since an organizer who has
+          // never been verified has no settlements to look at.
+          {
+            icon: 'trending-up' as const,
+            label: 'Payouts',
+            subtitle: 'What you have earned and been paid',
+            onPress: (nav: Props['navigation']) => nav.navigate('PayoutHistory'),
+          },
         ]
       : []),
     { icon: 'bell', label: 'Notifications', onPress: (nav) => nav.navigate('Notifications') },

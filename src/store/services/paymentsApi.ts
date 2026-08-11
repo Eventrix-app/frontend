@@ -43,6 +43,41 @@ export interface CheckoutEstimate {
 }
 
 
+// One settlement in the organizer's payout history (GET /payments/my-payouts). Mirrors
+// OrganizerPayoutView in Backend src/payments/payments.service.ts.
+//
+// Only three statuses exist server-side (Backend src/entities/payout.entity.ts):
+//   pending — the T+3 sweep has computed what is owed. NOTHING has been sent to a bank.
+//   paid    — a transfer was confirmed, and transferReference is the evidence.
+//   failed  — a transfer was attempted and did not go through.
+// Do not add speculative in-between states here; `paidAt` being set is the only thing that
+// means money actually moved.
+export interface OrganizerPayout {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate?: string;
+  eventCoverImageUrl?: string;
+  ticketCount: number;
+  // Rupees, already rounded to 2dp by the server. Not paise.
+  amount: number;
+  currency: string;
+  status: 'pending' | 'paid' | 'failed';
+  processedAt?: string;
+  paidAt?: string;
+  transferReference?: string;
+  // An ESTIMATE, and only present once a transfer has been sent. Must always be rendered as
+  // an approximation — it does not model bank holidays.
+  estimatedArrivalDate?: string;
+}
+
+export interface MyPayoutsPage {
+  payouts: OrganizerPayout[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 // Mirrors the shape returned by GET /payments/invoices/:enrollmentId on the backend.
 // All monetary amounts are in rupees (not paise) and are already rounded to 2 decimal places.
 export interface TaxInvoice {
@@ -132,7 +167,7 @@ export type FeeEstimateArg = number | { ticketPrice: number; feePayer?: 'organiz
 export const paymentsApi = createApi({
   reducerPath: 'paymentsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['PendingRefunds'],
+  tagTypes: ['PendingRefunds', 'MyPayouts'],
   endpoints: (builder) => ({
     getFeeEstimate: builder.query<FeeBreakdown, FeeEstimateArg>({
       query: (arg) => {
@@ -207,6 +242,15 @@ export const paymentsApi = createApi({
         }
       },
     }),
+    // The organizer's own settlement history. Takes no organizerId — the server scopes it to
+    // the session — so there is nothing to pass and nothing to get wrong.
+    getMyPayouts: builder.query<MyPayoutsPage, { page?: number; limit?: number } | void>({
+      query: (arg) => {
+        const { page = 1, limit = 20 } = arg ?? {};
+        return `payments/my-payouts?page=${page}&limit=${limit}`;
+      },
+      providesTags: ['MyPayouts'],
+    }),
     getPendingRefunds: builder.query<RefundRecord[], void>({
       query: () => 'payments/refunds/pending',
       providesTags: ['PendingRefunds'],
@@ -237,6 +281,7 @@ export const {
   useVerifyPayUNativeMutation,
   useGetInvoiceDataQuery,
   useRequestRefundMutation,
+  useGetMyPayoutsQuery,
   useGetPendingRefundsQuery,
   useApproveRefundMutation,
   useRejectRefundMutation,

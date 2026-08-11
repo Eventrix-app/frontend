@@ -32,6 +32,7 @@ import CreateEventScreen from '../Pages/main/CreateEventScreen';
 import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScreen';
 import VerificationSubmittedScreen from '../Pages/main/VerificationSubmittedScreen';
 import PayoutBankAccountScreen from '../Pages/main/PayoutBankAccountScreen';
+import PayoutHistoryScreen from '../Pages/main/PayoutHistoryScreen';
 import ManageTicketTypesScreen from '../Pages/main/ManageTicketTypesScreen';
 import CheckInScreen from '../Pages/main/CheckInScreen';
 import RefundApprovalScreen from '../Pages/main/RefundApprovalScreen';
@@ -238,6 +239,7 @@ const RootNavigator = () => {
         <Stack.Screen name="OrganizerVerification" component={OrganizerVerificationScreen} />
         <Stack.Screen name="VerificationSubmitted" component={VerificationSubmittedScreen} />
         <Stack.Screen name="PayoutBankAccount" component={PayoutBankAccountScreen} />
+        <Stack.Screen name="PayoutHistory" component={PayoutHistoryScreen} />
         <Stack.Screen name="ManageTicketTypes" component={ManageTicketTypesScreen} />
         <Stack.Screen name="CheckIn" component={CheckInScreen} />
         <Stack.Screen name="RefundApproval" component={RefundApprovalScreen} />
