@@ -17,6 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
 import { Dots } from '../../components/Dots';
 import { colorsLight } from '../../theme/colors.light';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Text } from '../../components/common/Text';
@@ -74,6 +75,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
   const [index, setIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const styles = useMemo(() => createStyles(colorsLight), []);
+
+  // react-native's own <SafeAreaView> (imported above and wrapping this screen) is an
+  // iOS-ONLY component — on Android it renders as a plain View and contributes no insets at
+  // all, which is why the Prev/Next row sat underneath the system navigation bar. This hook
+  // (react-native-safe-area-context) is the cross-platform source of truth and is what every
+  // other screen in the app already uses.
+  const insets = useSafeAreaInsets();
 
   // Screen-level slide transition
   const screenX = useRef(new Animated.Value(0)).current;
@@ -219,7 +227,14 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
             <Dots total={slides.length} index={index} />
           </View>
 
-          <Animated.View style={[styles.bottom, { opacity: btnOpacity }]}>
+          <Animated.View
+            style={[
+              styles.bottom,
+              // Floored at spacing.md so the row never sits flush against the screen edge on
+              // a device reporting inset 0 (older Android hardware keys, or a tablet).
+              { opacity: btnOpacity, paddingBottom: Math.max(insets.bottom, spacing.md) },
+            ]}
+          >
             {isFirst ? (
               <Pressable
                 onPress={handleNext}

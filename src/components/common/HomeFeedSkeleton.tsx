@@ -53,7 +53,16 @@ export const InterestCardSkeleton: React.FC<{ count?: number }> = ({ count = 1 }
 );
 
 const styles = StyleSheet.create({
+  // Must mirror HomeScreen's own `featuredWrap` geometry, not just approximate it. That
+  // section sits inside a ScrollView whose contentContainer has `padding: spacing.md`, and it
+  // cancels the top and side padding with negative margins so the pink runs flush into the
+  // header above it. This placeholder stands in the same slot, so without the same negative
+  // margins the cancelled padding comes back the moment the skeleton swaps in — a white band
+  // between the header and the feed, most visible on pull-to-refresh, which re-triggers the
+  // loading state on a screen the user is already looking at.
   featuredWrap: {
+    marginTop: -spacing.md,
+    marginHorizontal: -spacing.md,
     paddingBottom: spacing.md,
   },
   sectionHeader: {
