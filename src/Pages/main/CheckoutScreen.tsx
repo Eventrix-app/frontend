@@ -32,7 +32,8 @@ import {
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
 import { openPayUCheckout } from '../../services/payuNativeService';
 import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
-import { showAlert } from '../../utils/crossPlatformAlert';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { useGetMeQuery } from '../../store/services/userApi';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
@@ -62,6 +63,16 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
   const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
   const [verifyPayUNative] = useVerifyPayUNativeMutation();
+
+  // Mirrors PaymentsService.toPayuPhone on the server, including the trailing-10 rule that
+  // tolerates "+91 …"/"0…" forms — Edit Profile stores whatever was typed, with no format
+  // validation. Kept deliberately permissive: this only decides whether to interrupt before
+  // enrolling, and the server stays the authority on what PayU actually receives.
+  const { data: me } = useGetMeQuery();
+  const hasPayablePhone = useMemo(() => {
+    const digits = (me?.phoneNumber ?? '').replace(/\D/g, '');
+    return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
+  }, [me?.phoneNumber]);
 
   // If a non-cancelled enrollment for this event already exists (a fresh booking just made,
   // or one left over from a previous abandoned/failed payment attempt), this screen switches
@@ -135,6 +146,22 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handlePay = async () => {
     if (!event) return;
+
+    // Checked BEFORE enrollEvent below, not after. PayU's SDK rejects any phone that is not
+    // exactly 10 digits, and it does so at the very end of the flow — by which point an
+    // enrollment row exists that the user cannot pay for and has to resume from My Bookings.
+    // The server validates this too (PaymentsService.toPayuPhone is the authority); this
+    // check exists to turn a dead-end popup into a route to the screen that fixes it.
+    if (totalPayable > 0 && !hasPayablePhone) {
+      showConfirm(
+        'Add a mobile number',
+        'Our payment provider needs a 10-digit mobile number before it can take a payment. Add one to your profile and come back — your selection is kept.',
+        () => navigation.navigate('EditProfile' as never),
+        'Add number',
+      );
+      return;
+    }
+
     try {
       let enrollment: EnrollmentRecord;
 
