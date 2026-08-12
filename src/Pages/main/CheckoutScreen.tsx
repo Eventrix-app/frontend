@@ -64,10 +64,8 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
   const [verifyPayUNative] = useVerifyPayUNativeMutation();
 
-  // Mirrors PaymentsService.toPayuPhone on the server, including the trailing-10 rule that
-  // tolerates "+91 …"/"0…" forms — Edit Profile stores whatever was typed, with no format
-  // validation. Kept deliberately permissive: this only decides whether to interrupt before
-  // enrolling, and the server stays the authority on what PayU actually receives.
+  // Mirrors PaymentsService.toPayuPhone; permissive because it only decides whether to
+  // interrupt before enrolling, not what PayU receives.
   const { data: me } = useGetMeQuery();
   const hasPayablePhone = useMemo(() => {
     const digits = (me?.phoneNumber ?? '').replace(/\D/g, '');
@@ -147,11 +145,8 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const handlePay = async () => {
     if (!event) return;
 
-    // Checked BEFORE enrollEvent below, not after. PayU's SDK rejects any phone that is not
-    // exactly 10 digits, and it does so at the very end of the flow — by which point an
-    // enrollment row exists that the user cannot pay for and has to resume from My Bookings.
-    // The server validates this too (PaymentsService.toPayuPhone is the authority); this
-    // check exists to turn a dead-end popup into a route to the screen that fixes it.
+    // Before enrollEvent: PayU rejects a bad phone at the end of the flow, leaving an
+    // unpayable enrollment behind. Server stays the authority; this just routes to the fix.
     if (totalPayable > 0 && !hasPayablePhone) {
       showConfirm(
         'Add a mobile number',

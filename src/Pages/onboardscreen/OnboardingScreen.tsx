@@ -6,7 +6,6 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   View,
@@ -76,11 +75,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
   const [visibleIndex, setVisibleIndex] = useState(0);
   const styles = useMemo(() => createStyles(colorsLight), []);
 
-  // react-native's own <SafeAreaView> (imported above and wrapping this screen) is an
-  // iOS-ONLY component — on Android it renders as a plain View and contributes no insets at
-  // all, which is why the Prev/Next row sat underneath the system navigation bar. This hook
-  // (react-native-safe-area-context) is the cross-platform source of truth and is what every
-  // other screen in the app already uses.
+  // react-native's SafeAreaView is iOS-only and gave Android no insets, so the button row
+  // sat under the nav bar. Insets applied explicitly, once per edge.
   const insets = useSafeAreaInsets();
 
   // Screen-level slide transition
@@ -187,7 +183,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
         transform: [{ translateY: mountTranslateY }],
       },
     ]}>
-      <SafeAreaView style={styles.fill}>
+      {/* Plain View, not SafeAreaView: keeping it would double-count the inset on iOS */}
+      <View style={[styles.fill, { paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" backgroundColor={colorsLight.white} />
 
         <View pointerEvents="none" style={styles.glow} />
@@ -230,8 +227,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
           <Animated.View
             style={[
               styles.bottom,
-              // Floored at spacing.md so the row never sits flush against the screen edge on
-              // a device reporting inset 0 (older Android hardware keys, or a tablet).
+              // Floored so the row never sits flush on a device reporting inset 0
               { opacity: btnOpacity, paddingBottom: Math.max(insets.bottom, spacing.md) },
             ]}
           >
@@ -263,7 +259,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
             )}
           </Animated.View>
         </LinearGradient>
-      </SafeAreaView>
+      </View>
     </Animated.View>
   );
 };
