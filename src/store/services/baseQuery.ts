@@ -3,7 +3,12 @@ import type { RootState } from '../index';
 
 // Exported so callers that need the raw backend origin outside RTK Query's baseQuery — e.g.
 // PayUCheckoutModal building surl/furl for PayU's redirect — don't duplicate this fallback.
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
+//
+// Trailing slash trimmed here rather than at each call site: EXPO_PUBLIC_API_URL ends in one,
+// so `${API_URL}/payments/payu/return` produced a doubled slash that the backend answers with
+// a 308. PayU POSTs its result to that URL and does not follow the redirect, so checkout hung
+// waiting for a return that never landed. RTK Query normalises its own joins either way.
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/+$/, '');
 
 // Named/shaped as a BaseQueryFn (rather than exporting fetchBaseQuery(...) directly) so
 // every API slice can keep calling createFallbackBaseQuery(withAuth) — only one backend
