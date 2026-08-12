@@ -119,6 +119,9 @@ module.exports = {
       // Lets the app's own android:theme win over the one PayU's checkout UI declares on
       // <application>; without it the manifest merger fails the Android build outright.
       './plugins/withPayuManifestTheme',
+      // Declares the UPI intent/packages Android 11+ requires to see other apps at all —
+      // without it PayU's UPI list resolves to nothing and tapping an app does nothing.
+      './plugins/withPayuUpiQueries',
       '@react-native-community/datetimepicker',
       'expo-splash-screen',
       'expo-font',
