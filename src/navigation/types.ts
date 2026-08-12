@@ -44,8 +44,7 @@ export type RootStackParamList = {
   // because the two have independent lifecycles — KYC approval says who you are, this says
   // where the money goes, and changing a bank account must not reopen identity review.
   PayoutBankAccount: undefined;
-  // The organizer's settlement history — what was paid, when, and against which bank
-  // reference. Read-only; the bank account it pays into is PayoutBankAccount above.
+  // Read-only settlement history; the account it pays into is PayoutBankAccount above
   PayoutHistory: undefined;
   ManageTicketTypes: { eventId: string };
   CheckIn: { eventId: string };

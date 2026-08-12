@@ -43,15 +43,8 @@ export interface CheckoutEstimate {
 }
 
 
-// One settlement in the organizer's payout history (GET /payments/my-payouts). Mirrors
-// OrganizerPayoutView in Backend src/payments/payments.service.ts.
-//
-// Only three statuses exist server-side (Backend src/entities/payout.entity.ts):
-//   pending — the T+3 sweep has computed what is owed. NOTHING has been sent to a bank.
-//   paid    — a transfer was confirmed, and transferReference is the evidence.
-//   failed  — a transfer was attempted and did not go through.
-// Do not add speculative in-between states here; `paidAt` being set is the only thing that
-// means money actually moved.
+// Mirrors OrganizerPayoutView (Backend payments.service.ts). Only paidAt being set means
+// money actually moved — do not add speculative in-between statuses.
 export interface OrganizerPayout {
   id: string;
   eventId: string;
@@ -66,8 +59,7 @@ export interface OrganizerPayout {
   processedAt?: string;
   paidAt?: string;
   transferReference?: string;
-  // An ESTIMATE, and only present once a transfer has been sent. Must always be rendered as
-  // an approximation — it does not model bank holidays.
+  // Estimate only, and only once sent; does not model bank holidays
   estimatedArrivalDate?: string;
 }
 
@@ -242,8 +234,7 @@ export const paymentsApi = createApi({
         }
       },
     }),
-    // The organizer's own settlement history. Takes no organizerId — the server scopes it to
-    // the session — so there is nothing to pass and nothing to get wrong.
+    // Server scopes this to the session, so there is no organizerId to get wrong
     getMyPayouts: builder.query<MyPayoutsPage, { page?: number; limit?: number } | void>({
       query: (arg) => {
         const { page = 1, limit = 20 } = arg ?? {};
