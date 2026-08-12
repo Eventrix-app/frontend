@@ -46,6 +46,14 @@ export function openPayUCheckout(dispatch: AppDispatch, params: PayUNativeOrderP
     const subscriptions: { remove: () => void }[] = [];
     const cleanup = () => subscriptions.forEach((sub) => sub.remove());
 
+    // PayUBizSdkModule.java holds ONE listener field and overwrites it on every request, but
+    // the SDK fires several at once — four inside 70ms against a ~330ms round trip. A reply
+    // carrying only the hash we were asked for therefore reaches whichever listener happened
+    // to be last and satisfies nothing, which is why the SDK re-requested the same names and
+    // checkout sat on "Please wait". Replying with every hash signed so far lets the active
+    // listener find its own key whichever request it belongs to.
+    const signed: Record<string, string> = {};
+
     subscriptions.push(
       DeviceEventEmitter.addListener('generateHash', (data: { hashName: string; hashString: string }) => {
         // Name of every request, not just the first: the SDK asks for several, so logging
@@ -57,7 +65,10 @@ export function openPayUCheckout(dispatch: AppDispatch, params: PayUNativeOrderP
         }
         dispatch(paymentsApi.endpoints.signPayUHash.initiate({ hashString: data.hashString }))
           .unwrap()
-          .then(({ hash }) => PayUBizSdk.hashGenerated({ [data.hashName]: hash }))
+          .then(({ hash }) => {
+            signed[data.hashName] = hash;
+            PayUBizSdk.hashGenerated({ ...signed });
+          })
           .catch((err) => {
             // The SDK can't proceed without a hash and never fires a terminal event, so
             // resolving here is what stops the pay button spinning forever.
