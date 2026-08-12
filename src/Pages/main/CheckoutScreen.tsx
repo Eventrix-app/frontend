@@ -18,6 +18,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
+  eventsApi,
   useGetEventByIdQuery,
   useGetTicketTypesQuery,
   useEnrollEventMutation,
@@ -26,11 +27,11 @@ import {
 } from '../../store/services/eventsApi';
 import {
   useGetCheckoutEstimateQuery,
-  useInitiatePayUNativeOrderMutation,
-  useVerifyPayUNativeMutation,
+  useInitiatePayUOrderMutation,
+  type PayUOrderResult,
 } from '../../store/services/paymentsApi';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
-import { openPayUCheckout } from '../../services/payuNativeService';
+import PayUCheckoutModal from '../../components/payments/PayUCheckoutModal';
 import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { useGetMeQuery } from '../../store/services/userApi';
@@ -68,8 +69,11 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
   const dispatch = useDispatch<AppDispatch>();
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
-  const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
-  const [verifyPayUNative] = useVerifyPayUNativeMutation();
+  const [initiatePayUOrder, { isLoading: isCreatingOrder }] = useInitiatePayUOrderMutation();
+
+  // PayU's hosted page, not the native SDK. The SDK's generateHash protocol stalls before it
+  // ever presents a payment method; this flow needs one pre-computed hash and no callbacks.
+  const [payuOrder, setPayuOrder] = useState<PayUOrderResult | null>(null);
 
   const { data: me, refetch: refetchMe } = useGetMeQuery();
   const hasPayablePhone = useMemo(() => hasTenDigitPhone(me?.phoneNumber), [me?.phoneNumber]);
@@ -93,10 +97,6 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   // Overflow (⋮) menu state
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
-
-  // True from the moment the native PayU checkout sheet is asked to open until a terminal
-  // event (success/failure/cancelled/error) resolves.
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const isResuming = !!activeEnrollment;
   const effectiveTierId = activeEnrollment?.ticketType?.id ?? selectedTierId;
@@ -142,7 +142,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const isEstimatePending = !isResuming && !estimate;
   const isFreeEvent = estimate?.isFreeEvent ?? subtotal <= 0;
 
-  const isPaying = isEnrolling || isCreatingOrder || isProcessingPayment || isLoadingEstimate;
+  const isPaying = isEnrolling || isCreatingOrder || !!payuOrder || isLoadingEstimate;
 
   const handlePay = async () => {
     if (!event) return;
@@ -199,47 +199,29 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
 
-      const order = await initiatePayUNativeOrder({ enrollmentId: enrollment.id }).unwrap();
-
-      setIsProcessingPayment(true);
-      const result = await openPayUCheckout(dispatch, order);
-
-      if (result.status === 'success') {
-        try {
-          const parsed = result.payuResponse ? JSON.parse(result.payuResponse) : {};
-          await verifyPayUNative({
-            txnid: parsed.txnid ?? order.transactionId,
-            mihpayid: parsed.mihpayid,
-            status: parsed.status === 'success' ? 'success' : 'failure',
-            amount: String(parsed.amount ?? (typeof order.amount === 'number' ? order.amount.toFixed(2) : order.amount)),
-            productinfo: parsed.productinfo ?? order.productInfo,
-            firstname: parsed.firstname ?? order.firstName,
-            email: parsed.email ?? order.email,
-            hash: parsed.hash,
-          }).unwrap();
-          showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
-            navigation.navigate('Bookings' as any),
-          );
-        } catch {
-          showAlert(
-            'Payment received',
-            "We received your payment but couldn't confirm it immediately — check My Bookings shortly.",
-            () => navigation.navigate('Bookings' as any),
-          );
-        }
-      } else if (result.status === 'cancelled') {
-        showAlert('Payment not completed', 'You can try again anytime from My Bookings.');
-      } else {
-        showAlert(
-          "Couldn't complete payment",
-          ('errorMsg' in result && result.errorMsg) || 'Something went wrong. Please try again.',
-        );
-      }
+      // Opening the modal is the last step: it POSTs the form itself, and the outcome arrives
+      // through onSuccess/onDismiss rather than by awaiting anything here.
+      setPayuOrder(await initiatePayUOrder({ enrollmentId: enrollment.id }).unwrap());
     } catch (e: any) {
       showAlert("Couldn't complete payment", extractErrorMessage(e, 'Something went wrong. Please try again.'));
-    } finally {
-      setIsProcessingPayment(false);
     }
+  };
+
+  // The backend already verified PayU's reverse hash before the page that reports this, so
+  // there is nothing left to confirm client-side — only the stale enrollment list to drop.
+  const handlePayUSuccess = () => {
+    setPayuOrder(null);
+    dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
+    showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
+      navigation.navigate('Bookings' as any),
+    );
+  };
+
+  // Covers both a failed payment and the user closing the sheet — the enrollment stays
+  // pending either way, so this screen can resume it.
+  const handlePayUDismiss = () => {
+    setPayuOrder(null);
+    showAlert('Payment not completed', 'You can try again anytime from My Bookings.');
   };
 
   const handleCall = async () => {
@@ -491,6 +473,13 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      <PayUCheckoutModal
+        visible={!!payuOrder}
+        order={payuOrder}
+        onSuccess={handlePayUSuccess}
+        onDismiss={handlePayUDismiss}
+      />
 
       {/* Overflow (⋮) menu */}
       <HalfScreenModal visible={showMoreMenu} onClose={() => setShowMoreMenu(false)} heightPercent={0.35}>
