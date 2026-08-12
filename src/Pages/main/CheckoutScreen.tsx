@@ -51,6 +51,13 @@ interface Props {
   route: { params: CheckoutRouteParams };
 }
 
+// Mirrors PaymentsService.toPayuPhone; permissive because it only decides whether to
+// interrupt before enrolling, not what PayU receives.
+function hasTenDigitPhone(raw: string | null | undefined): boolean {
+  const digits = (raw ?? '').replace(/\D/g, '');
+  return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
+}
+
 const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -64,13 +71,8 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const [initiatePayUNativeOrder, { isLoading: isCreatingOrder }] = useInitiatePayUNativeOrderMutation();
   const [verifyPayUNative] = useVerifyPayUNativeMutation();
 
-  // Mirrors PaymentsService.toPayuPhone; permissive because it only decides whether to
-  // interrupt before enrolling, not what PayU receives.
-  const { data: me } = useGetMeQuery();
-  const hasPayablePhone = useMemo(() => {
-    const digits = (me?.phoneNumber ?? '').replace(/\D/g, '');
-    return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
-  }, [me?.phoneNumber]);
+  const { data: me, refetch: refetchMe } = useGetMeQuery();
+  const hasPayablePhone = useMemo(() => hasTenDigitPhone(me?.phoneNumber), [me?.phoneNumber]);
 
   // If a non-cancelled enrollment for this event already exists (a fresh booking just made,
   // or one left over from a previous abandoned/failed payment attempt), this screen switches
@@ -148,13 +150,21 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
     // Before enrollEvent: PayU rejects a bad phone at the end of the flow, leaving an
     // unpayable enrollment behind. Server stays the authority; this just routes to the fix.
     if (totalPayable > 0 && !hasPayablePhone) {
-      showConfirm(
-        'Add a mobile number',
-        'Our payment provider needs a 10-digit mobile number before it can take a payment. Add one to your profile and come back — your selection is kept.',
-        () => navigation.navigate('EditProfile' as never),
-        'Add number',
-      );
-      return;
+      // The cached profile still holds the old number while its refetch is in flight, which
+      // re-prompted users who had just saved one. Confirm with the server before asking again.
+      const fresh = await refetchMe()
+        .unwrap()
+        .catch(() => null);
+
+      if (!hasTenDigitPhone(fresh?.phoneNumber)) {
+        showConfirm(
+          'Add a mobile number',
+          'Our payment provider needs a 10-digit mobile number before it can take a payment. Add one to your profile and come back — your selection is kept.',
+          () => navigation.navigate('EditProfile' as never),
+          'Add number',
+        );
+        return;
+      }
     }
 
     try {

@@ -48,17 +48,22 @@ export function openPayUCheckout(dispatch: AppDispatch, params: PayUNativeOrderP
 
     subscriptions.push(
       DeviceEventEmitter.addListener('generateHash', (data: { hashName: string; hashString: string }) => {
+        // Name of every request, not just the first: the SDK asks for several, so logging
+        // only one leaves a rejection unattributable to the command that caused it.
+        if (__DEV__) console.log('[PayU generateHash]', data.hashName);
         if (!hasLoggedGenerateHash) {
           hasLoggedGenerateHash = true;
-          if (__DEV__) console.log('[PayU generateHash]', JSON.stringify(data));
+          if (__DEV__) console.log('[PayU generateHash] first payload', JSON.stringify(data));
         }
         dispatch(paymentsApi.endpoints.signPayUHash.initiate({ hashString: data.hashString }))
           .unwrap()
           .then(({ hash }) => PayUBizSdk.hashGenerated({ [data.hashName]: hash }))
           .catch((err) => {
-            // Nothing sensible to reply with — the SDK's own request just times out rather
-            // than proceeding with a bogus hash that would fail on PayU's end anyway.
-            if (__DEV__) console.warn('[PayU generateHash] Failed to sign hash', err);
+            // The SDK can't proceed without a hash and never fires a terminal event, so
+            // resolving here is what stops the pay button spinning forever.
+            if (__DEV__) console.warn(`[PayU generateHash] Failed to sign "${data.hashName}"`, err);
+            cleanup();
+            resolve({ status: 'error', errorMsg: 'Could not start the payment. Please try again.' });
           });
       }),
     );
