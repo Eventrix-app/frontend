@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   InteractionManager,
+  Linking,
   Modal,
   StyleSheet,
   TouchableOpacity,
@@ -14,6 +15,7 @@ import { CloseIcon } from '../common/Icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { API_URL } from '../../store/services/baseQuery';
+import { showAlert } from '../../utils/crossPlatformAlert';
 import type { PayUOrderResult } from '../../store/services/paymentsApi';
 
 interface Props {
@@ -93,6 +95,21 @@ const PayUCheckoutModal: React.FC<Props> = ({ visible, order, onSuccess, onDismi
   </body>
 </html>`;
 
+  // Choosing a UPI app makes PayU navigate to `upi://pay?...`, a scheme no WebView can load —
+  // it fails with ERR_UNKNOWN_URL_SCHEME and the page dead-ends. Handing the intent to Android
+  // is what actually opens the UPI app; the WebView stays put and PayU polls for the result.
+  const handleShouldStartLoad = (request: { url: string }): boolean => {
+    if (/^https?:/i.test(request.url) || request.url === 'about:blank') return true;
+
+    Linking.openURL(request.url).catch(() => {
+      showAlert(
+        'No app available',
+        'Nothing on this device can open that payment app. Pick another method, or enter a UPI ID instead.',
+      );
+    });
+    return false;
+  };
+
   // Our own /payments/payu/return page always postMessages {type:'success'|'failure'} once
   // PayU redirects there — the backend has already verified the reverse hash by then.
   const handleMessage = (event: WebViewMessageEvent) => {
@@ -129,6 +146,7 @@ const PayUCheckoutModal: React.FC<Props> = ({ visible, order, onSuccess, onDismi
         <WebView
           source={{ html }}
           onMessage={handleMessage}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
           style={styles.webview}
           originWhitelist={['*']}
           javaScriptEnabled
