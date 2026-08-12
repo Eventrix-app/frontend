@@ -21,16 +21,13 @@ export interface BackendEvent {
   endTime?: string;
   pricePerTicket?: number;
   currency?: string;
-  // Organizer-entered event-wide cap (Event.capacity) — set once at creation/edit and
-  // distinct from totalCapacity/availableTickets below, which are the *computed* numbers
-  // the backend derives from it (falling back to summing ticket-tier quantities when this
-  // is unset). Only meaningful to read back for pre-filling the edit form.
+  // The organizer-entered cap, distinct from the computed totalCapacity/availableTickets
+  // below. Only worth reading back to pre-fill the edit form.
   capacity?: number;
   totalCapacity?: number;
   availableTickets?: number;
-  // Computed at read time (withComputedFields on events.service.ts), never persisted —
-  // Event.status only ever advances to 'cancelled', so this is the only reliable signal
-  // that an event's end time has already passed.
+  // Computed at read time, never persisted — status only ever advances to 'cancelled', so
+  // this is the only reliable signal that an event has ended.
   isCompleted?: boolean;
   featured: boolean;
   isOnline: boolean;
@@ -43,10 +40,8 @@ export interface BackendEvent {
   rejectionReason?: string;
   refundPolicyType?: string;
   refundPolicyText?: string;
-  // Already returned by the backend (Event.feePayer, default 'organizer') — determines
-  // whether checkout needs to show a Service Fee line on top of the raw ticket price. No
-  // create/edit-event UI sets this today, so 'organizer' (no buyer-side markup) is the only
-  // value reachable in practice, but CheckoutScreen still reads it rather than assuming.
+  // Decides whether checkout shows a Service Fee line. No UI sets it today, so 'organizer'
+  // is the only reachable value, but CheckoutScreen reads it rather than assuming.
   feePayer?: 'organizer' | 'participant';
   status: string;
   createdAt: string;
@@ -54,10 +49,8 @@ export interface BackendEvent {
   // Eager-loaded by the backend on both GET /events and GET /events/:id
   // (events.service.ts findAllFiltered/findOne relations: ['organizer', 'organizer.user', 'category']).
   category?: { id: string; name: string };
-  // verified/verificationLevel are already returned by the backend (SAFE_ORGANIZER_SELECT on
-  // events.service.ts) — this type just hadn't caught up. verified is true exactly when
-  // verificationLevel is 'document_verified' (kept in sync in organizer.service.ts), so
-  // either can be used to gate a "verified" badge.
+  // verified is true exactly when verificationLevel is 'document_verified' (kept in sync
+  // server-side), so either can gate a verified badge.
   organizer?: {
     id: string;
     userId: string;
@@ -70,9 +63,8 @@ export interface BackendEvent {
 }
 
 export interface CreateTicketTypePayload {
-  // No `name` — the backend derives and stores the display name from `category` (see
-  // TICKET_CATEGORY_LABELS on TicketType) so every ticket type on the platform draws from
-  // the same small vocabulary instead of organizer-typed free text.
+  // No `name`: the backend derives it from `category` so every ticket type draws from the
+  // same vocabulary instead of organizer-typed free text.
   category: TicketCategory;
   price: number;
   currency?: string;
@@ -92,10 +84,8 @@ export interface TicketTypeRecord extends CreateTicketTypePayload {
   id: string;
   eventId: string;
   quantitySold: number;
-  // Server-derived from `category` at write time (create or edit) — always
-  // TICKET_CATEGORY_LABELS[category]. Present because BookingsScreen and other existing
-  // consumers already read `.name` for display and there is no reason to make them all
-  // re-derive it from `category` themselves.
+  // Server-derived from `category` at write time. Present because existing consumers already
+  // read `.name` and needn't re-derive it.
   name: string;
 }
 
@@ -112,15 +102,13 @@ export interface CreateEventPayload {
   eventDate: string;
   startTime: string;
   endTime?: string;
-  // Only set when the event's end time crosses midnight relative to eventDate (e.g. a
-  // 10 PM start with a 2 AM end) — see getEventEndDateTime on the backend, which defaults
-  // this to eventDate itself (a same-day event) whenever it's omitted.
+  // Only set when the end time crosses midnight relative to eventDate; the backend defaults
+  // it to eventDate for a same-day event.
   eventEndDate?: string;
   pricePerTicket?: number;
   totalCapacity?: number;
-  // Event-wide seat cap the organizer sets directly; when omitted, the backend derives it
-  // from the sum of ticket-tier quantities instead (see events.service.ts withComputedSeats).
-  // Accepted on both create and edit (PATCH keeps it — only ticketTypes is create-only).
+  // Event-wide cap; when omitted the backend derives it from the ticket-tier sum. Accepted on
+  // both create and edit — only ticketTypes is create-only.
   capacity?: number;
   isOnline?: boolean;
   meetingLink?: string;
@@ -171,9 +159,8 @@ export interface WaitlistEntryRecord {
   ticketType?: { id: string; name: string; price: number };
 }
 
-// EventsService.enroll() returns a confirmed Enrollment when a tier has room, or a
-// WaitlistEntryRecord when it's sold out — `position` only ever appears on the latter,
-// so its presence is what the UI branches on (see EventDetailsScreen's handleEnroll).
+// enroll() returns an Enrollment when a tier has room and a WaitlistEntryRecord when sold
+// out — `position` only appears on the latter, so its presence is what the UI branches on.
 export type EnrollResult = EnrollmentRecord | WaitlistEntryRecord;
 
 export function isWaitlistResult(result: EnrollResult): result is WaitlistEntryRecord {
@@ -195,10 +182,8 @@ export type UploadPurpose =
   | 'identity-proof'
   | 'address-proof'
   | 'pan-or-aadhaar'
-  // Reel/short media. Unlike every purpose above, any authenticated user may request this
-  // one (UploadsService.PURPOSE_CONFIG gives it allowedRoles: null) rather than just
-  // organizers/admins, because reel uploaders are attendees. Mirrors UploadPurpose.REEL_VIDEO
-  // in Backend/src/uploads/dto/create-signed-url.dto.ts.
+  // Any authenticated user may request this one, unlike the purposes above, because reel
+  // uploaders are attendees rather than organizers.
   | 'reel-video';
 export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
 export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
@@ -271,13 +256,8 @@ export const eventsApi = createApi({
   reducerPath: 'eventsApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Event', 'MyEvents', 'MyEnrollments', 'MyWaitlist', 'TicketType', 'Favorite', 'EventMedia', 'Enrollment', 'Schedule', 'Announcements', 'Reviews'],
-  // A query that fails once (e.g. hitting a backend mid-deploy/restart) otherwise stays
-  // cached as an error indefinitely. Bottom-tab screens (Home/Explore/Bookings/etc.) stay
-  // mounted when switching tabs, so a plain remount won't retry it — refetchOnFocus
-  // (window/tab regains focus, via the setupListeners() call in store/index.ts) is the
-  // one that actually fires when just switching back to a tab in a browser session.
-  // refetchOnMountOrArgChange covers the case where the screen genuinely does remount
-  // (e.g. after an app reload) with cached data older than 10s.
+  // A query that fails once would stay cached as an error: tab screens stay mounted, so a
+  // remount won't retry. refetchOnFocus is what actually fires on tab switch.
   refetchOnMountOrArgChange: 10,
   refetchOnFocus: true,
   endpoints: (builder) => ({
@@ -336,11 +316,8 @@ export const eventsApi = createApi({
         method: 'PATCH',
         body,
       }),
-      // Also invalidates the plain 'Event' tag (not just the specific id) — without it,
-      // getEvents' list query (providesTags: ['Event'], used by Home/Explore/Search) kept
-      // serving cached pre-edit data until its own TTL/focus-refetch happened to fire,
-      // making an edit look like it silently didn't save. Matches createEvent/deleteEvent/
-      // cancelEvent below, which already invalidate the broad tag.
+      // Also invalidates the broad 'Event' tag — without it the list query kept serving
+      // pre-edit data, making an edit look like it silently didn't save.
       invalidatesTags: (result, error, { id }) => [{ type: 'Event', id }, 'Event', 'MyEvents'],
     }),
     deleteEvent: builder.mutation<void, string>({
@@ -403,10 +380,8 @@ export const eventsApi = createApi({
       query: (eventId) => ({ url: `events/${eventId}/favorite`, method: 'DELETE' }),
       invalidatesTags: ['Favorite'],
     }),
-    // idempotencyKey identifies the *scan*, not the request: generated once when the QR is
-    // read and reused for every retry of that scan. It is what lets the backend answer 200
-    // for "this same scan, arriving again" and 409 only for "a different scan of an
-    // already-used ticket" — see events.service.ts checkIn().
+    // idempotencyKey identifies the SCAN, not the request, so retries of one scan return 200
+    // while a different scan of a used ticket returns 409.
     checkIn: builder.mutation<EnrollmentRecord, { ticketCode: string; idempotencyKey?: string }>({
       query: (body) => ({
         url: 'events/check-in',
@@ -420,10 +395,8 @@ export const eventsApi = createApi({
     }),
     cancelEnrollment: builder.mutation<EnrollmentRecord, string>({
       query: (enrollmentId) => ({ url: `events/enrollments/${enrollmentId}/cancel`, method: 'PATCH' }),
-      // Cancelling frees a seat exactly like enrollEvent claims one (and can trigger a
-      // waitlist promotion server-side, per EventsService.cancelEnrollment) — mirrors
-      // enrollEvent's invalidatesTags so ticket-tier availability and any promoted
-      // waitlist entry refresh without a manual pull-to-refresh.
+      // Cancelling frees a seat exactly as enrolling claims one and can promote the waitlist,
+      // so it mirrors enrollEvent's invalidation.
       invalidatesTags: (result, error, enrollmentId) => [
         'MyEnrollments',
         'MyWaitlist',

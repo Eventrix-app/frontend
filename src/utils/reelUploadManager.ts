@@ -27,25 +27,16 @@ export interface StartReelUploadInput {
   longitude?: number;
 }
 
-// Low-importance, silent channel: a progress notification updates dozens of times per
-// upload, and on the default channel each update would buzz and pop a heads-up banner.
-// Android ignores importance changes to an existing channel, so this ID is versioned —
-// bumping the suffix is the only way to change those settings after first install.
+// Silent low-importance channel: progress updates dozens of times per upload. Android
+// ignores importance changes to an existing channel, so the ID is versioned.
 export const REEL_UPLOAD_CHANNEL_ID = 'reel-upload-progress-v1';
 
-// Marks our own notifications so App.tsx's global handler can present them silently, and
-// so RootNavigator's tap handler can ignore them (they aren't server notifications and
-// have no Notifications-screen entry to open).
+// Marks our own notifications so the global handler presents them silently and the tap
+// handler ignores them — they have no Notifications-screen entry to open.
 export const REEL_UPLOAD_NOTIFICATION_TYPE = 'reel-upload';
 
-/**
- * The largest reel the storage bucket will accept.
- *
- * Must match MAX_VIDEO_BYTES in Backend/src/uploads/uploads.service.ts, which is itself
- * pinned to the Supabase project's global file size limit — a bucket cannot exceed it.
- * Checked here so an oversized file fails instantly with a clear message instead of after
- * uploading tens of megabytes on someone's mobile data only to be rejected at the end.
- */
+// Must match MAX_VIDEO_BYTES in Backend uploads.service.ts, itself pinned to the Supabase
+// project limit. Checked here so an oversized file fails before spending mobile data.
 export const MAX_REEL_BYTES = 50 * 1024 * 1024;
 
 const formatMb = (bytes: number) => `${Math.round(bytes / (1024 * 1024))}MB`;
@@ -54,10 +45,8 @@ const formatMb = (bytes: number) => `${Math.round(bytes / (1024 * 1024))}MB`;
 // outlive the screen that started it, which is the entire point of this module.
 const inFlight = new Map<string, XMLHttpRequest>();
 
-// Jobs cancelled after the bytes finished transferring but before (or during) the POST that
-// turns them into a reel. There is no XHR left to abort in that window, so cancellation is
-// recorded here and honoured by runUpload instead — otherwise the X would clear the row
-// while the reel quietly got created anyway, which is the opposite of what it promises.
+// Cancelled after the bytes landed but before the reel is created: no XHR left to abort, so
+// runUpload honours this instead. Otherwise the X clears the row and the reel still appears.
 const cancelRequested = new Set<string>();
 
 // Terminal notifications survive as history; progress ones are replaced in place by
@@ -114,26 +103,11 @@ async function dismissNotification(jobId: string): Promise<void> {
   }
 }
 
-/**
- * PUTs the file to the signed storage URL, reporting progress.
- *
- * XMLHttpRequest rather than fetch because fetch exposes no upload progress at all — there
- * is no way to drive a percentage from it. XHR also gives a real cancel via abort(), which
- * fetch would need an AbortController for and which would still not report progress.
- *
- * The body is a Blob resolved from the local file:// URI. React Native backs that Blob with
- * a native file handle rather than a JS-side byte array, so a 60-second video does not get
- * copied into the JS heap.
- */
-/**
- * Turns a failed storage PUT into something that names the actual cause.
- *
- * Supabase Storage answers with JSON like
- *   {"statusCode":"400","error":"InvalidMimeType","message":"mime type video/mp4 is not supported"}
- * and that message is the whole diagnosis — bucket MIME allow-list, size limit, an already
- * consumed one-shot upload token, a duplicate object. Without it every one of those reads
- * identically as "HTTP 400".
- */
+// XHR, not fetch: fetch exposes no upload progress and no real abort. The body is a Blob
+// backed by a native file handle, so a long video never enters the JS heap.
+
+// Supabase Storage puts the actual cause in the response body (MIME rejected, token already
+// consumed, duplicate object) — without it every one of those reads as "HTTP 400".
 function describeStorageFailure(xhr: XMLHttpRequest): string {
   const status = xhr.status;
   const raw = typeof xhr.responseText === 'string' ? xhr.responseText.trim() : '';
@@ -171,10 +145,8 @@ function putWithProgress(
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total === 0) return;
-      // Clamped because the reported bytes can exceed the declared total — observed running
-      // to 200%, i.e. the body being transmitted twice (a redirect on the signed URL that
-      // OkHttp follows by re-sending, being the likely cause). Whatever the cause, progress
-      // is a fraction of one file by definition and must never be shown above 100%.
+      // Clamped because reported bytes can exceed the declared total (observed at 200%, likely
+      // a redirect re-sending the body). Progress is a fraction and must never exceed 100%.
       onProgress(Math.min(1, Math.max(0, event.loaded / event.total)));
     };
 
@@ -184,10 +156,8 @@ function putWithProgress(
         resolve();
         return;
       }
-      // Supabase Storage explains every rejection in the response body — which MIME type was
-      // refused, that the object already exists, that the token was consumed. Reporting only
-      // the status code threw that away and left "HTTP 400" meaning any of a dozen things,
-      // so the body is parsed out and shown instead.
+      // Storage explains every rejection in the body; reporting only the status code left
+      // "HTTP 400" meaning any of a dozen different things.
       reject(new Error(`Storage rejected the upload: ${describeStorageFailure(xhr)}`));
     };
     xhr.onerror = () => {
@@ -212,11 +182,8 @@ class UploadCancelledError extends Error {
 
 const isCancellation = (err: unknown): boolean => err instanceof UploadCancelledError;
 
-// extractErrorMessage only reads an RTK Query error's `data.message`, so the plain Errors
-// thrown by putWithProgress (HTTP status, network failure, unreadable file) would all
-// collapse to the same generic fallback — which is precisely the detail worth showing here,
-// since it distinguishes "too large" from "no signal". Server errors still go through
-// extractErrorMessage so a NestJS validation message reaches the user unchanged.
+// extractErrorMessage only reads RTK Query's data.message, so plain Errors thrown here would
+// collapse to a generic fallback — losing exactly what distinguishes "too large" from "no signal".
 function describeUploadError(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   return extractErrorMessage(err, 'Please try again.');
@@ -225,18 +192,8 @@ function describeUploadError(err: unknown): string {
 // How long a finished job lingers in the store before clearing itself.
 const TERMINAL_LINGER_MS = 4000;
 
-/**
- * Clears a finished job from the store.
- *
- * This used to be a timer inside ReelUploadProgressBar's row. That component is no longer
- * mounted anywhere, so nothing was left to run it and every completed or failed upload
- * stayed in `state.reelUpload.jobs` for the lifetime of the process — an unbounded list
- * holding a media URI per entry. Clearing belongs to whatever owns the job's lifecycle,
- * which is this module, not a view that may or may not exist.
- *
- * The linger is kept rather than dismissing instantly so that if a progress UI is mounted
- * again later, a finished row is still visible long enough to read.
- */
+// Clearing belongs to whatever owns the job lifecycle, not a view that may not be mounted:
+// the old timer lived in a component that no longer exists, so finished jobs leaked forever.
 function scheduleCleanup(dispatch: AppDispatch, jobId: string): void {
   setTimeout(() => {
     dispatch(reelUploadDismissed({ id: jobId }));
