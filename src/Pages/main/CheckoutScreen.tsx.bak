@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   KeyboardAvoidingView,
-  Image,
   Linking,
   Platform,
   ScrollView,
@@ -13,7 +12,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../navigation/types';
 import type { AppDispatch } from '../../store';
 import { useTheme } from '../../theme/ThemeContext';
@@ -273,27 +271,22 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Pink gradient header with event title context */}
-      <LinearGradient
-        colors={[colors.brandPink, '#FF6B8A']}
-        style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
-      >
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-            <LeftArrow color="#FFFFFF" size={20} />
+            <LeftArrow color={colors.text} size={20} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Checkout</Text>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setShowMoreMenu(true)}>
             <Text style={styles.headerMenuDots}>⋮</Text>
           </TouchableOpacity>
         </View>
-        {/* No event title shown here — header stays clean */}
         <Text style={styles.headerSubtitle}>
           {isResuming
             ? 'Complete your payment to confirm this booking.'
-            : 'Review your tickets and confirm before payment.'}
+            : 'Please review your tickets and confirm your details before payment.'}
         </Text>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scroll}
@@ -302,33 +295,26 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Event Summary */}
-        <View style={styles.sectionLabelRow}>
-          <View style={styles.sectionAccentBar} />
-          <Text style={styles.sectionLabel}>Event Summary</Text>
-        </View>
+        <Text style={styles.sectionLabel}>Event Summary</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Title</Text>
             <Text style={styles.summaryValue} numberOfLines={1}>{event.title}</Text>
           </View>
-          <View style={styles.rowDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Date</Text>
             <Text style={styles.summaryValue}>{formatEventDate(event.eventDate)}</Text>
           </View>
-          <View style={styles.rowDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Time</Text>
             <Text style={styles.summaryValue}>{formatEventTime(event.startTime)}</Text>
           </View>
-          <View style={styles.rowDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Organizer</Text>
             <Text style={styles.summaryValue} numberOfLines={1}>
               {event.organizer?.companyName ?? event.organizer?.user?.fullName ?? 'Organizer'}
             </Text>
           </View>
-          <View style={styles.rowDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Location</Text>
             <Text style={styles.summaryValue} numberOfLines={1}>{event.venueName}</Text>
@@ -336,10 +322,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {/* Ticket Selection */}
-        <View style={styles.sectionLabelRow}>
-          <View style={styles.sectionAccentBar} />
-          <Text style={styles.sectionLabel}>Ticket Selection</Text>
-        </View>
+        <Text style={styles.sectionLabel}>Ticket Selection</Text>
         <View style={styles.card}>
           <View style={styles.tierPickerRow}>
             <View style={styles.tierPickerCol}>
@@ -383,15 +366,15 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.fieldLabel}>Quantity</Text>
               <View style={styles.stepper}>
                 <TouchableOpacity
-                  style={[styles.stepperBtn, (isResuming || effectiveQuantity <= min) && styles.stepperBtnDisabled]}
+                  style={styles.stepperBtn}
                   onPress={() => adjustQuantity(-1)}
                   disabled={isResuming || effectiveQuantity <= min}
                 >
-                  <Text style={styles.stepperBtnText}>{'−'}</Text>
+                  <Text style={styles.stepperBtnText}>{'\u2212'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{String(effectiveQuantity).padStart(2, '0')}</Text>
                 <TouchableOpacity
-                  style={[styles.stepperBtn, (isResuming || effectiveQuantity >= max) && styles.stepperBtnDisabled]}
+                  style={styles.stepperBtn}
                   onPress={() => adjustQuantity(1)}
                   disabled={isResuming || effectiveQuantity >= max}
                 >
@@ -405,17 +388,14 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <>
               <View style={styles.tierInfoRow}>
                 <Text style={styles.tierInfoLabel}>{selectedTier?.name ?? 'Ticket'} Availability</Text>
-                <View style={styles.availabilityRow}>
-                  {remaining !== null && remaining > 0 && <View style={styles.availabilityDot} />}
-                  <Text style={styles.tierInfoValue}>
-                    {remaining !== null ? `${remaining} tickets left` : 'Available'}
-                  </Text>
-                </View>
+                <Text style={styles.tierInfoValue}>
+                  {remaining !== null ? `${remaining} tickets left` : 'Available'}
+                </Text>
               </View>
               <View style={styles.tierInfoRow}>
                 <Text style={styles.tierInfoLabel}>Price</Text>
                 <Text style={styles.tierInfoValue}>
-                  {selectedTier && selectedTier.price > 0 ? `₹${selectedTier.price} per ticket` : 'Free'}
+                  {selectedTier && selectedTier.price > 0 ? `\u20b9${selectedTier.price} per ticket` : 'Free'}
                 </Text>
               </View>
             </>
@@ -435,42 +415,31 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {/* Order Summary */}
-        <View style={styles.sectionLabelRow}>
-          <View style={styles.sectionAccentBar} />
-          <Text style={styles.sectionLabel}>Order Summary</Text>
-        </View>
+        <Text style={styles.sectionLabel}>Order Summary</Text>
         <View style={styles.card}>
-          {/* Full-bleed pink gradient To Pay strip — the most important number on screen */}
-          <LinearGradient
-            colors={[colors.brandPink, '#FF6B8A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.toPayStrip}
-          >
-            <Text style={styles.toPayLabel}>Amount to Pay</Text>
-            <Text style={styles.toPayFinal}>{'₹'}{totalPayable}</Text>
-          </LinearGradient>
+          <View style={styles.toPayRow}>
+            <Text style={styles.toPayLabel}>To Pay</Text>
+            <Text style={styles.toPayFinal}>{'\u20b9'}{totalPayable}</Text>
+          </View>
 
-          <View style={styles.orderBreakdown}>
-            <View style={styles.orderRow}>
-              <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x {'₹'}{tierPrice})</Text>
-              <Text style={styles.orderValue}>{'₹'}{subtotal}</Text>
+          <View style={styles.orderRow}>
+            <Text style={styles.orderLabel}>Tickets ({effectiveQuantity} x {'\u20b9'}{tierPrice})</Text>
+            <Text style={styles.orderValue}>{'\u20b9'}{subtotal}</Text>
+          </View>
+          {/* Server-supplied. No fee rows at all when the organizer absorbs them \u2014 showing a
+              "Platform Fee" the buyer isn't paying would misstate what they're being charged. */}
+          {feeLines.map((line) => (
+            <View key={line.label} style={styles.orderRow}>
+              <Text style={styles.orderLabel}>{line.label}</Text>
+              <Text style={styles.orderValue}>{'\u20b9'}{line.amount.toFixed(2)}</Text>
             </View>
-            {/* Server-supplied. No fee rows at all when the organizer absorbs them — showing a
-                "Platform Fee" the buyer isn't paying would misstate what they're being charged. */}
-            {feeLines.map((line) => (
-              <View key={line.label} style={styles.orderRow}>
-                <Text style={styles.orderLabel}>{line.label}</Text>
-                <Text style={styles.orderValue}>{'₹'}{line.amount.toFixed(2)}</Text>
-              </View>
-            ))}
+          ))}
 
-            <View style={styles.divider} />
+          <View style={styles.divider} />
 
-            <View style={styles.orderRow}>
-              <Text style={styles.totalPayableLabel}>Total Payable</Text>
-              <Text style={styles.totalPayableValue}>{'₹'}{totalPayable}</Text>
-            </View>
+          <View style={styles.orderRow}>
+            <Text style={styles.totalPayableLabel}>Total Payable</Text>
+            <Text style={styles.totalPayableValue}>{'\u20b9'}{totalPayable}</Text>
           </View>
         </View>
 
@@ -483,41 +452,25 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.footerLinkDot}> {'\u2022'} </Text>
             <Text style={styles.footerLink}>Contact Us</Text>
           </View>
-          <Image
-            source={require('../../../assets/splash/watermark.png')}
-            style={styles.footerWatermark}
-            resizeMode="contain"
-          />
+          <Text style={styles.footerBrand}>Eventrix</Text>
+          <Text style={styles.footerTagline}>DISCOVER EVENTS THAT MATCH YOU</Text>
         </View>
       </ScrollView>
 
-      {/* Gradient fade pay bar — blends softly into scroll content above */}
-      <View style={[styles.payBarWrap, { paddingBottom: insets.bottom + spacing.md }]}>
-        <LinearGradient
-          colors={['rgba(250,250,252,0)', colors.neutralBg]}
-          style={styles.payBarFade}
-          pointerEvents="none"
-        />
+      <View style={[styles.payBar, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
-          style={[styles.payBtn, (isPaying || isEstimatePending || (!isResuming && !selectedTier)) && styles.payBtnDisabled]}
+          style={styles.payBtn}
           onPress={handlePay}
           // Blocked while the estimate is outstanding: totalPayable falls back to the bare
           // subtotal until it arrives, and the user must never tap "Pay ₹X" on a number that
           // isn't the one about to be charged.
           disabled={isPaying || isEstimatePending || (!isResuming && !selectedTier)}
         >
-          <LinearGradient
-            colors={['#FF3366', '#FF6B8A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.payBtnGradient}
-          >
-            {isPaying ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.payBtnText}>Pay {'₹'}{totalPayable}</Text>
-            )}
-          </LinearGradient>
+          {isPaying ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.payBtnText}>Pay {'\u20b9'}{totalPayable}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -594,11 +547,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.neutralBg },
     center: { justifyContent: 'center', alignItems: 'center' },
-
-    // ── Header (now a LinearGradient, no backgroundColor needed here) ─────────
     header: {
+      backgroundColor: colors.white,
       paddingHorizontal: spacing.md,
-      paddingBottom: spacing.md,
+      paddingBottom: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
     },
     headerTopRow: {
       flexDirection: 'row',
@@ -606,113 +560,58 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       justifyContent: 'space-between',
     },
     iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: {
-      fontSize: 18,
-      fontFamily: 'ZalandoSansExpanded_700Bold',
-      color: '#FFFFFF',
-    },
-    headerMenuDots: { fontSize: 22, color: '#FFFFFF' },
-    headerEventTitle: {
-      fontSize: 14,
-      fontFamily: 'Poppins_600SemiBold',
-      color: 'rgba(255,255,255,0.95)',
-      marginTop: spacing.xs,
-      marginBottom: 2,
-    },
-    headerSubtitle: {
-      fontSize: 12,
-      color: 'rgba(255,255,255,0.78)',
-      lineHeight: 16,
-    },
-
-    // ── Scroll ────────────────────────────────────────────────────────────────
+    headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+    headerMenuDots: { fontSize: 22, color: colors.text },
+    headerSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 16 },
     scroll: { flex: 1, paddingHorizontal: spacing.md },
-
-    // ── Section Labels with accent bar ────────────────────────────────────────
-    sectionLabelRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs + 2,
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
       marginTop: spacing.md,
       marginBottom: spacing.sm,
     },
-    sectionAccentBar: {
-      width: 3,
-      height: 14,
-      borderRadius: 2,
-      backgroundColor: colors.brandPink,
-    },
-    sectionLabel: {
-      fontSize: 12,
-      fontFamily: 'Poppins_600SemiBold',
-      color: colors.text,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-    },
-
-    // ── Cards ─────────────────────────────────────────────────────────────────
     card: {
       backgroundColor: colors.white,
-      borderRadius: 20,
-      overflow: 'hidden',
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
       ...Platform.select({
         android: { elevation: 2 },
         default: {
-          shadowColor: '#000',
+          shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.07,
-          shadowRadius: 10,
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
         },
       }),
     },
-
-    // ── Event Summary rows ────────────────────────────────────────────────────
     summaryRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 11,
-      paddingHorizontal: spacing.md,
-      gap: spacing.sm,
+      justifyContent: 'space-between',
+      paddingVertical: 6,
     },
-    summaryIcon: { fontSize: 15, width: 22, textAlign: 'center' },
-    summaryLabel: { fontSize: 13, color: colors.textSecondary, flex: 1 },
-    summaryValue: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.text,
-      flexShrink: 1,
-      textAlign: 'right',
-      maxWidth: '55%',
-    },
-    rowDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: colors.borderLight,
-      marginHorizontal: spacing.md,
-    },
+    summaryLabel: { fontSize: 13, color: colors.textSecondary },
+    summaryValue: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1, textAlign: 'right', marginLeft: spacing.md },
 
-    // ── Ticket Selection ──────────────────────────────────────────────────────
-    tierPickerRow: { flexDirection: 'row', gap: spacing.md, padding: spacing.md },
+    tierPickerRow: { flexDirection: 'row', gap: spacing.md },
     tierPickerCol: { flex: 1.4 },
     quantityCol: { flex: 1 },
-    fieldLabel: {
-      fontSize: 11,
-      fontFamily: 'Poppins_600SemiBold',
-      color: colors.brandPink,
-      marginBottom: 6,
-    },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.brandPink, marginBottom: 4 },
     tierPickerBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderWidth: 1.5,
-      borderColor: colors.brandPink,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
       borderRadius: borderRadius.md,
       paddingHorizontal: spacing.sm,
       paddingVertical: 10,
     },
     tierPickerBtnLocked: { opacity: 0.6 },
     tierPickerText: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
-    tierPickerChevron: { fontSize: 10, color: colors.brandPink, marginLeft: 4 },
+    tierPickerChevron: { fontSize: 10, color: colors.textSecondary, marginLeft: 4 },
     tierDropdown: {
       marginTop: 4,
       borderWidth: 1,
@@ -727,30 +626,25 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       borderBottomColor: colors.borderLight,
     },
     tierDropdownText: { fontSize: 13, color: colors.text },
-
-    // Stepper — pink filled circles
     stepper: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderWidth: 1.5,
-      borderColor: colors.brandPink,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
       borderRadius: borderRadius.md,
       paddingHorizontal: 6,
       paddingVertical: 6,
     },
     stepperBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: colors.brandPink,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: colors.muted,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    stepperBtnDisabled: {
-      backgroundColor: colors.muted,
-    },
-    stepperBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+    stepperBtnText: { fontSize: 16, fontWeight: '700', color: colors.text },
     stepperValue: { fontSize: 14, fontWeight: '700', color: colors.text },
 
     tierInfoRow: {
@@ -758,18 +652,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginTop: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.xs,
     },
     tierInfoLabel: { fontSize: 12, color: colors.textSecondary },
     tierInfoValue: { fontSize: 12, fontWeight: '600', color: colors.text },
-    availabilityRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    availabilityDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: '#10B981',
-    },
     tierTotalLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
     tierTotalSub: { fontSize: 11, color: colors.textSecondary },
     tierTotalValue: { fontSize: 16, fontWeight: '700', color: colors.brandPink },
@@ -780,26 +665,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       marginVertical: spacing.sm,
     },
 
-    // ── Order Summary ─────────────────────────────────────────────────────────
-    // Full-bleed pink gradient To Pay strip at the top of the order card
-    toPayStrip: {
+    toPayRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md + 2,
+      marginBottom: spacing.sm,
     },
-    toPayLabel: {
-      fontSize: 13,
-      fontFamily: 'Poppins_500Medium',
-      color: 'rgba(255,255,255,0.88)',
-    },
-    toPayFinal: {
-      fontSize: 17,
-      fontFamily: 'ZalandoSansExpanded_700Bold',
-      color: '#FFFFFF',
-    },
-    orderBreakdown: { padding: spacing.md, paddingTop: spacing.sm },
+    toPayLabel: { fontSize: 13, color: colors.textSecondary },
+    toPayFinal: { fontSize: 18, fontWeight: '700', color: colors.text },
+
     orderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -807,68 +681,56 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     orderLabel: { fontSize: 13, color: colors.textSecondary },
     orderValue: { fontSize: 13, fontWeight: '600', color: colors.text },
+    freeEventBanner: {
+      backgroundColor: colors.muted,
+      borderRadius: borderRadius.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    freeEventTitle: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 2 },
+    freeEventBody: { fontSize: 12, lineHeight: 17, color: colors.textSecondary },
     totalPayableLabel: { fontSize: 15, fontWeight: '700', color: colors.brandPink },
     totalPayableValue: { fontSize: 17, fontWeight: '700', color: colors.brandPink },
 
-    // ── Footer ────────────────────────────────────────────────────────────────
     footerLinksWrap: { alignItems: 'center', paddingVertical: spacing.xl, gap: 6 },
     footerCopyright: { fontSize: 11, color: colors.textSecondary },
     footerLinksRow: { flexDirection: 'row', alignItems: 'center' },
     footerLink: { fontSize: 11, color: colors.brandPink, textDecorationLine: 'underline' },
     footerLinkDot: { fontSize: 11, color: colors.textSecondary },
-    footerWatermark: {
-      width: 380,
-      height: 140,
-      opacity: 0.18,
-      marginTop: spacing.md,
-    },
+    footerBrand: { fontSize: 22, fontWeight: '800', color: colors.borderLight, marginTop: spacing.md },
+    footerTagline: { fontSize: 10, color: colors.borderLight, letterSpacing: 1 },
 
-    // ── Pay Bar ───────────────────────────────────────────────────────────────
-    payBarWrap: {
+    payBar: {
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
       paddingHorizontal: spacing.md,
-      paddingTop: spacing.lg,
-      backgroundColor: 'transparent',
-    },
-    // Soft upward fade from transparent → neutralBg so the bar blends into scroll content
-    payBarFade: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: spacing.lg,
-    },
-    payBtn: {
-      borderRadius: borderRadius.lg,
-      overflow: 'hidden',
+      paddingTop: spacing.sm,
+      backgroundColor: colors.white,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
       ...Platform.select({
-        android: { elevation: 6 },
+        android: { elevation: 8 },
         default: {
-          shadowColor: colors.brandPink,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.4,
-          shadowRadius: 12,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
         },
       }),
     },
-    payBtnDisabled: { opacity: 0.55 },
-    payBtnGradient: {
-      paddingVertical: 18,
+    payBtn: {
+      flex: 1,
+      backgroundColor: colors.brandPink,
+      borderRadius: borderRadius.lg,
+      paddingVertical: 16,
       paddingHorizontal: spacing.lg,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    payBtnText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontFamily: 'ZalandoSansExpanded_700Bold',
-      letterSpacing: 0.3,
-    },
+    payBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
-    // ── More Menu ─────────────────────────────────────────────────────────────
     moreMenu: { padding: spacing.md },
     moreMenuTitle: { marginBottom: spacing.sm },
     moreMenuItem: {
