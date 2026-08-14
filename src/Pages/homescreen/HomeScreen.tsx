@@ -240,16 +240,15 @@ const HomeScreen: React.FC = () => {
   const { stage: slowStage } = useSlowNetwork(isLoadingEvents);
 
   const openProfile = useCallback(() => navigation.navigate('Profile'), [navigation]);
-  const openSearch = useCallback(() => navigation.navigate('Search'), [navigation]);
+  // Dictation lands here and stays put rather than jumping straight to results — the point
+  // of showing it word by word is that the user gets to read it back before searching.
+  const [spokenQuery, setSpokenQuery] = useState('');
+  const voice = useVoiceSearch({ onResult: setSpokenQuery, onPartial: setSpokenQuery });
 
-  // Home's search bar is a button, not an input, so a spoken query has nowhere to run here —
-  // hand it to Search, which owns the query state and the results list.
-  const voice = useVoiceSearch({
-    onResult: useCallback(
-      (transcript: string) => navigation.navigate('Search', { initialQuery: transcript }),
-      [navigation],
-    ),
-  });
+  const openSearch = useCallback(
+    () => navigation.navigate('Search', spokenQuery.trim() ? { initialQuery: spokenQuery.trim() } : undefined),
+    [navigation, spokenQuery],
+  );
   const openNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
 
 
@@ -328,8 +327,9 @@ const HomeScreen: React.FC = () => {
               style={styles.searchInput}
               placeholder={voice.isListening ? 'Listening…' : "Search 'events'"}
               placeholderTextColor="#aaa"
-              // Shows what it is hearing; this bar is a button, so the text is never editable.
-              value={voice.partial}
+              // Fills word by word as the recogniser reports each one, then keeps the final
+              // wording. The bar is a button, so this is display-only.
+              value={spokenQuery}
               editable={false}
             />
             <View style={styles.divider} />
@@ -338,7 +338,14 @@ const HomeScreen: React.FC = () => {
               onPress={(e) => {
                 // The whole bar navigates to Search — without this the tap does both.
                 e.stopPropagation();
-                voice.isListening ? voice.stop() : voice.start();
+                if (voice.isListening) {
+                  voice.stop();
+                  return;
+                }
+                // Cleared up front so a new attempt does not sit under the previous phrase
+                // until the first word of this one lands.
+                setSpokenQuery('');
+                voice.start();
               }}
               accessibilityLabel={voice.isListening ? 'Stop listening' : 'Search by voice'}
             >

@@ -6,9 +6,11 @@ import {
 import { showAlert } from '../utils/crossPlatformAlert';
 
 interface Options {
-  // Called once the recogniser settles on a final transcript. Partial results drive the
-  // live preview instead, so a caller never searches on a half-heard phrase.
+  // Called once the recogniser settles on a final transcript.
   onResult: (transcript: string) => void;
+  // Called on every interim transcript, which the recogniser emits as each word lands. A
+  // caller writes these straight into its input so dictation appears word by word.
+  onPartial?: (transcript: string) => void;
 }
 
 interface VoiceSearch {
@@ -23,7 +25,7 @@ interface VoiceSearch {
 // proper nouns, which the India model transcribes far better.
 const LOCALE = 'en-IN';
 
-export function useVoiceSearch({ onResult }: Options): VoiceSearch {
+export function useVoiceSearch({ onResult, onPartial }: Options): VoiceSearch {
   const [isListening, setIsListening] = useState(false);
   const [partial, setPartial] = useState('');
 
@@ -40,6 +42,7 @@ export function useVoiceSearch({ onResult }: Options): VoiceSearch {
       onResult(transcript);
     } else {
       setPartial(transcript);
+      onPartial?.(transcript);
     }
   });
 

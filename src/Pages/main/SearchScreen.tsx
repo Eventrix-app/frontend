@@ -40,7 +40,9 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   // Seeded from voice search on Home, whose search bar is only a button.
   const [query, setQuery] = useState(route.params?.initialQuery ?? '');
-  const voice = useVoiceSearch({ onResult: setQuery });
+  // Both write into the box: interim results make dictation appear word by word, and the
+  // final one replaces them with the recogniser's settled wording.
+  const voice = useVoiceSearch({ onResult: setQuery, onPartial: setQuery });
   const { data: categories = [] } = useGetCategoriesQuery();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -51,11 +53,19 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
   // sent to the backend so search runs over the full catalog, not just already-loaded pages.
   const debouncedQuery = useDebouncedValue(query.trim(), 400);
+
+  // Held back while dictating so each interim word is shown but not searched on — otherwise
+  // "rock festival" fires a request for "rock" first and the list churns mid-sentence.
+  const [searchTerm, setSearchTerm] = useState(debouncedQuery);
+  useEffect(() => {
+    if (!voice.isListening) setSearchTerm(debouncedQuery);
+  }, [debouncedQuery, voice.isListening]);
+
   // Category now goes through the same server-side param as search (GET /events?categoryId=)
   // instead of filtering only the already-loaded page — previously "load more" while a
   // category was selected silently returned thin/incomplete results.
   const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents({
-    search: debouncedQuery || undefined,
+    search: searchTerm || undefined,
     categoryId: categoryId ?? undefined,
   });
   const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
