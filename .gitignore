@@ -53,5 +53,9 @@ GoogleService-Info.plist
 # generated/derived artifacts (regenerate via convert.js)
 offline-base64.txt
 
+# editor backups — git already holds every previous version
+*.bak
+*.orig
+
 # graphify skill output
 graphify-out/
