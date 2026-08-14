@@ -26,6 +26,7 @@ import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin, MicIcon } from '../../components/common/Icons';
 import { useVoiceSearch } from '../../hooks/useVoiceSearch';
+import VoiceListeningDialog from '../../components/common/VoiceListeningDialog';
 import Skeleton from '../../components/common/Skeleton';
 import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
@@ -338,18 +339,14 @@ const HomeScreen: React.FC = () => {
               onPress={(e) => {
                 // The whole bar navigates to Search — without this the tap does both.
                 e.stopPropagation();
-                if (voice.isListening) {
-                  voice.stop();
-                  return;
-                }
                 // Cleared up front so a new attempt does not sit under the previous phrase
                 // until the first word of this one lands.
                 setSpokenQuery('');
                 voice.start();
               }}
-              accessibilityLabel={voice.isListening ? 'Stop listening' : 'Search by voice'}
+              accessibilityLabel="Search by voice"
             >
-              <MicIcon color={voice.isListening ? '#B0173F' : '#F43362'} size={22} />
+              <MicIcon color="#F43362" size={22} />
             </TouchableOpacity>
           </TouchableOpacity>
 
@@ -441,6 +438,17 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
       </Animated.ScrollView>
+
+      <VoiceListeningDialog
+        visible={voice.isListening}
+        transcript={voice.partial}
+        isSpeaking={voice.isSpeaking}
+        onDone={voice.stop}
+        onCancel={() => {
+          voice.cancel();
+          setSpokenQuery('');
+        }}
+      />
     </View>
   );
 };

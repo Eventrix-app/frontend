@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -31,6 +31,7 @@ import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import { SearchIcon, WarningIcon, ClockIcon, MicIcon } from '../../components/common/Icons';
 import { useVoiceSearch } from '../../hooks/useVoiceSearch';
+import VoiceListeningDialog from '../../components/common/VoiceListeningDialog';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -43,6 +44,9 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   // Both write into the box: interim results make dictation appear word by word, and the
   // final one replaces them with the recogniser's settled wording.
   const voice = useVoiceSearch({ onResult: setQuery, onPartial: setQuery });
+  // Snapshot taken when dictation starts, so cancelling restores whatever was typed rather
+  // than leaving a half-heard phrase behind.
+  const queryBeforeVoice = useRef('');
   const { data: categories = [] } = useGetCategoriesQuery();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -112,11 +116,14 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
-            onPress={() => (voice.isListening ? voice.stop() : voice.start())}
+            onPress={() => {
+              queryBeforeVoice.current = query;
+              voice.start();
+            }}
             hitSlop={8}
-            accessibilityLabel={voice.isListening ? 'Stop listening' : 'Search by voice'}
+            accessibilityLabel="Search by voice"
           >
-            <MicIcon color={voice.isListening ? colors.brandPink : colors.textSecondary} size={18} />
+            <MicIcon color={colors.textSecondary} size={18} />
           </TouchableOpacity>
         </View>
       </View>
@@ -231,6 +238,18 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           }
         />
       )}
+
+      <VoiceListeningDialog
+        visible={voice.isListening}
+        transcript={voice.partial}
+        isSpeaking={voice.isSpeaking}
+        onDone={voice.stop}
+        onCancel={() => {
+          voice.cancel();
+          // The box was filling live, so abandoning has to put back what was there before.
+          setQuery(queryBeforeVoice.current);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };
