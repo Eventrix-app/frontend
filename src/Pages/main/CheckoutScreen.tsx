@@ -61,10 +61,19 @@ function hasTenDigitPhone(raw: string | null | undefined): boolean {
   return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
 }
 
+// Both watermark assets are required at module level so Metro can resolve them
+// statically at bundle time — conditional require() inside a component body
+// causes a Metro resolution error.
+const watermarkLight = require('../../../assets/splash/watermark.png');
+const watermarkDark = require('../../../assets/splash/watermark_dark_theme.png');
+
 const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const watermarkSource = theme === 'dark' ? watermarkDark : watermarkLight;
+
   const { eventId, ticketTypeId: initialTicketTypeId, quantity: initialQuantity } = route.params;
 
   const { data: event, isLoading: isLoadingEvent } = useGetEventByIdQuery(eventId);
@@ -484,8 +493,8 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.footerLink}>Contact Us</Text>
           </View>
           <Image
-            source={require('../../../assets/splash/watermark.png')}
-            style={styles.footerWatermark}
+            source={watermarkSource}
+            style={[styles.footerWatermark, theme === 'dark' && { tintColor: '#FFFFFF' }]}
             resizeMode="contain"
           />
         </View>
@@ -819,7 +828,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     footerWatermark: {
       width: 380,
       height: 140,
-      opacity: 0.18,
+      opacity: 0.45,
       marginTop: spacing.md,
     },
 
