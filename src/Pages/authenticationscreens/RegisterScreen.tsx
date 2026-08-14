@@ -34,6 +34,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -47,10 +48,17 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   // non-empty, so a syntactically invalid string (no "@") could pass client-side
   // validation and rely entirely on the backend to reject it.
   const isEmailValid = email.trim() !== '' && email.includes('@');
+  // Required here so checkout never has to interrupt a payment to collect it. Mirrors the
+  // server's toTenDigitMobile, which is what decides whether PayU will accept the number.
+  const isPhoneValid = (() => {
+    const digits = phoneNumber.replace(/\D/g, '');
+    return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
+  })();
   const canSubmit =
     firstName.trim() &&
     lastName.trim() &&
     isEmailValid &&
+    isPhoneValid &&
     password.length >= 8 &&
     password === confirm &&
     isOldEnough &&
@@ -64,6 +72,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       setErrorMessage(null);
       const result = await register({
         email: email.trim(),
+        phoneNumber: phoneNumber.trim(),
         password,
         firstName,
         lastName,
@@ -120,6 +129,15 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      {/* Asked for here rather than at checkout: the payment gateway requires one, and
+          collecting it mid-purchase meant leaving a pending booking to edit your profile. */}
+      <AuthInput
+        placeholder="Mobile Number"
+        value={phoneNumber}
+        onChangeText={setPhoneNumber}
+        keyboardType="phone-pad"
         autoCapitalize="none"
       />
       <AuthInput

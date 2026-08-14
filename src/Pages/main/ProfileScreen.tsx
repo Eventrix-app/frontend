@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +27,7 @@ import { toCardEvent } from '../../utils/eventCardAdapter';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import ProfileHeaderSkeleton from '../../components/common/ProfileHeaderSkeleton';
+import ProfileCompletionCard, { type CompletionTask } from '../../components/profile/ProfileCompletionCard';
 
 const bgImage = require('../../../assets/shared/backgrounds/bg.png');
 const VERIFIED_BADGE_IMG = require('../../../assets/shared/icons/checked.png');
@@ -89,10 +90,10 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const { data: favorites = [] } = useGetMyFavoritesQuery();
   const { data: myEvents = [] } = useGetMyEventsQuery();
   const { data: verificationStatus } = useGetMyVerificationStatusQuery();
-  // Skipped for anyone who isn't an approved organizer — the endpoint 404s without an
-  // organizer profile, and the menu row it feeds is hidden in that case anyway.
+  // Skipped only for someone who has never applied — the endpoint 404s without an organizer
+  // profile. Applicants can set up payouts before approval, so this must load for them too.
   const { data: bankAccount } = useGetMyBankAccountQuery(undefined, {
-    skip: verificationStatus?.status !== 'approved',
+    skip: !verificationStatus || verificationStatus.status === 'not_submitted',
   });
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -131,8 +132,57 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
     rejected: 'Rejected — resubmit',
   };
 
+  // Mirrors the server's toTenDigitMobile: what counts as "has a phone" here must be what
+  // checkout will accept, or the banner clears while payment still refuses.
+  const phoneDigits = (me?.phoneNumber ?? '').replace(/\D/g, '');
+  const hasPayablePhone = (phoneDigits.length > 10 ? phoneDigits.slice(-10) : phoneDigits).length === 10;
+  const isEmailVerified = !!me?.isEmailVerified;
+
+  // Dismissal is per-session on purpose: persisting it would let someone permanently hide
+  // the one prompt that stops checkout failing, and this reappears on the next launch.
+  const [completionDismissed, setCompletionDismissed] = useState(false);
+
+  const completionTasks: CompletionTask[] = [
+    ...(hasPayablePhone
+      ? []
+      : [
+          {
+            key: 'phone' as const,
+            label: 'Add your mobile number',
+            description: 'Required by our payment provider to book a ticket',
+            icon: 'phone' as const,
+            onPress: () => navigation.navigate('EditProfile'),
+          },
+        ]),
+    ...(isEmailVerified
+      ? []
+      : [
+          {
+            key: 'email' as const,
+            label: 'Verify your email',
+            description: 'Needed before you can book or create an event',
+            icon: 'mail' as const,
+            onPress: () => navigation.navigate('VerifyEmail', {}),
+          },
+        ]),
+  ];
+
   const menuItems: MenuItem[] = [
     { icon: 'edit-2', label: 'Edit Profile', onPress: (nav) => nav.navigate('EditProfile') },
+    // Both live here rather than buried in Settings and Edit Profile: these are the two
+    // things that block a booking, so they belong where the account is reviewed.
+    {
+      icon: 'phone',
+      label: 'Mobile Number',
+      subtitle: hasPayablePhone ? me?.phoneNumber ?? '' : 'Not added — required to book',
+      onPress: (nav) => nav.navigate('EditProfile'),
+    },
+    {
+      icon: 'mail',
+      label: 'Email Address',
+      subtitle: isEmailVerified ? `${me?.email ?? ''} — verified` : 'Not verified',
+      onPress: (nav) => (isEmailVerified ? nav.navigate('EditProfile') : nav.navigate('VerifyEmail', {})),
+    },
     {
       icon: 'bookmark',
       label: 'Saved Events',
@@ -159,12 +209,12 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
           },
         ]
       : []),
-    // Gated on APPROVED, not merely submitted: there is no point collecting bank details
-    // from someone whose identity has not been established, and the subtitle deliberately
-    // reads from the bank account's own status rather than the KYC one — the two are
-    // independent, and conflating them would tell an approved organizer they are ready to be
-    // paid when no account exists.
-    ...(verificationStatus?.status === 'approved'
+    // Shown from submission, not approval: the two reviews run independently, and an
+    // organizer approved without an account cannot be paid until they come back for this.
+    // The subtitle still reads the bank account's own status rather than the KYC one —
+    // conflating them would tell an approved organizer they are ready to be paid when no
+    // account exists.
+    ...(verificationStatus && verificationStatus.status !== 'not_submitted'
       ? [
           {
             icon: 'credit-card' as const,
@@ -178,7 +228,12 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
               : 'Not set up — required to get paid',
             onPress: (nav: Props['navigation']) => nav.navigate('PayoutBankAccount'),
           },
-          // Gated on the same approval — an unverified organizer has no settlements yet
+        ]
+      : []),
+    // Still approval-gated, unlike the account above: an organizer awaiting review has no
+    // settlements yet, so this would open on a permanently empty list.
+    ...(verificationStatus?.status === 'approved'
+      ? [
           {
             icon: 'trending-up' as const,
             label: 'Payouts',
@@ -231,6 +286,10 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
       </LinearGradient>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xxl }]}>
+        {!completionDismissed && (
+          <ProfileCompletionCard tasks={completionTasks} onDismiss={() => setCompletionDismissed(true)} />
+        )}
+
         <Text variant="label" style={styles.eyebrow}>Account</Text>
 
         <View style={[styles.menuCard, cardShadow]}>

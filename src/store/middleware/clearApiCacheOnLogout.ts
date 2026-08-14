@@ -22,6 +22,13 @@ export const clearApiCacheOnLogout: Middleware = (storeApi) => (next) => (action
     [eventsApi, authApi, userApi, paymentsApi, notificationsApi, organizerApi, chatApi, moderationApi, shortsApi].forEach((api) => {
       storeApi.dispatch(api.util.resetApiState());
     });
+
+    // Google's native SDK caches the signed-in account independently of our auth state, so
+    // the next "Continue with Google" silently reused it instead of offering the chooser.
+    // Imported lazily and best-effort — logging out must never depend on it resolving.
+    void import('@react-native-google-signin/google-signin')
+      .then(({ GoogleSignin }) => GoogleSignin.signOut())
+      .catch(() => undefined);
   }
   return result;
 };

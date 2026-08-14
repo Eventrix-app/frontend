@@ -28,12 +28,22 @@ const VerificationSubmittedScreen: React.FC<Props> = ({ navigation }) => {
           We've received your documents and an admin will review them soon. You'll be notified as soon as a
           decision is made — you can also check your verification status anytime from your profile.
         </Text>
+
+        {/* Offered now rather than after approval: review and payout setup run independently,
+            and an organizer approved without an account cannot be paid until they come back. */}
         <TouchableOpacity
           style={styles.doneBtn}
-          onPress={() => navigation.navigate('Main', { screen: 'Home' })}
+          onPress={() => navigation.replace('PayoutBankAccount')}
           activeOpacity={0.9}
         >
-          <Text style={styles.doneBtnText}>Done</Text>
+          <Text style={styles.doneBtnText}>Add payout account</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.laterBtn}
+          onPress={() => navigation.navigate('Main', { screen: 'Home' })}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.laterBtnText}>I'll do this later</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -89,6 +99,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     justifyContent: 'center',
   },
   doneBtnText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+  laterBtn: {
+    width: '100%',
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  laterBtnText: { color: colors.textSecondary, fontSize: 15, fontWeight: '500' },
 });
 
 export default VerificationSubmittedScreen;
