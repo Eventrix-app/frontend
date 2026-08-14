@@ -25,7 +25,9 @@ export type RootStackParamList = {
   // GET /payments/invoice/:enrollmentId expects. Only reachable from a paid booking —
   // the endpoint 400s on anything still pending.
   InvoiceDetail: { enrollmentId: string };
-  Search: { categoryId?: string } | undefined;
+  // initialQuery seeds the box from voice search on Home, where the search bar is only a
+  // button — the dictation has to land somewhere that can actually run the query.
+  Search: { categoryId?: string; initialQuery?: string } | undefined;
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;

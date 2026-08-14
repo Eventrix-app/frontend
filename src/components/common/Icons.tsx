@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line, Path, Rect } from 'react-native-svg';
 
 export interface IconProps {
   color?: string;
@@ -232,6 +232,16 @@ export const SearchIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }
       d="M796-121 533-384q-30 26-70 40.5T378-329q-108 0-183-75t-75-181q0-106 75-181t182-75q106 0 180.5 75T632-585q0 43-14 83t-42 75l264 262-44 44ZM377-389q81 0 138-57.5T572-585q0-81-57-138.5T377-781q-82 0-139.5 57.5T180-585q0 81 57.5 138.5T377-389Z"
       fill={color}
     />
+  </Svg>
+);
+
+// Colour-driven so the same icon can show the idle and listening states of voice search.
+export const MicIcon: React.FC<IconProps> = ({ color = '#000000', size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={9} y={2} width={6} height={12} rx={3} fill={color} />
+    <Path d="M5 11a7 7 0 0 0 14 0" stroke={color} strokeWidth={2} strokeLinecap="round" fill="none" />
+    <Line x1={12} y1={18} x2={12} y2={22} stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Line x1={8} y1={22} x2={16} y2={22} stroke={color} strokeWidth={2} strokeLinecap="round" />
   </Svg>
 );
 

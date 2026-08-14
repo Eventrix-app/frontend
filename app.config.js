@@ -125,6 +125,15 @@ module.exports = {
       // Declares the UPI intent/packages Android 11+ requires to see other apps at all —
       // without it PayU's UPI list resolves to nothing and tapping an app does nothing.
       './plugins/withPayuUpiQueries',
+      // Voice search. The plugin adds RECORD_AUDIO plus the Android 11+ <queries> entry for
+      // speech services, which the recogniser needs to be visible at all.
+      [
+        '@jamsch/expo-speech-recognition',
+        {
+          microphonePermission: 'Allow Eventrix to use the microphone so you can search events by voice.',
+          speechRecognitionPermission: 'Allow Eventrix to recognise speech so you can search events by voice.',
+        },
+      ],
       '@react-native-community/datetimepicker',
       'expo-splash-screen',
       'expo-font',

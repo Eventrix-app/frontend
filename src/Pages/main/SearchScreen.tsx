@@ -29,7 +29,8 @@ import Noevents from '../../components/common/Noevents';
 import EventListSkeleton from '../../components/common/EventListSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
-import { SearchIcon, WarningIcon, ClockIcon } from '../../components/common/Icons';
+import { SearchIcon, WarningIcon, ClockIcon, MicIcon } from '../../components/common/Icons';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
@@ -37,7 +38,9 @@ const CHIP_ICON_SIZE = 20;
 
 const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
+  // Seeded from voice search on Home, whose search bar is only a button.
+  const [query, setQuery] = useState(route.params?.initialQuery ?? '');
+  const voice = useVoiceSearch({ onResult: setQuery });
   const { data: categories = [] } = useGetCategoriesQuery();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -98,6 +101,13 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.clear}>✕</Text>
             </TouchableOpacity>
           ) : null}
+          <TouchableOpacity
+            onPress={() => (voice.isListening ? voice.stop() : voice.start())}
+            hitSlop={8}
+            accessibilityLabel={voice.isListening ? 'Stop listening' : 'Search by voice'}
+          >
+            <MicIcon color={voice.isListening ? colors.brandPink : colors.textSecondary} size={18} />
+          </TouchableOpacity>
         </View>
       </View>
 

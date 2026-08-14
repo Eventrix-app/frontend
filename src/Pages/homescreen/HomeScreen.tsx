@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
 import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
@@ -25,18 +24,12 @@ import { useGetNotificationsQuery } from '../../store/services/notificationsApi'
 import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
-import { NotificationBell, LocationPin } from '../../components/common/Icons';
+import { NotificationBell, LocationPin, MicIcon } from '../../components/common/Icons';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
 import Skeleton from '../../components/common/Skeleton';
 import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
 const bgImage = require('../../../assets/shared/backgrounds/bg.png');
-
-const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none">
-  <rect x="9" y="2" width="6" height="12" rx="3" fill="#F43362"/>
-  <path d="M5 11a7 7 0 0 0 14 0" stroke="#F43362" stroke-width="2" stroke-linecap="round" fill="none"/>
-  <line x1="12" y1="18" x2="12" y2="22" stroke="#F43362" stroke-width="2" stroke-linecap="round"/>
-  <line x1="8" y1="22" x2="16" y2="22" stroke="#F43362" stroke-width="2" stroke-linecap="round"/>
-</svg>`;
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -248,6 +241,15 @@ const HomeScreen: React.FC = () => {
 
   const openProfile = useCallback(() => navigation.navigate('Profile'), [navigation]);
   const openSearch = useCallback(() => navigation.navigate('Search'), [navigation]);
+
+  // Home's search bar is a button, not an input, so a spoken query has nowhere to run here —
+  // hand it to Search, which owns the query state and the results list.
+  const voice = useVoiceSearch({
+    onResult: useCallback(
+      (transcript: string) => navigation.navigate('Search', { initialQuery: transcript }),
+      [navigation],
+    ),
+  });
   const openNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
 
 
@@ -324,13 +326,23 @@ const HomeScreen: React.FC = () => {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search 'events'"
+              placeholder={voice.isListening ? 'Listening…' : "Search 'events'"}
               placeholderTextColor="#aaa"
+              // Shows what it is hearing; this bar is a button, so the text is never editable.
+              value={voice.partial}
               editable={false}
             />
             <View style={styles.divider} />
-            <TouchableOpacity style={styles.micBtn}>
-              <SvgXml xml={micSvg} width={22} height={22} />
+            <TouchableOpacity
+              style={styles.micBtn}
+              onPress={(e) => {
+                // The whole bar navigates to Search — without this the tap does both.
+                e.stopPropagation();
+                voice.isListening ? voice.stop() : voice.start();
+              }}
+              accessibilityLabel={voice.isListening ? 'Stop listening' : 'Search by voice'}
+            >
+              <MicIcon color={voice.isListening ? '#B0173F' : '#F43362'} size={22} />
             </TouchableOpacity>
           </TouchableOpacity>
 
