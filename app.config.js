@@ -34,6 +34,9 @@ module.exports = {
       resizeMode: 'contain',
       backgroundColor: '#ffffff',
     },
+    // Every require()d image ships inside the build. Debug builds stream them from Metro
+    // instead, which is why they vanish on a device that cannot reach it — not a code fault.
+    assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.eventrix.app',
