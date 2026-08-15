@@ -2029,9 +2029,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   salesText: { fontWeight: '600', color: '#065F46' },
   salesCount: { fontSize: 13, color: '#047857' },
 
-  title: { fontSize: 22, color: colors.text, fontFamily: 'ZalandoSansExpanded_700Bold' },
+  title: { fontSize: 22, color: colors.text, fontFamily: 'ZalandoSansExpanded_700Bold', marginTop: spacing.md, marginBottom: spacing.xs },
 
-  badgeRow: { gap: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.sm },
+  badgeRow: { gap: spacing.sm, paddingVertical: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.sm },
   badgePill: {
     backgroundColor: 'rgba(225,29,72,0.1)',
     borderRadius: borderRadius.pill ?? 20,

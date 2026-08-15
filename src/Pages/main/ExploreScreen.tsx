@@ -150,15 +150,19 @@ const ExploreScreen: React.FC = () => {
     () => (
       <>
         <SectionHeader title="Browse by Category" />
-        <View style={styles.categoryGrid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+        >
           {categories.map((category) => (
             <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
-        </View>
+        </ScrollView>
         <SectionHeader title="You Might Also Like" />
       </>
     ),
-    [styles.categoryGrid, categories, openCategory],
+    [styles.categoryRow, categories, openCategory],
   );
 
   return (
@@ -414,13 +418,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
-  categoryGrid: {
+  categoryRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
   },
   footer: {
     alignItems: 'center',

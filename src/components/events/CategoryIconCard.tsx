@@ -13,7 +13,7 @@ const FALLBACK_ICON = require('../../../assets/shared/placeholders/image-frame.p
 // horizontal-wrap grid down to one icon per row (reading as a vertical stack) and blew out
 // Home's category rail. `resizeMode="contain"` keeps each icon's own aspect ratio inside
 // this box instead of stretching/cropping it.
-const ICON_SIZE = 84;
+const ICON_SIZE = 95;
 
 interface Props {
   item: Category;

@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
-import { TicketIcon, CalendarIcon, LocationPin } from '../common/Icons';
+import { CalendarIcon, LocationPin } from '../common/Icons';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - spacing.md * 2;
@@ -32,6 +32,11 @@ const LOOP_MULTIPLIER = 50;
 const AUTO_SCROLL_INTERVAL = 3500;
 const TRANSITION_DURATION_MS = 550;
 const TRANSITION_EASING = Easing.inOut(Easing.cubic);
+
+// Same gradient ramp as EventInterestCard's price badge so the two card styles stay consistent.
+const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
+const BADGE_HEIGHT = 36;
+const BADGE_RADIUS = 10;
 
 export interface FeaturedEvent {
   id: string;
@@ -246,9 +251,16 @@ const FeaturedCarousel: React.FC<Props> = ({ events, onEventPress, cardWidth: ca
             fallbackStyle={styles.imageFallback}
             radiusStyle={styles.imageRadius}
           >
-            <View style={styles.priceTag}>
-              <TicketIcon color={colors.textInverse} size={12} />
-              <Text style={styles.priceText}>{event.price}</Text>
+            <View style={styles.priceBadgeWrap} pointerEvents="none">
+              <LinearGradient
+                colors={BADGE_GRADIENT}
+                locations={[0, 0.38, 0.72, 1]}
+                start={{ x: 0.15, y: 0 }}
+                end={{ x: 0.85, y: 1 }}
+                style={styles.priceBadge}
+              >
+                <Text style={styles.priceBadgeText} numberOfLines={1}>{event.price}</Text>
+              </LinearGradient>
             </View>
 
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gradient}>
@@ -336,22 +348,34 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   imageRadius: {
     borderRadius: 20,
   },
-  priceTag: {
+  priceBadgeWrap: {
     position: 'absolute',
-    top: spacing.sm,
+    top: 0,
     right: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    zIndex: 3,
+    elevation: 8,
   },
-  priceText: {
-    color: colors.textInverse,
-    fontWeight: '700',
+  priceBadge: {
+    minWidth: 60,
+    height: BADGE_HEIGHT,
+    paddingHorizontal: 12,
+    // Flat top flush against the card top edge; rounded bottom hangs down visibly.
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: BADGE_RADIUS,
+    borderBottomRightRadius: BADGE_RADIUS,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priceBadgeText: {
+    color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(120,6,36,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   gradient: {
     paddingHorizontal: spacing.md,
