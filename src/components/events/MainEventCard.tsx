@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MockEvent } from '../../data/mockEvents';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -16,6 +17,11 @@ type MainEventCardProps = {
   // SearchScreen) see no visual change.
   onMenuPress?: () => void;
 };
+
+// Same gradient ramp as FeaturedCarousel's price badge, so both card styles stay consistent.
+const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
+const BADGE_HEIGHT = 36;
+const BADGE_RADIUS = 10;
 
 // Memoized: these render inside lists that re-render whenever the parent screen does.
 // Props are compared shallowly, so this only pays off where the parent passes stable
@@ -35,16 +41,11 @@ export const MainEventCard: React.FC<MainEventCardProps> = React.memo(({
         <View style={styles.image}>
           <View style={styles.imageTopRow}>
             <Text style={styles.categoryPill}>{event.category}</Text>
-            <View style={styles.imageTopRightGroup}>
-              <View style={styles.pricePill}>
-                <Text style={styles.pricePillText}>{event.price}</Text>
-              </View>
-              {onMenuPress && (
-                <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
-                  <Text style={styles.menuBtnText}>⋮</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {onMenuPress && (
+              <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
+                <Text style={styles.menuBtnText}>⋮</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {typeof event.image === 'string' && event.image.startsWith('http') ? (
             <FallbackImage source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
@@ -59,6 +60,23 @@ export const MainEventCard: React.FC<MainEventCardProps> = React.memo(({
             </View>
           ) : null}
         </View>
+
+        {/* Hangs off the top-right edge of the card, flush with the outer edge — matches
+            FeaturedCarousel's price badge (flat top, rounded bottom, gradient fill). Rendered
+            as a sibling of `image` (not inside it) since `image` has overflow: hidden and
+            would clip a badge positioned at top: 0. */}
+        <View style={styles.priceBadgeWrap} pointerEvents="none">
+          <LinearGradient
+            colors={BADGE_GRADIENT}
+            locations={[0, 0.38, 0.72, 1]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={styles.priceBadge}
+          >
+            <Text style={styles.priceBadgeText} numberOfLines={1}>{event.price}</Text>
+          </LinearGradient>
+        </View>
+
         <View style={styles.body}>
           <Text style={styles.category}>{event.category}</Text>
           <Text style={styles.title} numberOfLines={2}>
@@ -165,24 +183,35 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.pill,
     overflow: 'hidden',
   },
-  imageTopRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  pricePill: {
-    backgroundColor: 'rgba(20,39,102,0.92)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: borderRadius.pill,
-  },
-  pricePillText: {
-    // Same fixed-dark-navy background regardless of theme, so text must stay literal white
-    // — colors.white is a *surface* token (remapped to a near-black dark-mode surface, not
-    // literally white), which made this near-invisible against the navy pill in dark mode.
-    color: colors.textInverse,
-    fontSize: 11,
+ priceBadgeWrap: {
+  position: 'absolute',
+  top: 3,          // was: 0 — now sits below the category pill / menu row
+  right: spacing.md,
+  zIndex: 3,
+  elevation: 8,
+},
+priceBadge: {
+  minWidth: 60,
+  height: BADGE_HEIGHT,
+  paddingHorizontal: 12,
+  // Flat top / rounded bottom "ribbon" shape — even though it's no longer flush
+  // with the card's outer edge, this reads better than a floating pill.
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+  borderBottomLeftRadius: BADGE_RADIUS,
+  borderBottomRightRadius: BADGE_RADIUS,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+  priceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(120,6,36,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   menuBtn: {
     width: 26,
