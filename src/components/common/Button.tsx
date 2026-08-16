@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { TouchableOpacity, ActivityIndicator, Platform, StyleSheet, View, ViewStyle, TextStyle } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View, ViewStyle, TextStyle } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from './Text';
+import { SpringPressable } from './SpringPressable';
 
 interface ButtonProps {
   title: string;
@@ -78,11 +79,15 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    // SpringPressable, not TouchableOpacity: the primary/secondary variants render an
+    // elevated `glass` surface below, and fading a subtree containing an Android elevation
+    // paints an opaque rectangle over it for the length of the press.
+    <SpringPressable
       style={[getButtonStyle(), disabled && styles.disabled, style]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.7}
+      scaleTo={0.97}
+      accessibilityLabel={title}
     >
       {variant === 'primary' || variant === 'secondary' ? (
         <View style={styles.glass}>
@@ -99,7 +104,7 @@ const Button: React.FC<ButtonProps> = ({
       ) : (
         <Text style={[getTextStyle(), textStyle]}>{title}</Text>
       )}
-    </TouchableOpacity>
+    </SpringPressable>
   );
 };
 

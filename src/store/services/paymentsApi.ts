@@ -100,7 +100,10 @@ export interface RefundRecord {
   id: string;
   enrollmentId: string;
   requestedBy: string;
+  /** What the participant wrote when asking for the refund. */
   reason?: string;
+  /** What the organizer/admin wrote back when refusing it — only set on a rejection. */
+  rejectionReason?: string;
   status: RefundStatus;
   amount: number;
   gatewayRefundId?: string;
@@ -159,7 +162,7 @@ export type FeeEstimateArg = number | { ticketPrice: number; feePayer?: 'organiz
 export const paymentsApi = createApi({
   reducerPath: 'paymentsApi',
   baseQuery: createFallbackBaseQuery(true),
-  tagTypes: ['PendingRefunds', 'MyPayouts'],
+  tagTypes: ['PendingRefunds', 'MyPayouts', 'MyRefunds'],
   endpoints: (builder) => ({
     getFeeEstimate: builder.query<FeeBreakdown, FeeEstimateArg>({
       query: (arg) => {
@@ -225,6 +228,7 @@ export const paymentsApi = createApi({
     }),
     requestRefund: builder.mutation<RefundRecord, { enrollmentId: string; reason?: string }>({
       query: (body) => ({ url: 'payments/refunds', method: 'POST', body }),
+      invalidatesTags: ['MyRefunds'],
       async onQueryStarted({ enrollmentId }, { queryFulfilled, dispatch }) {
         try {
           await queryFulfilled;
@@ -233,6 +237,14 @@ export const paymentsApi = createApi({
           // Refund request failed — nothing to invalidate.
         }
       },
+    }),
+    // The participant's own refunds, scoped server-side to the session. Backs the refund
+    // line — and the rejection reason — on each booking card; before this the app had no
+    // read of refund state outside the organizer's pending queue, so a rejection was
+    // invisible in the UI no matter how many times the user reopened the screen.
+    getMyRefunds: builder.query<RefundRecord[], void>({
+      query: () => 'payments/refunds/mine',
+      providesTags: ['MyRefunds'],
     }),
     // Server scopes this to the session, so there is no organizerId to get wrong
     getMyPayouts: builder.query<MyPayoutsPage, { page?: number; limit?: number } | void>({
@@ -246,9 +258,12 @@ export const paymentsApi = createApi({
       query: () => 'payments/refunds/pending',
       providesTags: ['PendingRefunds'],
     }),
+    // 'MyRefunds' too: an admin or an organizer reviewing their own booking's refund is the
+    // same account on both sides of the decision, and their bookings list must not keep
+    // showing "Under review" after they have just decided it.
     approveRefund: builder.mutation<RefundRecord, string>({
       query: (refundId) => ({ url: `payments/refunds/${refundId}/approve`, method: 'PATCH' }),
-      invalidatesTags: ['PendingRefunds'],
+      invalidatesTags: ['PendingRefunds', 'MyRefunds'],
     }),
     rejectRefund: builder.mutation<RefundRecord, { refundId: string; reason: string }>({
       query: ({ refundId, reason }) => ({
@@ -256,7 +271,7 @@ export const paymentsApi = createApi({
         method: 'PATCH',
         body: { reason },
       }),
-      invalidatesTags: ['PendingRefunds'],
+      invalidatesTags: ['PendingRefunds', 'MyRefunds'],
     }),
   }),
 });
@@ -272,6 +287,7 @@ export const {
   useVerifyPayUNativeMutation,
   useGetInvoiceDataQuery,
   useRequestRefundMutation,
+  useGetMyRefundsQuery,
   useGetMyPayoutsQuery,
   useGetPendingRefundsQuery,
   useApproveRefundMutation,

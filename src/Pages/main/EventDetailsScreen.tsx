@@ -966,8 +966,8 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: mediaItems = [] } = useGetEventMediaQuery(route.params.eventId);
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
   const { data: favorites = [] } = useGetMyFavoritesQuery(undefined, { skip: !authUser });
-  const [addFavorite, { isLoading: isSaving }] = useAddFavoriteMutation();
-  const [removeFavorite, { isLoading: isUnsaving }] = useRemoveFavoriteMutation();
+  const [addFavorite] = useAddFavoriteMutation();
+  const [removeFavorite] = useRemoveFavoriteMutation();
   const [cancelEvent, { isLoading: isCancelling }] = useCancelEventMutation();
   const { activeEnrollment: myActiveEnrollment, isPaid: isMyEnrollmentPaid, needsPayment: myEnrollmentNeedsPayment } =
     useMyEventEnrollment(event?.id, { skip: !authUser });
@@ -978,7 +978,18 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     { skip: !event?.organizer?.id },
   );
   const organizerPhone = organizerProfile?.phone;
-  const saved = !!event && favorites.some((f) => f.id === event.id);
+
+  // Local override rather than an optimistic cache patch, matching EventInterestCard:
+  // getMyFavorites holds full Event objects and SavedEventsScreen needs every field real,
+  // so the cache can't be patched with a stub. Without this the bookmark stays on its old
+  // state for a whole round trip — the POST, then the refetch the invalidated 'Favorite'
+  // tag triggers — which is the lag the button had.
+  const [pendingSaved, setPendingSaved] = useState<boolean | null>(null);
+  const serverSaved = !!event && favorites.some((f) => f.id === event.id);
+  const saved = pendingSaved ?? serverSaved;
+  if (pendingSaved !== null && serverSaved === pendingSaved) {
+    setPendingSaved(null);
+  }
 
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
@@ -1005,34 +1016,101 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
+  // Guarded by a ref, not the mutations' isLoading: that only flips true on the next
+  // render, so a fast double-tap could fire two requests before the old gate closed.
+  const isTogglingSaveRef = useRef(false);
+
   const handleToggleSave = async () => {
     if (!authUser) { navigation.navigate('Auth'); return; }
-    if (!event || isSaving || isUnsaving) return;
+    if (!event || isTogglingSaveRef.current) return;
+    isTogglingSaveRef.current = true;
+    const next = !saved;
+    setPendingSaved(next);
     try {
-      if (saved) {
-        await removeFavorite(event.id).unwrap();
-      } else {
+      if (next) {
         await addFavorite(event.id).unwrap();
+      } else {
+        await removeFavorite(event.id).unwrap();
       }
     } catch (e: any) {
+      setPendingSaved(!next);
       showAlert('Error', extractErrorMessage(e, 'Failed to update saved events'));
+    } finally {
+      isTogglingSaveRef.current = false;
     }
   };
 
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [isDownloadingTicket, setIsDownloadingTicket] = useState(false);
 
+  // Only accounts that actually signed in with Google get the calendar button — adding to
+  // "their calendar" means their Google calendar, and there is nothing to write to for an
+  // email/password account.
+  const isGoogleAccount = !!me?.authProviders?.includes('google');
+
+  // null while the status is still being read, so the button doesn't flash in and out on
+  // mount. 'denied' hides it for good: the OS will not re-prompt, so a visible button would
+  // do nothing but re-open the same refusal.
+  const [calendarPermission, setCalendarPermission] = useState<'granted' | 'undetermined' | 'denied' | null>(null);
+
+  useEffect(() => {
+    if (!isGoogleAccount) return;
+    let cancelled = false;
+    Calendar.getCalendarPermissionsAsync()
+      .then(({ status, canAskAgain }) => {
+        if (cancelled) return;
+        setCalendarPermission(status === 'granted' ? 'granted' : canAskAgain ? 'undetermined' : 'denied');
+      })
+      .catch(() => {
+        if (!cancelled) setCalendarPermission('denied');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isGoogleAccount]);
+
+  // 'undetermined' still shows it: the grant has to be reachable from somewhere, and the
+  // first tap is what asks. A refusal at that point flips this to 'denied' and the button
+  // goes away.
+  const canAddToCalendar =
+    isGoogleAccount && (calendarPermission === 'granted' || calendarPermission === 'undetermined');
+
+  // The device calendar backed by the user's Google account, not just any writable one.
+  // Android reports the owning account in source.name (the gmail address) with a
+  // 'com.google' account type; iOS exposes Google-backed calendars as CalDAV sources named
+  // after the account. Falls back to any writable calendar so the action still does
+  // something sensible on a device with no Google calendar synced.
+  const pickGoogleCalendar = (calendars: Calendar.Calendar[]): Calendar.Calendar | undefined => {
+    const writable = calendars.filter((c) => c.allowsModifications);
+    const email = me?.email?.toLowerCase();
+    const isGoogleSource = (c: Calendar.Calendar) => {
+      const sourceName = (c.source?.name ?? '').toLowerCase();
+      const sourceType = ((c.source as { type?: string } | undefined)?.type ?? '').toLowerCase();
+      return sourceType.includes('com.google') || sourceType.includes('caldav') || sourceName.includes('@gmail.') || sourceName.includes('google');
+    };
+    return (
+      writable.find((c) => isGoogleSource(c) && email && (c.source?.name ?? '').toLowerCase() === email) ??
+      writable.find(isGoogleSource) ??
+      writable.find((c) => c.isPrimary) ??
+      writable[0]
+    );
+  };
+
   const handleAddToCalendar = async () => {
     if (!event || isAddingToCalendar) return;
     setIsAddingToCalendar(true);
     try {
-      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      const { status, canAskAgain } = await Calendar.requestCalendarPermissionsAsync();
       if (status !== 'granted') {
+        // Mirrors the refusal into the gate above, so the button disappears rather than
+        // sitting there re-asking for something the OS will no longer prompt for.
+        setCalendarPermission(canAskAgain ? 'undetermined' : 'denied');
         showAlert('Permission needed', 'Allow calendar access in your device settings to add this event.');
         return;
       }
+      setCalendarPermission('granted');
       const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-      const targetCalendar = calendars.find((c) => c.allowsModifications) ?? calendars[0];
+      const targetCalendar = pickGoogleCalendar(calendars);
       if (!targetCalendar) {
         showAlert("Couldn't add to calendar", 'No calendar is available on this device.');
         return;
@@ -1049,7 +1127,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         notes: event.description || undefined,
         timeZone: 'Asia/Kolkata',
       });
-      showAlert('Added to Calendar', `"${event.title}" has been added to your calendar.`);
+      showAlert('Added to Calendar', `"${event.title}" has been added to ${targetCalendar.title || 'your calendar'}.`);
     } catch (e: any) {
       showAlert("Couldn't add to calendar", extractErrorMessage(e, 'Something went wrong. Please try again.'));
     } finally {
@@ -1378,13 +1456,15 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity style={styles.heroActionBtn} onPress={handleShare}>
             <SvgXml xml={theme === 'dark' ? SHARE_LIGHT_SVG : SHARE_DARK_SVG} width={18} height={18} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.heroActionBtn} onPress={handleAddToCalendar} disabled={isAddingToCalendar}>
-            {isAddingToCalendar ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <SvgXml xml={theme === 'dark' ? CALENDAR_LIGHT_SVG : CALENDAR_DARK_SVG} width={18} height={18} />
-            )}
-          </TouchableOpacity>
+          {canAddToCalendar ? (
+            <TouchableOpacity style={styles.heroActionBtn} onPress={handleAddToCalendar} disabled={isAddingToCalendar}>
+              {isAddingToCalendar ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <SvgXml xml={theme === 'dark' ? CALENDAR_LIGHT_SVG : CALENDAR_DARK_SVG} width={18} height={18} />
+              )}
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity style={styles.heroActionBtn} onPress={handleToggleSave}>
             <SvgXml xml={saved ? BOOKMARK_CHECK_SVG : BOOKMARK_SVG} width={18} height={18} />
           </TouchableOpacity>

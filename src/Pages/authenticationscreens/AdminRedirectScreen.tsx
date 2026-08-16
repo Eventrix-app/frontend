@@ -8,6 +8,7 @@ import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import { useClearPushTokenMutation } from '../../store/services/userApi';
 import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
@@ -84,13 +85,21 @@ const AdminRedirectScreen: React.FC<Props> = () => {
             If you are not redirected automatically within a few seconds, please click the button below.
           </Text>
 
-          <TouchableOpacity style={styles.primaryButtonWrap} onPress={handleRedirect} activeOpacity={0.9}>
+          {/* Scale, not fade: primaryButton is an elevated solid surface, and fading a
+              subtree containing an Android elevation paints its shadow as an opaque
+              rectangle over the button while pressed. */}
+          <SpringPressable
+            style={styles.primaryButtonWrap}
+            onPress={handleRedirect}
+            scaleTo={0.97}
+            accessibilityLabel="Open Dashboard Manually"
+          >
             <View style={styles.primaryButton}>
               <View style={styles.primaryButtonContent}>
                 <Text style={styles.primaryButtonText}>Open Dashboard Manually</Text>
               </View>
             </View>
-          </TouchableOpacity>
+          </SpringPressable>
 
           <TouchableOpacity style={styles.logoutButtonWrap} onPress={handleLogout} activeOpacity={0.8}>
             <View style={styles.logoutButton}>

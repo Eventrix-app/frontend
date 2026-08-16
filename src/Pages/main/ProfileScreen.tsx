@@ -10,8 +10,6 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
-import { LocationPin } from '../../components/common/Icons';
-import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
 import {
@@ -121,10 +119,6 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   const displayName = (me?.fullName ?? '').trim() || me?.email || '';
   const initial = displayName.charAt(0).toUpperCase() || '?';
   const memberSince = me?.createdAt ? MEMBER_SINCE_FORMATTER.format(new Date(me.createdAt)) : '';
-  // Shared with HomeScreen (useDisplayAddress) so both show the exact same resolved
-  // location instead of this one showing the raw city field while Home shows the
-  // reverse-geocoded address.
-  const displayAddress = useDisplayAddress(me);
 
   const verificationSubtitle: Record<'pending' | 'approved' | 'rejected', string> = {
     pending: 'Pending review',
@@ -167,16 +161,10 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
         ]),
   ];
 
+  // Edit Profile is no longer a row — it is the button above the list. The Mobile Number row
+  // is gone with it: the number is still editable inside Edit Profile (checkout depends on
+  // being able to add one), it just no longer takes a line of its own here.
   const menuItems: MenuItem[] = [
-    { icon: 'edit-2', label: 'Edit Profile', onPress: (nav) => nav.navigate('EditProfile') },
-    // Both live here rather than buried in Settings and Edit Profile: these are the two
-    // things that block a booking, so they belong where the account is reviewed.
-    {
-      icon: 'phone',
-      label: 'Mobile Number',
-      subtitle: hasPayablePhone ? me?.phoneNumber ?? '' : 'Not added — required to book',
-      onPress: (nav) => nav.navigate('EditProfile'),
-    },
     {
       icon: 'mail',
       label: 'Email Address',
@@ -247,52 +235,74 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   ];
 
   return (
-    <View style={styles.root}>
-      <LinearGradient colors={[colors.brandPink, '#F43362']} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+    <View style={styles.selfRoot}>
+      {/* The brand banner is back: same brandPink→#F43362 gradient and the same bg.png
+          watermark the old header carried, sized to the compact layout rather than to the
+          old tall centred one. Everything inside keeps the position and dimensions it had
+          on the flat white version — only the colours change, because coral-on-coral text
+          and a coral-outlined button would not survive on this backdrop. */}
+      <LinearGradient
+        colors={[colors.brandPink, '#F43362']}
+        style={[styles.selfBanner, { paddingTop: insets.top }]}
+      >
         <View style={styles.headerBgWrap}>
           <Image source={bgImage} style={styles.headerBg} contentFit="cover" />
         </View>
 
-        <TouchableOpacity style={styles.back} onPress={handleGoBack} hitSlop={8}>
-          <Feather name="arrow-left" size={20} color={colors.white} />
-        </TouchableOpacity>
+        <View style={styles.selfBannerInner}>
+          <View style={styles.selfHeader}>
+            <TouchableOpacity style={styles.selfBack} onPress={handleGoBack} hitSlop={8}>
+              <Feather name="arrow-left" size={20} color={colors.white} />
+            </TouchableOpacity>
+            {/* Absolutely-positioned back button so the name lands on the true centre of the
+                screen rather than the centre of what is left beside it. */}
+            <Text variant="h2" color="white" numberOfLines={1} style={styles.selfName}>
+              {displayName || 'Your Profile'}
+            </Text>
+          </View>
 
-        <View style={styles.avatarRing}>
-          {me?.profilePictureUrl ? (
-            <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImage} />
-          ) : (
-            <Text variant="h2" style={styles.avatarInitial}>{initial}</Text>
-          )}
-        </View>
+          {/* Avatar and stats read as one line: the picture identifies the account, the four
+              numbers summarise it, and neither needs a full row of its own. */}
+          <View style={styles.profileRow}>
+            <View style={styles.avatarRing}>
+              {me?.profilePictureUrl ? (
+                <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text variant="h2" style={styles.avatarInitial}>{initial}</Text>
+              )}
+            </View>
 
-        <Text variant="h3" color="white" style={styles.name}>{displayName || 'Your Profile'}</Text>
-        {me?.email ? (
-          <Text variant="caption" style={styles.headerSubtext}>{me.email}</Text>
-        ) : null}
-        <View style={styles.locationRow}>
-          <LocationPin size={12} color="rgba(255,255,255,0.85)" />
-          <Text variant="caption" style={styles.headerSubtext}>{displayAddress}</Text>
-        </View>
+            <View style={styles.selfStatsRow}>
+              <StatBlock value={createdEventsCount} label="Events" onGradient />
+              <StatBlock value={savedCount} label="Saved" onGradient />
+              <StatBlock value={bookingsCount} label="Bookings" onGradient />
+              <StatBlock value={followingCount} label="Following" onGradient />
+            </View>
+          </View>
 
-        <View style={[styles.statsCard, cardShadow]}>
-          <StatBlock value={createdEventsCount} label="Events" />
-          <View style={styles.statDivider} />
-          <StatBlock value={savedCount} label="Saved" />
-          <View style={styles.statDivider} />
-          <StatBlock value={bookingsCount} label="Bookings" />
-          <View style={styles.statDivider} />
-          <StatBlock value={followingCount} label="Following" />
+          <TouchableOpacity
+            style={styles.editProfileBtn}
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+          >
+            <Feather name="edit-2" size={16} color={colors.white} />
+            <Text variant="button" color="white" style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xxl }]}>
+      <ScrollView
+        contentContainerStyle={[styles.selfScroll, { paddingBottom: insets.bottom + spacing.xxl }]}
+        showsVerticalScrollIndicator={false}
+      >
         {!completionDismissed && (
           <ProfileCompletionCard tasks={completionTasks} onDismiss={() => setCompletionDismissed(true)} />
         )}
 
-        <Text variant="label" style={styles.eyebrow}>Account</Text>
+        <Text variant="label" style={styles.eyebrow}>Account Settings</Text>
 
-        <View style={[styles.menuCard, cardShadow]}>
+        <View style={styles.menuCard}>
           {menuItems.map((item, i) => (
             <TouchableOpacity
               key={item.label}
@@ -300,7 +310,7 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
               activeOpacity={0.6}
               style={[styles.menuRow, i > 0 && styles.menuRowDivider]}
             >
-              <Feather name={item.icon} size={18} color={colors.textSecondary} style={styles.menuIcon} />
+              <Feather name={item.icon} size={18} color={colors.brandPink} style={styles.menuIcon} />
               <View style={styles.menuText}>
                 <Text variant="label" color="text">{item.label}</Text>
                 {item.subtitle ? (
@@ -322,13 +332,32 @@ const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: nu
   );
 };
 
-const StatBlock: React.FC<{ value: number; label: string }> = ({ value, label }) => {
+// `onGradient` switches the pair to white for the self banner, where the default brandPink
+// value would be coral text on a coral background. The organizer branch renders these on a
+// white card and keeps the default.
+const StatBlock: React.FC<{ value: number; label: string; onGradient?: boolean }> = ({
+  value,
+  label,
+  onGradient = false,
+}) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.stat}>
-      <Text variant="h4" color="brandPink" style={styles.statValue}>{value}</Text>
-      <Text variant="caption" color="textSecondary">{label}</Text>
+      <Text
+        variant="h4"
+        color={onGradient ? 'white' : 'brandPink'}
+        style={styles.statValue}
+      >
+        {value}
+      </Text>
+      <Text
+        variant="caption"
+        color={onGradient ? undefined : 'textSecondary'}
+        style={onGradient ? styles.statLabelOnGradient : undefined}
+      >
+        {label}
+      </Text>
     </View>
   );
 };
@@ -524,14 +553,26 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   retryBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   backLinkBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
 
-  // --- Self header ---
-  header: {
-    alignItems: 'center',
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
+  // --- Self layout ---
+  //
+  // The whole self branch sits on one flat white surface now: the pink gradient banner is
+  // gone, and with it the stats card that used to float on top of it. Name, then identity +
+  // numbers on one line, then the single action, then the list.
+  selfRoot: { flex: 1, backgroundColor: colors.white },
+  selfBanner: {
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    paddingBottom: spacing.md,
+    // Clips the watermark to the rounded corners — without it the image paints over them.
     overflow: 'hidden',
+  },
+  // Full-bleed gradient, but its contents obey the same 520pt cap as the list below so the
+  // two halves of the screen stay aligned with each other on a wide display.
+  selfBannerInner: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
   },
   headerBgWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   headerBg: {
@@ -543,55 +584,89 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     transform: [{ scale: 0.78 }],
     opacity: 0.15,
   },
-  back: {
-    alignSelf: 'flex-start',
+  selfHeader: {
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+  },
+  selfBack: {
+    position: 'absolute',
+    left: spacing.xs,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    zIndex: 1,
+  },
+  selfName: { textAlign: 'center', marginHorizontal: 48 },
+  // Capped rather than a percentage width: the spec's "60–70% of screen" keeps the content
+  // from sprawling on a tablet or on web, but applied literally on a phone it would leave
+  // 30% of a 390pt screen empty on either side. A max width does the same job at the size it
+  // actually matters and stays edge-to-edge (with padding) on a handset.
+  selfScroll: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+  },
+
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   avatarRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    // Translucent over the gradient with a white rim, as the old header had — a solid
+    // brandPink disc would vanish into the banner behind it. The border is inset, so the
+    // circle is still exactly 100pt.
     backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
     borderWidth: 3,
     borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Never squeezed by the stats beside it, however many stats there are.
+    flexShrink: 0,
     overflow: 'hidden',
   },
-  avatarInitial: { fontSize: 36, lineHeight: 40, color: colors.white },
+  avatarInitial: { fontSize: 40, lineHeight: 46, color: colors.white },
   avatarImage: { width: '100%', height: '100%' },
-  name: { textAlign: 'center' },
-  headerSubtext: { color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
-
-  statsCard: {
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.white,
-    width: '100%',
-    marginTop: spacing.lg,
+  selfStatsRow: {
+    flex: 1,
     flexDirection: 'row',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
     justifyContent: 'space-around',
   },
   stat: { alignItems: 'center' },
   statValue: { marginBottom: 2 },
+  statLabelOnGradient: { color: 'rgba(255,255,255,0.85)' },
   statDivider: { width: 1, alignSelf: 'stretch', backgroundColor: colors.borderLight },
 
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    // Same outlined shape and 14pt padding as before, just legible on the gradient.
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+  },
+  editProfileText: { fontWeight: '700' },
+
   // --- Self account list ---
-  scroll: { padding: spacing.md },
   eyebrow: {
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     marginTop: spacing.sm,
   },
   menuCard: {
@@ -613,6 +688,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   memberSince: { textAlign: 'center', marginTop: spacing.xl },
 
   // --- Organizer branch ---
+  scroll: { padding: spacing.md },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import {
   GoogleSignin,
@@ -8,6 +8,7 @@ import {
 } from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+import { SpringPressable } from '../common/SpringPressable';
 import { Text } from '../common/Text';
 import { useSocialLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
@@ -113,16 +114,19 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         <Text style={styles.dividerText}>Or</Text>
         <View style={styles.line} />
       </View>
-      <TouchableOpacity
+      {/* Scale, not fade: googleBtn carries an Android elevation, and TouchableOpacity's
+          alpha animation over an elevated view paints its shadow as an opaque rectangle
+          across the button while it is held down. */}
+      <SpringPressable
         style={styles.googleBtn}
-        activeOpacity={0.8}
         onPress={handleGoogle}
+        scaleTo={0.97}
         accessibilityRole="button"
         accessibilityLabel="Continue with Google"
       >
         <SvgXml xml={GOOGLE_SVG} width={GOOGLE_ICON_SIZE} height={GOOGLE_ICON_SIZE} />
         <Text style={styles.googleBtnLabel}>Continue with Google</Text>
-      </TouchableOpacity>
+      </SpringPressable>
     </View>
   );
 };

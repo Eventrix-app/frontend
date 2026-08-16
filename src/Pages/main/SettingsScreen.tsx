@@ -20,6 +20,7 @@ import {
 } from '../../store/services/userApi';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { DeleteMyDataModal } from '../../components/common/DeleteMyDataModal';
 import Skeleton from '../../components/common/Skeleton';
 import { authApi } from '../../store/services/authApi';
@@ -329,7 +330,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.logoutWrap} onPress={handleLogout}>
+        {/* Scale feedback, not opacity — and that is the whole point of not using
+            TouchableOpacity here. TouchableOpacity presses by fading its wrapper, and
+            logoutBtn below carries an Android `elevation`. Fading a parent that contains an
+            elevated child makes Android composite that child through an offscreen layer, and
+            its shadow lands as a flat opaque rectangle over the button for the duration of
+            the press — the white box. PrimaryButton has the same elevated shape and already
+            avoids it the same way, by animating transform instead of alpha. */}
+        <SpringPressable style={styles.logoutWrap} onPress={handleLogout} scaleTo={0.96}>
           <View style={styles.logoutBtn}>
             <View style={styles.logoutContent}>
               {/* numberOfLines={1}: without it, a larger device font-scale setting could
@@ -339,7 +347,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.logoutText} numberOfLines={1}>Log Out</Text>
             </View>
           </View>
-        </TouchableOpacity>
+        </SpringPressable>
 
         <Text style={styles.version}>Eventrix v1.0.0</Text>
       </ScrollView>

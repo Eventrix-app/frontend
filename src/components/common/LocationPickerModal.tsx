@@ -122,7 +122,21 @@ export const LocationPickerModal: React.FC<Props> = ({ visible, initialLatitude,
             <Feather name="map-pin" size={36} color={colors.brandPink} />
           </View>
 
-          <TouchableOpacity style={styles.currentLocationBtn} onPress={useCurrentLocation} disabled={isLocating}>
+          {/* activeOpacity 1 — no fade. currentLocationBtn carries an Android elevation, and
+              fading a subtree containing one paints its shadow as an opaque rectangle over
+              the button mid-press. The scale-based SpringPressable used for this elsewhere is
+              deliberately NOT used here: this screen is a bare RN Modal with no
+              GestureHandlerRootView of its own, and a gesture handler inside one never
+              receives touches (see the note in halfscreenmodal.tsx) — the button would go
+              dead. The spinner this swaps to while locating is the press feedback. */}
+          <TouchableOpacity
+            style={styles.currentLocationBtn}
+            onPress={useCurrentLocation}
+            disabled={isLocating}
+            activeOpacity={1}
+            accessibilityRole="button"
+            accessibilityLabel="Use my current location"
+          >
             {isLocating ? (
               <ActivityIndicator size="small" color={colors.brandPink} />
             ) : (

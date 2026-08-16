@@ -39,6 +39,7 @@ import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import { LeftArrow, PhoneIcon, WhatsAppIcon, ClipboardIcon } from '../../components/common/Icons';
 import HalfScreenModal from '../../components/common/halfscreenmodal';
@@ -507,9 +508,14 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.payBarFade}
           pointerEvents="none"
         />
-        <TouchableOpacity
+        {/* Scale, not fade: payBtn carries an Android elevation, and fading a subtree
+            containing one paints its shadow as an opaque rectangle over the button while
+            pressed — on the single most consequential control in the app. */}
+        <SpringPressable
           style={[styles.payBtn, (isPaying || isEstimatePending || (!isResuming && !selectedTier)) && styles.payBtnDisabled]}
           onPress={handlePay}
+          scaleTo={0.97}
+          accessibilityLabel={`Pay ₹${totalPayable}`}
           // Blocked while the estimate is outstanding: totalPayable falls back to the bare
           // subtotal until it arrives, and the user must never tap "Pay ₹X" on a number that
           // isn't the one about to be charged.
@@ -527,7 +533,7 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.payBtnText}>Pay {'₹'}{totalPayable}</Text>
             )}
           </LinearGradient>
-        </TouchableOpacity>
+        </SpringPressable>
       </View>
 
       <PayUCheckoutModal

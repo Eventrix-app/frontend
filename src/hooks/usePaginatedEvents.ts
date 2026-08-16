@@ -29,7 +29,15 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
   const [pagesById, setPagesById] = useState<Map<number, BackendEvent[]>>(new Map());
   const [hasMore, setHasMore] = useState(true);
 
-  const { data, isFetching, isError, refetch } = useGetEventsQuery({
+  // `currentData`, NOT `data`. RTK Query deliberately keeps `data` pointing at the last
+  // successful result even after the hook's arguments change, so during the gap between a
+  // new search/page being requested and its response landing, `data` still holds the
+  // PREVIOUS query's events. Filing those under the new `page` key is what produced
+  // duplicate ids in the list: the same stale array got written under two page numbers as
+  // `page` reset from N back to 1, so every event rendered twice and FlatList warned about
+  // duplicate keys. `currentData` is undefined until the current arguments have their own
+  // result, which is exactly the guarantee this needs.
+  const { currentData, isFetching, isError, refetch } = useGetEventsQuery({
     categoryId: filters.categoryId,
     isOnline: filters.isOnline,
     search: filters.search,
@@ -50,20 +58,23 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
   }, [filters.categoryId, filters.isOnline, filters.search, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo, filters.sortBy]);
 
   useEffect(() => {
-    if (!data) return;
-    setHasMore(data.length === PAGE_SIZE);
+    if (!currentData) return;
+    setHasMore(currentData.length === PAGE_SIZE);
     setPagesById((prev) => {
-      if (prev.get(page) === data) return prev; // identical reference — nothing changed
+      if (prev.get(page) === currentData) return prev; // identical reference — nothing changed
       const next = new Map(prev);
-      next.set(page, data);
+      next.set(page, currentData);
       return next;
     });
-  }, [data, page]);
+  }, [currentData, page]);
 
-  const events = useMemo(
-    () => [...pagesById.keys()].sort((a, b) => a - b).flatMap((p) => pagesById.get(p)!),
-    [pagesById],
-  );
+  const events = useMemo(() => {
+    const ordered = [...pagesById.keys()].sort((a, b) => a - b).flatMap((p) => pagesById.get(p)!);
+    // Deduped by id as well. Pages are fetched at separate moments against a live list, so
+    // an event created — or simply reordered — between two page requests genuinely appears
+    // in both, and one duplicate id is enough to break FlatList's keying for the whole list.
+    return [...new Map(ordered.map((event) => [event.id, event])).values()];
+  }, [pagesById]);
 
   const loadMore = () => {
     if (!isFetching && hasMore) setPage((p) => p + 1);
@@ -79,11 +90,11 @@ export function usePaginatedEvents(filters: PaginatedEventFilters = {}) {
     // reflects a pull-to-refresh rather than an infinite-scroll page append.
     isRefreshing: isFetching && page === 1,
     isError,
-    // Deliberately does not rely on the [data, page] effect above to repopulate pagesById:
-    // RTK Query's default structural sharing keeps the *same* `data` reference across a
-    // refetch whenever the response is content-identical to what's already cached (the
-    // common case — a pull-to-refresh usually returns the same events back). That effect is
-    // keyed on `data` itself, so when the reference doesn't change, it never re-fires, and
+    // Deliberately does not rely on the [currentData, page] effect above to repopulate
+    // pagesById: RTK Query's default structural sharing keeps the *same* result reference
+    // across a refetch whenever the response is content-identical to what's already cached
+    // (the common case — a pull-to-refresh usually returns the same events back). That effect
+    // is keyed on that reference, so when it doesn't change, it never re-fires, and
     // the empty Map set below would then stick forever — a pull-to-refresh that looked like
     // it wiped the list and never brought it back. Awaiting the refetch's own settled result
     // and writing it into state directly sidesteps that reference check entirely.

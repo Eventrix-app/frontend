@@ -20,7 +20,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
   const userId = useSelector((state: RootState) => state.auth.user?.id);
   const { data: me } = useGetMeQuery();
   const [updateParticipant, { isLoading: isSaving }] = useUpdateParticipantMutation();
-  const { isUploading: isUploadingPhoto, pickAndUploadPhoto } = useProfilePictureUpload(userId);
+  const { isUploading: isUploadingPhoto, pickAndUploadPhoto, sourcePicker } = useProfilePictureUpload(userId);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -91,6 +91,8 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.skipText}>Skip for now</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {sourcePicker}
     </KeyboardAvoidingView>
   );
 };

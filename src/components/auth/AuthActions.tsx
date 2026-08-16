@@ -3,6 +3,7 @@ import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { LeftArrow } from '../common/Icons';
+import { SpringPressable } from '../common/SpringPressable';
 import { Text } from '../common/Text';
 
 type AuthActionsProps = {
@@ -22,18 +23,23 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
-      <TouchableOpacity style={styles.backWrap} onPress={onBack} activeOpacity={0.8}>
+      {/* Scale feedback rather than TouchableOpacity's fade: backBtn and primaryBtn below
+          both carry an Android elevation, and fading a subtree that contains one paints its
+          shadow as an opaque rectangle over the button while pressed. primaryBtnDisabled
+          already zeroes elevation alongside its opacity for exactly this reason. */}
+      <SpringPressable style={styles.backWrap} onPress={onBack} scaleTo={0.94} accessibilityLabel="Go back">
         <View style={styles.backBtn}>
           <View style={styles.backContent}>
             <LeftArrow color={colors.brandPink} />
           </View>
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity
+      </SpringPressable>
+      <SpringPressable
         style={styles.primaryWrap}
         onPress={onPrimary}
         disabled={primaryDisabled}
-        activeOpacity={0.9}
+        scaleTo={0.97}
+        accessibilityLabel={primaryLabel}
       >
         <View style={[styles.primaryBtn, primaryDisabled && styles.primaryBtnDisabled]}>
           <View style={styles.primaryContent}>
@@ -45,7 +51,7 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
             </Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </SpringPressable>
     </View>
   );
 };

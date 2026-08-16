@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
@@ -9,6 +9,7 @@ import { AuthStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useResetPasswordMutation } from '../../store/services/authApi';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
 
@@ -95,17 +96,21 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
             You can now log in to your account with your new password.
           </Text>
 
-          <TouchableOpacity
+          {/* Scale, not fade: loginBtn is an elevated solid surface, and fading a subtree
+              containing an Android elevation paints its shadow as an opaque rectangle over
+              the button while pressed. */}
+          <SpringPressable
             style={styles.loginBtnWrap}
             onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.9}
+            scaleTo={0.97}
+            accessibilityLabel="Back to Log In"
           >
             <View style={styles.loginBtn}>
               <View style={styles.loginBtnContent}>
                 <Text style={styles.loginBtnText}>Back to Log In</Text>
               </View>
             </View>
-          </TouchableOpacity>
+          </SpringPressable>
         </View>
         <LegalFooter />
       </AuthLayout>

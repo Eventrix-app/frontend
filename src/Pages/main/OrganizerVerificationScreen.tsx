@@ -10,7 +10,11 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetUploadUrlMutation, ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType, UploadPurpose } from '../../store/services/eventsApi';
-import { useGetMyVerificationStatusQuery, useSubmitVerificationMutation } from '../../store/services/organizerApi';
+import {
+  useGetMyVerificationStatusQuery,
+  useSubmitBankAccountMutation,
+  useSubmitVerificationMutation,
+} from '../../store/services/organizerApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { Text } from '../../components/common/Text';
@@ -20,6 +24,13 @@ import { HourglassIcon, CheckCircleIcon, WarningIcon } from '../../components/co
 type Props = NativeStackScreenProps<RootStackParamList, 'OrganizerVerification'>;
 
 type DocField = 'identityProofUrl' | 'addressProofUrl' | 'panOrAadhaarUrl';
+
+// Mirrors SubmitBankAccountDto's server-side rules, and deliberately the same constants
+// PayoutBankAccountScreen uses — the two screens write to the same account, so a rule that
+// disagreed between them would let a value through one and be rejected by the other.
+// Checked here only for immediate feedback; the server revalidates everything.
+const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_PATTERN = /^\d{9,18}$/;
 
 const DOC_FIELDS: { key: DocField; purpose: UploadPurpose; label: string; hint: string }[] = [
   { key: 'identityProofUrl', purpose: 'identity-proof', label: 'Identity Proof', hint: 'Passport, driving license, or voter ID' },
@@ -35,10 +46,15 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
   const { data: status, isLoading: isLoadingStatus } = useGetMyVerificationStatusQuery();
   const [getUploadUrl] = useGetUploadUrlMutation();
   const [submitVerification, { isLoading: isSubmitting }] = useSubmitVerificationMutation();
+  const [submitBankAccount, { isLoading: isSubmittingBank }] = useSubmitBankAccountMutation();
 
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [upiId, setUpiId] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [bankName, setBankName] = useState('');
   const [docs, setDocs] = useState<Record<DocField, string>>({
     identityProofUrl: '',
     addressProofUrl: '',
@@ -89,15 +105,41 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // Normalised exactly as the server normalises them, so what the user sees validated is
+  // what actually gets checked. Spaces and dashes come off account numbers because people
+  // copy them from a passbook or cheque printed in groups.
+  const cleanAccount = accountNumber.replace(/[\s-]/g, '');
+  const cleanConfirm = confirmAccountNumber.replace(/[\s-]/g, '');
+  const cleanIfsc = ifscCode.trim().toUpperCase();
+
+  // Only shown once enough has been typed for the message to be useful — flagging "too
+  // short" against a half-entered account number is noise, not help.
+  const accountError =
+    cleanAccount.length >= 9 && !ACCOUNT_PATTERN.test(cleanAccount) ? 'Account number must be 9-18 digits' : null;
+  const confirmError =
+    cleanConfirm.length >= cleanAccount.length && cleanAccount !== cleanConfirm ? "Account numbers don't match" : null;
+  const ifscError = cleanIfsc.length >= 11 && !IFSC_PATTERN.test(cleanIfsc) ? 'Enter a valid 11-character IFSC' : null;
+
   const isFormValid =
-    fullName.trim() !== '' &&
+    // 2 characters, not merely non-empty: this value is now also sent as the bank account's
+    // holder name, where the server enforces a 2-character minimum. Letting a 1-character
+    // name through here would submit the KYC fine and then fail the payout leg every time.
+    fullName.trim().length >= 2 &&
     companyName.trim() !== '' &&
     upiId.trim() !== '' &&
+    ACCOUNT_PATTERN.test(cleanAccount) &&
+    cleanAccount === cleanConfirm &&
+    IFSC_PATTERN.test(cleanIfsc) &&
+    bankName.trim().length >= 2 &&
     docs.identityProofUrl !== '' &&
     docs.addressProofUrl !== '' &&
     docs.panOrAadhaarUrl !== '';
 
   const handleSubmit = async () => {
+    // Strictly ordered, and this is not incidental: BankAccountService.submit() resolves the
+    // caller's organizer row and 404s without one, and that row is created by
+    // submitVerification on a first-time application. The payout account can only be written
+    // after the KYC submission has landed.
     try {
       await submitVerification({
         fullName: fullName.trim(),
@@ -107,11 +149,45 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
         addressProofUrl: docs.addressProofUrl,
         panOrAadhaarUrl: docs.panOrAadhaarUrl,
       }).unwrap();
-      navigation.replace('VerificationSubmitted');
     } catch (e: any) {
       showAlert('Submission failed', extractErrorMessage(e, 'Something went wrong. Please try again.'));
+      return;
     }
+
+    // KYC is already accepted at this point, so a payout-side failure must not present as a
+    // failed application or send the user back to a form whose submission has succeeded.
+    // The server can legitimately refuse this leg on its own terms — a 503 when
+    // BANK_ENCRYPTION_KEY is unset, or a 409 when the account is already active under
+    // another organizer — and neither is a reason to hold up document review.
+    try {
+      await submitBankAccount({
+        accountNumber: cleanAccount,
+        confirmAccountNumber: cleanConfirm,
+        // The name on the KYC document is the name the account has to be in; admin review
+        // checks exactly that, so it is taken from the field above rather than asked twice.
+        accountHolderName: fullName.trim(),
+        ifscCode: cleanIfsc,
+        bankName: bankName.trim(),
+      }).unwrap();
+    } catch (e: any) {
+      showAlert(
+        'Verification submitted',
+        `${extractErrorMessage(e, "We couldn't save your payout details.")} Your documents are with our team — add your bank details from Profile › Payout Account.`,
+      );
+      navigation.replace('VerificationSubmitted');
+      return;
+    }
+
+    // Cleared before navigating: these are the most sensitive values this screen holds and
+    // there is no reason to leave them in memory once the server has them.
+    setAccountNumber('');
+    setConfirmAccountNumber('');
+    navigation.replace('VerificationSubmitted');
   };
+
+  // Submitting is now two sequential requests, and the button has to stay disabled across
+  // both — not just the first — or a second tap could fire while the bank leg is in flight.
+  const isBusy = isSubmitting || isSubmittingBank;
 
   // Already approved, pending, or rejected — show status instead of the form. A rejected
   // applicant can still see their reason here, then use "Update & Resubmit" to fall through
@@ -182,6 +258,47 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.label}>UPI ID</Text>
           <AuthInput value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" autoCapitalize="none" />
 
+          <Text style={styles.sectionHeading}>Payout Bank Account</Text>
+          <Text style={styles.sectionHint}>
+            Where your event earnings are settled. The account must be in the same name as your ID — an admin checks
+            it against the documents below, then we send ₹1 to confirm it is live before the first real payout.
+          </Text>
+
+          <Text style={styles.label}>Account Number</Text>
+          <AuthInput
+            value={accountNumber}
+            onChangeText={setAccountNumber}
+            placeholder="9-18 digits"
+            keyboardType="number-pad"
+          />
+          {accountError ? <Text style={styles.fieldError}>{accountError}</Text> : null}
+
+          <Text style={styles.label}>Confirm Account Number</Text>
+          <AuthInput
+            value={confirmAccountNumber}
+            onChangeText={setConfirmAccountNumber}
+            placeholder="Re-enter the account number"
+            keyboardType="number-pad"
+            // Pasting defeats the point of a confirmation field — it copies the typo too.
+            contextMenuHidden
+          />
+          {confirmError ? <Text style={styles.fieldError}>{confirmError}</Text> : null}
+
+          <Text style={styles.label}>IFSC Code</Text>
+          <AuthInput
+            value={ifscCode}
+            onChangeText={setIfscCode}
+            placeholder="e.g. HDFC0000123"
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+          {ifscError ? <Text style={styles.fieldError}>{ifscError}</Text> : null}
+
+          <Text style={styles.label}>Bank Name</Text>
+          <AuthInput value={bankName} onChangeText={setBankName} placeholder="e.g. HDFC Bank" />
+
+          <Text style={styles.sectionHeading}>Documents</Text>
+
           {DOC_FIELDS.map((field) => (
             <View key={field.key} style={styles.docRow}>
               <View style={styles.docText}>
@@ -205,11 +322,11 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
           ))}
 
           <TouchableOpacity
-            style={[styles.submitBtn, (!isFormValid || isSubmitting) && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (!isFormValid || isBusy) && styles.submitBtnDisabled]}
             onPress={handleSubmit}
-            disabled={!isFormValid || isSubmitting}
+            disabled={!isFormValid || isBusy}
           >
-            {isSubmitting ? (
+            {isBusy ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={styles.submitBtnText}>Submit for Review</Text>
@@ -226,6 +343,17 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   scroll: { padding: spacing.md },
   intro: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.lg },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.sm },
+  sectionHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  sectionHint: { fontSize: 12, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.xs },
+  fieldError: { fontSize: 12, color: colors.error ?? '#DC2626', marginTop: spacing.xs },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -41,9 +41,6 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   // Seeded from voice search on Home, whose search bar is only a button.
   const [query, setQuery] = useState(route.params?.initialQuery ?? '');
-  // Both write into the box: interim results make dictation appear word by word, and the
-  // final one replaces them with the recogniser's settled wording.
-  const voice = useVoiceSearch({ onResult: setQuery, onPartial: setQuery });
   // Snapshot taken when dictation starts, so cancelling restores whatever was typed rather
   // than leaving a half-heard phrase behind.
   const queryBeforeVoice = useRef('');
@@ -61,9 +58,28 @@ const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   // Held back while dictating so each interim word is shown but not searched on — otherwise
   // "rock festival" fires a request for "rock" first and the list churns mid-sentence.
   const [searchTerm, setSearchTerm] = useState(debouncedQuery);
+
+  // Interim results only fill the box; the settled transcript also runs the search, straight
+  // away. It cannot be left to the debounce below: the user pressed "Search" on the dialog
+  // and expects a result now, and at the moment dictation ends the debounced value is still
+  // whatever the box held 400ms ago — so nothing would search until the timer caught up.
+  const voice = useVoiceSearch({
+    onResult: (transcript) => {
+      setQuery(transcript);
+      setSearchTerm(transcript.trim());
+    },
+    onPartial: setQuery,
+  });
+
   useEffect(() => {
-    if (!voice.isListening) setSearchTerm(debouncedQuery);
-  }, [debouncedQuery, voice.isListening]);
+    if (voice.isListening) return;
+    // Adopted only once the debounce has caught up with what is actually in the box.
+    // Without this the end of dictation would immediately overwrite the final transcript
+    // that onResult just searched on with the pre-dictation term, and leave it wrong for a
+    // full debounce period before correcting itself.
+    if (debouncedQuery !== query.trim()) return;
+    setSearchTerm(debouncedQuery);
+  }, [debouncedQuery, query, voice.isListening]);
 
   // Category now goes through the same server-side param as search (GET /events?categoryId=)
   // instead of filtering only the already-loaded page — previously "load more" while a

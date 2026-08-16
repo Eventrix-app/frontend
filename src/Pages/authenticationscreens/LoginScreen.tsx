@@ -16,6 +16,7 @@ import { registerForPushNotifications } from '../../utils/registerForPushNotific
 import { getDeviceLabel } from '../../utils/getDeviceLabel';
 import { prefetchPostLoginData } from '../../utils/prefetchPostLoginData';
 import { showAlert } from '../../utils/crossPlatformAlert';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
 import { AuthStackParamList } from '../../navigation/types';
@@ -154,14 +155,19 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         ) : null}
 
-        <TouchableOpacity
+        {/* Scale, not fade: loginBtn is an elevated solid surface, and fading a subtree
+            containing an Android elevation paints its shadow as an opaque rectangle over
+            the button while pressed. loginBtnDisabled already zeroes elevation next to its
+            opacity for the same reason. */}
+        <SpringPressable
           style={[
             styles.loginWrap,
             { marginTop: isCompact ? spacing.sm : spacing.md },
           ]}
           onPress={handleLogin}
           disabled={!isFormValid || isLoading}
-          activeOpacity={0.9}
+          scaleTo={0.97}
+          accessibilityLabel="Login"
         >
           <View
             style={[
@@ -193,7 +199,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
           </View>
-        </TouchableOpacity>
+        </SpringPressable>
 
         <View style={styles.registerLinkWrap}>
           <Text style={styles.registerHint}>Don&apos;t have an account?</Text>

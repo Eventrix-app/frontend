@@ -8,6 +8,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store';
 import { setCurrentScreen } from '../store/slices/uiSlice';
 import { notificationsApi } from '../store/services/notificationsApi';
+import { paymentsApi } from '../store/services/paymentsApi';
+import { eventsApi } from '../store/services/eventsApi';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import EventDetailsScreen from '../Pages/main/EventDetailsScreen';
@@ -189,8 +191,17 @@ const RootNavigator = () => {
 
     // A push arrived while the app is in the foreground — refresh the in-app
     // notifications list so it shows up without the user needing to reopen the screen.
-    const receivedSub = Notifications.addNotificationReceivedListener(() => {
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       dispatch(notificationsApi.util.invalidateTags(['Notifications']));
+
+      // A refund decision changes state the user may be looking at right now (the Bookings
+      // list, a ticket). Refreshing it here is what makes the new status — and the reason a
+      // rejection came with — appear on the card without the user reopening the screen.
+      const data = notification.request.content.data as Record<string, unknown> | undefined;
+      if (data?.type === 'refund_status') {
+        dispatch(paymentsApi.util.invalidateTags(['MyRefunds']));
+        dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
+      }
     });
 
     return () => {

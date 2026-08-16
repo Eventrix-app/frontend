@@ -23,7 +23,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const userId = useSelector((state: RootState) => state.auth.user?.id);
   const { data: me, isLoading: isLoadingMe } = useGetMeQuery();
   const [updateParticipant, { isLoading: isSaving }] = useUpdateParticipantMutation();
-  const { isUploading: isUploadingPhoto, pickAndUploadPhoto } = useProfilePictureUpload(userId);
+  const { isUploading: isUploadingPhoto, pickAndUploadPhoto, sourcePicker } = useProfilePictureUpload(userId);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -145,6 +145,8 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </View>
+
+      {sourcePicker}
     </KeyboardAvoidingView>
   );
 };

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { AuthInput } from '../../components/auth/AuthInput';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import { WarningIcon } from '../../components/common/Icons';
 import { RootStackParamList } from '../../navigation/types';
@@ -93,13 +94,16 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           <Text style={styles.successTitle}>Email Verified!</Text>
           <Text style={styles.successText}>Your email address has been successfully verified.</Text>
-          <TouchableOpacity style={styles.doneBtnWrap} onPress={() => navigation.goBack()} activeOpacity={0.9}>
+          {/* Scale, not fade: doneBtn is an elevated solid surface, and fading a subtree
+              containing an Android elevation paints its shadow as an opaque rectangle over
+              the button while pressed. */}
+          <SpringPressable style={styles.doneBtnWrap} onPress={() => navigation.goBack()} scaleTo={0.97} accessibilityLabel="Done">
             <View style={styles.doneBtn}>
               <View style={styles.doneBtnContent}>
                 <Text style={styles.doneBtnText}>Done</Text>
               </View>
             </View>
-          </TouchableOpacity>
+          </SpringPressable>
         </View>
       </View>
     );
@@ -129,13 +133,13 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.helperText}>
               We'll send a 6-digit verification code to this email address.
             </Text>
-            <TouchableOpacity style={styles.primaryBtnWrap} onPress={handleSendCode} disabled={isSending} activeOpacity={0.9}>
+            <SpringPressable style={styles.primaryBtnWrap} onPress={handleSendCode} disabled={isSending} scaleTo={0.97} accessibilityLabel="Send Verification Code">
               <View style={[styles.primaryBtn, isSending && styles.primaryBtnDisabled]}>
                 <View style={styles.primaryBtnContent}>
                   <Text style={styles.primaryBtnText}>{isSending ? 'Sending...' : 'Send Verification Code'}</Text>
                 </View>
               </View>
-            </TouchableOpacity>
+            </SpringPressable>
           </>
         ) : (
           <>
@@ -160,13 +164,13 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ) : null}
 
-            <TouchableOpacity style={styles.primaryBtnWrap} onPress={handleVerify} disabled={isConfirming} activeOpacity={0.9}>
+            <SpringPressable style={styles.primaryBtnWrap} onPress={handleVerify} disabled={isConfirming} scaleTo={0.97} accessibilityLabel="Verify Email">
               <View style={[styles.primaryBtn, isConfirming && styles.primaryBtnDisabled]}>
                 <View style={styles.primaryBtnContent}>
                   <Text style={styles.primaryBtnText}>{isConfirming ? 'Verifying...' : 'Verify Email'}</Text>
                 </View>
               </View>
-            </TouchableOpacity>
+            </SpringPressable>
 
             <TouchableOpacity onPress={handleSendCode} disabled={isSending} style={styles.resendWrap}>
               <Text style={styles.resendText}>{isSending ? 'Resending...' : "Didn't get a code? Resend"}</Text>

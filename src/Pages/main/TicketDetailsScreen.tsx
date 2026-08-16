@@ -12,6 +12,7 @@ import { useGetEnrollmentByIdQuery, useCancelEnrollmentMutation } from '../../st
 import { useRequestRefundMutation } from '../../store/services/paymentsApi';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
 import TicketDetailsSkeleton from '../../components/common/TicketDetailsSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
@@ -134,9 +135,12 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         title="Ticket Details"
         onBack={handleGoBack}
         rightAction={
-          <TouchableOpacity style={styles.shareIconBtn} onPress={handleShare} hitSlop={8}>
+          // Scale, not fade: shareIconBtn is an elevated surface, and fading a subtree
+          // containing an Android elevation paints its shadow as an opaque rectangle over
+          // the button while pressed.
+          <SpringPressable style={styles.shareIconBtn} onPress={handleShare} hitSlop={8} accessibilityLabel="Share ticket">
             <Text style={styles.shareIconText}>⤴</Text>
-          </TouchableOpacity>
+          </SpringPressable>
         }
       />
 

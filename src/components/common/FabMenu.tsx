@@ -11,6 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { SpringPressable } from './SpringPressable';
 import { Text } from './Text';
 import { IconProps, MenuOpenIcon, MenuCloseIcon } from './Icons';
 import { useTheme } from '../../theme/ThemeContext';
@@ -138,9 +139,14 @@ const FabMenu: React.FC<Props> = ({
         />
       ))}
 
+      {/* activeOpacity 1 — no fade at all. The FAB already animates its own press
+          compression (fabPress above), so the fade added nothing, and styles.fab carries an
+          Android elevation: fading a subtree containing one makes Android composite it
+          offscreen and paint its shadow as an opaque rectangle over the button mid-press. */}
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={1}
         onPress={toggle}
+        accessibilityRole="button"
         accessibilityLabel={open ? closeAccessibilityLabel : openAccessibilityLabel}
       >
         <Animated.View style={[styles.fab, fabAnimatedStyle]}>
@@ -230,7 +236,10 @@ const FabMenuItemView: React.FC<ItemViewProps> = ({ item, index, total, open, co
         animatedStyle,
       ]}
     >
-      <TouchableOpacity style={styles.itemPill} activeOpacity={0.85} onPress={onSelect}>
+      {/* Scale rather than fade — itemPill is an elevated solid surface, and
+          TouchableOpacity's alpha animation over one paints its shadow as an opaque
+          rectangle across the pill while pressed. */}
+      <SpringPressable style={styles.itemPill} onPress={onSelect} scaleTo={0.96} accessibilityLabel={item.label}>
         {/* Solid brandPink fill needs white for both regular and destructive items —
             colors.error ('#EF4444') is close enough in hue/lightness to brandPink
             ('#FF3366') that red-on-pink text would be nearly illegible here. */}
@@ -238,7 +247,7 @@ const FabMenuItemView: React.FC<ItemViewProps> = ({ item, index, total, open, co
         <Text style={styles.itemLabel} numberOfLines={1}>
           {item.label}
         </Text>
-      </TouchableOpacity>
+      </SpringPressable>
     </Animated.View>
   );
 };

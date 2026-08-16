@@ -8,7 +8,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { EnrollmentRecord, useGetMyEnrollmentsQuery, useGetMyWaitlistQuery } from '../../store/services/eventsApi';
-import { useGetInvoiceDataQuery } from '../../store/services/paymentsApi';
+import { useGetInvoiceDataQuery, useGetMyRefundsQuery, type RefundRecord } from '../../store/services/paymentsApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { formatEventDate } from '../../utils/eventCardAdapter';
@@ -63,6 +63,16 @@ function statusDisplayFor(enrollment: EnrollmentRecord, eventOver: boolean): { l
 function fmtRupees(amount: number): string {
   return `₹${Number(amount).toFixed(2)}`;
 }
+
+// What the participant should read for each refund state. 'processed' is deliberately absent
+// — by then the enrollment itself reads "Refunded" in the status line above, and repeating it
+// would only add noise.
+const REFUND_DISPLAY: Partial<Record<RefundRecord['status'], { label: string; tone: StatusTone }>> = {
+  requested: { label: 'Refund requested — under review', tone: 'warning' },
+  approved: { label: 'Refund approved — processing', tone: 'success' },
+  rejected: { label: 'Refund request declined', tone: 'error' },
+  failed: { label: "Refund couldn't be processed", tone: 'error' },
+};
 
 // Per-card invoice button + modal — self-contained so the RTK Query instance is
 // scoped to each card and the fetch is deferred until the user taps "Tax Invoice".
@@ -233,6 +243,19 @@ const BookingsScreen: React.FC = () => {
     isError: isErrorWaitlist,
     refetch: refetchWaitlist,
   } = useGetMyWaitlistQuery();
+  // Refunds are keyed by enrollment so each card can show its own. Fetched once for the
+  // screen rather than per card — a per-card query would fire one request per booking.
+  const { data: refunds = [] } = useGetMyRefundsQuery();
+  const refundByEnrollment = useMemo(() => {
+    const map = new Map<string, RefundRecord>();
+    // Newest first from the server, so the first entry seen for an enrollment is the current
+    // one — a booking can accumulate several refunds over its life (a rejection does not
+    // close the booking, and the user may ask again).
+    refunds.forEach((refund) => {
+      if (!map.has(refund.enrollmentId)) map.set(refund.enrollmentId, refund);
+    });
+    return map;
+  }, [refunds]);
   const { data: notifications = [] } = useGetNotificationsQuery();
   const hasUnread = notifications.some((n) => !n.readAt);
   const { data: me } = useGetMeQuery();
@@ -401,6 +424,8 @@ const BookingsScreen: React.FC = () => {
                 const event = booking.event;
                 const eventOver = !!event?.eventDate && !!event?.startTime && isEventOver(event);
                 const status = statusDisplayFor(booking, eventOver);
+                const refund = refundByEnrollment.get(booking.id);
+                const refundDisplay = refund ? REFUND_DISPLAY[refund.status] : undefined;
                 return (
                   <TicketCard key={booking.id} styles={styles}>
                     <Text style={styles.eventTitle}>{event?.title ?? 'Event'}</Text>
@@ -420,6 +445,24 @@ const BookingsScreen: React.FC = () => {
                         </Text>
                       </View>
                     </View>
+
+                    {/* Sits below the booking's own details, above the divider — the refund is
+                        a fact about this booking, not a separate row in the footer's action
+                        line. The declined case carries the organizer's reason with it; a
+                        rejection with no explanation is the complaint this exists to fix. */}
+                    {refundDisplay ? (
+                      <View style={styles.refundBox}>
+                        <Text style={[styles.refundStatus, { color: colors[refundDisplay.tone] }]}>
+                          {refundDisplay.label}
+                        </Text>
+                        {refund?.status === 'rejected' && refund.rejectionReason ? (
+                          <>
+                            <Text style={styles.refundReasonLabel}>Reason</Text>
+                            <Text style={styles.refundReasonText}>{refund.rejectionReason}</Text>
+                          </>
+                        ) : null}
+                      </View>
+                    ) : null}
 
                     <View style={styles.stubDivider} />
 
@@ -700,6 +743,15 @@ notchLeft: {
     fontWeight: '600',
     color: colors.text,
   },
+  refundBox: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  refundStatus: { fontSize: 13, fontWeight: '700' },
+  refundReasonLabel: { fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
+  refundReasonText: { fontSize: 13, color: colors.text, marginTop: 2, lineHeight: 18 },
   // Approximates a ticket-stub perforation. borderStyle: 'dashed' renders correctly on iOS
   // and web, but Android's dashed border support is inconsistent — if it renders solid on
   // Android, swap this for a row of small dot Views instead.

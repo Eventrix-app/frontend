@@ -345,18 +345,11 @@ const ShortsScreen: React.FC = () => {
   const isFocused = useIsFocused();
 
   const { data, isLoading, isFetching, isError, refetch } = useGetShortsFeedQuery({ page, limit: PAGE_SIZE });
-  // Accumulated across pages: the query itself is keyed per page, so without this the feed
-  // would replace its contents on every page change instead of growing.
-  const [loaded, setLoaded] = useState<FeedShort[]>([]);
-  React.useEffect(() => {
-    if (!data) return;
-    setLoaded((prev) => {
-      const merged = data.page === 1 ? data.shorts : [...prev, ...data.shorts];
-      // Dedupe by id — a reel inserted while paging can otherwise shift rows across the
-      // page boundary and arrive twice, which would crash FlatList on duplicate keys.
-      return [...new Map(merged.map((s) => [s.id, s])).values()];
-    });
-  }, [data]);
+  // Pages are accumulated and deduped inside the cache entry itself (see getShortsFeed's
+  // merge in shortsApi.ts), so this reads the merged feed directly. It deliberately does not
+  // keep its own copy: a local snapshot could not see the like/comment counts patched into
+  // the cache, which is exactly why those numbers used to lag behind the tap.
+  const loaded = data?.shorts ?? [];
 
   // Liked state is per-user, so it is only requested when signed in — the feed itself is
   // public and must still render for a signed-out viewer.
