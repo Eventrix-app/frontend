@@ -102,8 +102,36 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         showAlert('Sign in failed', 'Google Play Services is required to sign in with Google.');
         return;
       }
+      if (isErrorWithCode(err) && err.code === statusCodes.IN_PROGRESS) return;
+
+      // DEVELOPER_ERROR is Google's code for "this app's signing certificate and package
+      // name do not match any OAuth client in the Cloud project". It has no constant in
+      // statusCodes, so it used to fall through to the generic message below — which is
+      // exactly the case that fails identically for every account and looks like a broken
+      // login rather than a build/console mismatch.
+      if (isErrorWithCode(err) && String(err.code).toUpperCase().includes('DEVELOPER_ERROR')) {
+        showAlert(
+          'Sign in unavailable',
+          "This build isn't registered for Google sign-in. Its SHA-1 signing fingerprint and package name need to match an Android OAuth client in the Google Cloud project.",
+        );
+        return;
+      }
+
       const serverMessage = err?.data?.message;
-      showAlert('Sign in failed', typeof serverMessage === 'string' ? serverMessage : 'Could not sign in with this account. Please try again.');
+      if (typeof serverMessage === 'string') {
+        showAlert('Sign in failed', serverMessage);
+        return;
+      }
+
+      // The code is included rather than swallowed. Every remaining failure previously
+      // collapsed into one sentence, which made a signing mismatch, an offline device and a
+      // server rejection indistinguishable from each other and from the app's own bugs.
+      const code = isErrorWithCode(err) ? ` (${err.code})` : '';
+      showAlert(
+        'Sign in failed',
+        `Could not sign in with this account. Please try again.${code}`,
+      );
+      if (__DEV__) console.warn('[Google sign-in] failed:', err?.code, err?.message, err);
     }
   };
 
