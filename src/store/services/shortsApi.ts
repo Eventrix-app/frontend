@@ -161,13 +161,19 @@ export const shortsApi = createApi({
       async onQueryStarted(id, api) {
         const { queryFulfilled } = api;
         const patch = patchFeedEverywhere(api, id, (short) => {
-          short.likeCount += 1;
+          // ?? 0 rather than a bare +1: an older cached row without the field would
+          // otherwise become NaN, which formatCount renders as a flat 0.
+          short.likeCount = (short.likeCount ?? 0) + 1;
         });
         const likedPatch = patchMyLikes(api, id, true);
         try {
           const { data } = await queryFulfilled;
           patchFeedEverywhere(api, id, (short) => {
-            short.likeCount = data.likeCount;
+            // Only written back when the server actually sent a number. It briefly did not
+            // — the like endpoint misread its own UPDATE result and answered with
+            // `likeCount: undefined`, which landed here and blanked the count to 0. The
+            // server is the authority, but not on a value it did not send.
+            if (typeof data?.likeCount === 'number') short.likeCount = data.likeCount;
           });
         } catch {
           // The request failed — put the count back rather than leaving a like that
@@ -184,13 +190,14 @@ export const shortsApi = createApi({
         const { queryFulfilled } = api;
         const patch = patchFeedEverywhere(api, id, (short) => {
           // Floored at zero so a stale cached count can never render as negative.
-          short.likeCount = Math.max(0, short.likeCount - 1);
+          short.likeCount = Math.max(0, (short.likeCount ?? 0) - 1);
         });
         const likedPatch = patchMyLikes(api, id, false);
         try {
           const { data } = await queryFulfilled;
           patchFeedEverywhere(api, id, (short) => {
-            short.likeCount = data.likeCount;
+            // Guarded for the same reason as like() above.
+            if (typeof data?.likeCount === 'number') short.likeCount = data.likeCount;
           });
         } catch {
           patch.forEach((p) => p.undo());
@@ -225,7 +232,7 @@ export const shortsApi = createApi({
       async onQueryStarted({ shortId, body }, api) {
         const { queryFulfilled } = api;
         const patch = patchFeedEverywhere(api, shortId, (short) => {
-          short.commentCount += 1;
+          short.commentCount = (short.commentCount ?? 0) + 1;
         });
         // The open sheet renders its own header count off getShortComments.total, which the
         // tag invalidation above only corrects a round trip later. Showing the comment (and
@@ -246,7 +253,7 @@ export const shortsApi = createApi({
       async onQueryStarted({ shortId }, api) {
         const { queryFulfilled } = api;
         const patch = patchFeedEverywhere(api, shortId, (short) => {
-          short.commentCount = Math.max(0, short.commentCount - 1);
+          short.commentCount = Math.max(0, (short.commentCount ?? 0) - 1);
         });
         try {
           await queryFulfilled;
@@ -268,7 +275,10 @@ export const shortsApi = createApi({
         try {
           const { data } = await api.queryFulfilled;
           patchFeedEverywhere(api, id, (short) => {
-            short.viewCount = data.viewCount;
+            // Guarded like the like/unlike write-backs: the view endpoint had the same
+            // misread of its own UPDATE result, and blanking a real count to 0 is worse
+            // than leaving the last known one in place.
+            if (typeof data?.viewCount === 'number') short.viewCount = data.viewCount;
           });
         } catch {
           // An uncounted view is invisible to the user and not worth surfacing.
