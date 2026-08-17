@@ -1,12 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { useUpdateParticipantMutation, useGetMeQuery } from '../store/services/userApi';
+import { useUpdateParticipantMutation } from '../store/services/userApi';
 import { useGetUploadUrlMutation, ALLOWED_UPLOAD_CONTENT_TYPES, UploadContentType } from '../store/services/eventsApi';
 import { showAlert } from '../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../utils/apiError';
 import PhotoSourceSheet, { type PhotoSource } from '../components/common/PhotoSourceSheet';
-import GoogleDrivePickerModal from '../components/common/GoogleDrivePickerModal';
-import { fetchDriveImageBlob, type DriveImage } from '../services/googleDriveService';
 
 const PICKER_OPTIONS = {
   allowsEditing: true,
@@ -25,22 +23,15 @@ function resolveContentType(mimeType: string | null | undefined): UploadContentT
 // record. Callers just read `me.profilePictureUrl` afterward (updateParticipant
 // invalidates the 'Me' cache tag, so it refetches on its own).
 //
-// `pickAndUploadPhoto` no longer opens the photo library directly: it opens a source
-// chooser, and the caller renders the returned `sourcePicker` element for it to appear in.
+// `pickAndUploadPhoto` does not open the photo library directly: it opens a source chooser,
+// and the caller renders the returned `sourcePicker` element for it to appear in.
 export function useProfilePictureUpload(userId: string | undefined) {
   const [updateParticipant] = useUpdateParticipantMutation();
   const [getUploadUrl] = useGetUploadUrlMutation();
-  const { data: me } = useGetMeQuery();
   const [isUploading, setIsUploading] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isDriveOpen, setIsDriveOpen] = useState(false);
 
-  // Drive is only worth offering to an account that actually signed in with Google — the
-  // scope prompt has nowhere to go otherwise.
-  const canUseDrive = !!me?.authProviders?.includes('google');
-
-  // Everything converges here regardless of where the bytes came from, so camera, library
-  // and Drive share one upload path and one failure message.
+  // Both sources converge here, so they share one upload path and one failure message.
   const uploadBlob = useCallback(
     async (blob: Blob, contentType: UploadContentType) => {
       if (!userId) return;
@@ -108,33 +99,12 @@ export function useProfilePictureUpload(userId: string | undefined) {
     await uploadPickerResult(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
   }, [uploadPickerResult]);
 
-  const handleSelectDriveFile = useCallback(
-    async (file: DriveImage) => {
-      setIsDriveOpen(false);
-      setIsUploading(true);
-      try {
-        const blob = await fetchDriveImageBlob(file.id);
-        setIsUploading(false);
-        await uploadBlob(blob, resolveContentType(file.mimeType));
-      } catch (e: any) {
-        setIsUploading(false);
-        showAlert("Couldn't use that file", extractErrorMessage(e, 'Could not download the image from Google Drive.'));
-      }
-    },
-    [uploadBlob],
-  );
-
   const handleSelectSource = useCallback(
     (source: PhotoSource) => {
-      // Closed before anything else opens: on both platforms a native picker presented while
-      // a modal is still dismissing can be swallowed entirely.
+      // Closed before the picker opens: on both platforms a native picker presented while a
+      // modal is still dismissing can be swallowed entirely. The delay covers the sheet's
+      // close animation, which owns the screen until it finishes.
       setIsSheetOpen(false);
-      if (source === 'drive') {
-        setIsDriveOpen(true);
-        return;
-      }
-      // Deferred a tick for the same reason — the sheet's close animation owns the screen
-      // until it finishes.
       setTimeout(() => {
         if (source === 'camera') void takePhoto();
         else void pickFromLibrary();
@@ -148,25 +118,13 @@ export function useProfilePictureUpload(userId: string | undefined) {
     setIsSheetOpen(true);
   }, [isUploading, userId]);
 
-  // Returned as an element rather than expecting every caller to wire three pieces of state
-  // and two modals: the call sites are avatar buttons, and they should stay that simple.
-  const sourcePicker = React.createElement(
-    React.Fragment,
-    null,
-    React.createElement(PhotoSourceSheet, {
-      key: 'source',
-      visible: isSheetOpen,
-      onClose: () => setIsSheetOpen(false),
-      onSelect: handleSelectSource,
-      showDrive: canUseDrive,
-    }),
-    React.createElement(GoogleDrivePickerModal, {
-      key: 'drive',
-      visible: isDriveOpen,
-      onClose: () => setIsDriveOpen(false),
-      onSelect: handleSelectDriveFile,
-    }),
-  );
+  // Returned as an element rather than expecting every caller to wire the state and the
+  // sheet themselves: the call sites are avatar buttons, and they should stay that simple.
+  const sourcePicker = React.createElement(PhotoSourceSheet, {
+    visible: isSheetOpen,
+    onClose: () => setIsSheetOpen(false),
+    onSelect: handleSelectSource,
+  });
 
   return { isUploading, pickAndUploadPhoto, sourcePicker };
 }

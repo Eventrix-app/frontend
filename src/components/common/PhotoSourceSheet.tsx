@@ -7,24 +7,17 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 
-export type PhotoSource = 'camera' | 'library' | 'drive';
+export type PhotoSource = 'camera' | 'library';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSelect: (source: PhotoSource) => void;
-  /**
-   * Whether to offer Google Drive. Only true for accounts that actually signed in with
-   * Google — everyone else has no Drive session to browse, and an option that always ends
-   * in "sign in with Google first" is worse than no option.
-   */
-  showDrive: boolean;
 }
 
 const OPTIONS: { source: PhotoSource; icon: React.ComponentProps<typeof Feather>['name']; label: string; hint: string }[] = [
   { source: 'camera', icon: 'camera', label: 'Take a photo', hint: 'Use your camera' },
   { source: 'library', icon: 'image', label: 'Photo library', hint: 'Choose from your photos' },
-  { source: 'drive', icon: 'cloud', label: 'Google Drive', hint: 'Browse images in your Drive' },
 ];
 
 /**
@@ -34,19 +27,18 @@ const OPTIONS: { source: PhotoSource; icon: React.ComponentProps<typeof Feather>
  * say and no way back to a different source without cancelling out of a picker they never
  * asked for.
  */
-const PhotoSourceSheet: React.FC<Props> = ({ visible, onClose, onSelect, showDrive }) => {
+const PhotoSourceSheet: React.FC<Props> = ({ visible, onClose, onSelect }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const options = showDrive ? OPTIONS : OPTIONS.filter((o) => o.source !== 'drive');
 
   return (
-    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={showDrive ? 0.42 : 0.36}>
+    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.36}>
       <View style={styles.body}>
         <Text variant="h4" color="text" style={styles.title}>Profile photo</Text>
         <Text variant="caption" color="textSecondary" style={styles.subtitle}>Where would you like to pick it from?</Text>
 
         <View style={styles.options}>
-          {options.map((option) => (
+          {OPTIONS.map((option) => (
             <TouchableOpacity
               key={option.source}
               style={styles.option}
