@@ -45,9 +45,13 @@ yarn-error.*
 /ios
 /android
 /lovable-screens
-eventrix-ff79a-firebase-adminsdk-fbsvc-d06a1db5ed.json
 *firebase-adminsdk*.json
 google-services.json
+# OAuth client downloads from the Cloud console - these carry a client_secret.
+client_secret_*.json
+# Service-account key downloads, whatever the console names them.
+*service-account*.json
+*serviceAccount*.json
 GoogleService-Info.plist
 
 # generated/derived artifacts (regenerate via convert.js)
