@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { AuthActions } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
-import { AuthStackParamList, RootStackParamList } from '../../navigation/types';
+import { AuthStackParamList } from '../../navigation/types';
 import { spacing } from '../../theme/spacing';
 import { useRegisterMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
@@ -20,6 +20,7 @@ import { WarningIcon } from '../../components/common/Icons';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
 import { isAtLeastAge, latestDateOfBirthForMinAge } from '../../utils/dateFormat';
 import { useTheme } from '../../theme/ThemeContext';
+import { openLegalDocument } from '../../config/legalLinks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -27,10 +28,6 @@ const MIN_AGE = 18;
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
-  // Register lives inside the Auth child navigator — LegalDocument is a RootStack screen,
-  // so opening it (from the checkbox's inline links below) goes through the parent, same
-  // as LegalFooter's own links.
-  const rootNavigation = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -180,11 +177,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             checkbox as before. */}
         <Text style={styles.agreeText}>
           I agree to the{' '}
-          <Text style={styles.agreeLink} onPress={() => rootNavigation?.navigate('LegalDocument', { doc: 'terms' })}>
+          <Text style={styles.agreeLink} onPress={() => void openLegalDocument('terms')}>
             Terms of Use
           </Text>
           {' '}and{' '}
-          <Text style={styles.agreeLink} onPress={() => rootNavigation?.navigate('LegalDocument', { doc: 'privacy' })}>
+          <Text style={styles.agreeLink} onPress={() => void openLegalDocument('privacy')}>
             Privacy Policy
           </Text>
         </Text>

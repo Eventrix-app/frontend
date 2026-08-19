@@ -6,17 +6,19 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 import { RootStackParamList } from '../../navigation/types';
+import { openLegalDocument } from '../../config/legalLinks';
 
 type LegalFooterProps = {
   compact?: boolean;
 };
 
-// Auth-stack screens (Register/Login/ForgotPassword/UpdatePassword) sit inside the "Auth"
-// child navigator — these links target RootStack screens, so they go through the parent
-// navigator, same pattern RegisterScreen already uses for its post-register redirect.
+// The legal documents open on the website instead of in-app, so only Contact Us still
+// needs the navigator. Auth-stack screens (Register/Login/ForgotPassword/UpdatePassword)
+// sit inside the "Auth" child navigator and HelpCenter is a RootStack screen, so that one
+// goes through the parent — same pattern RegisterScreen uses for its post-register redirect.
 const LINKS: { label: string; onPress: (root: NativeStackNavigationProp<RootStackParamList> | undefined) => void }[] = [
-  { label: 'Terms of use', onPress: (root) => root?.navigate('LegalDocument', { doc: 'terms' }) },
-  { label: 'Privacy Policy', onPress: (root) => root?.navigate('LegalDocument', { doc: 'privacy' }) },
+  { label: 'Terms of use', onPress: () => void openLegalDocument('terms') },
+  { label: 'Privacy Policy', onPress: () => void openLegalDocument('privacy') },
   { label: 'Contact Us', onPress: (root) => root?.navigate('HelpCenter') },
 ];
 

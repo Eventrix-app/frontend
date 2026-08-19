@@ -18,6 +18,7 @@ import { RootStackParamList } from '../../navigation/types';
 import type { AppDispatch } from '../../store';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+import { openLegalDocument } from '../../config/legalLinks';
 import { borderRadius } from '../../theme/borderRadius';
 import {
   eventsApi,
@@ -487,11 +488,13 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.footerLinksWrap}>
           <Text style={styles.footerCopyright}>All Rights Reserved. {'\u00a9'} Eventrix</Text>
           <View style={styles.footerLinksRow}>
-            <Text style={styles.footerLink}>Terms of use</Text>
+            {/* Rendered as inert text until now: styled as links with no handler, so
+                tapping a policy from checkout did nothing. */}
+            <Text style={styles.footerLink} onPress={() => void openLegalDocument('terms')}>Terms of use</Text>
             <Text style={styles.footerLinkDot}> {'\u2022'} </Text>
-            <Text style={styles.footerLink}>Privacy Policy</Text>
+            <Text style={styles.footerLink} onPress={() => void openLegalDocument('privacy')}>Privacy Policy</Text>
             <Text style={styles.footerLinkDot}> {'\u2022'} </Text>
-            <Text style={styles.footerLink}>Contact Us</Text>
+            <Text style={styles.footerLink} onPress={() => navigation.navigate('HelpCenter' as never)}>Contact Us</Text>
           </View>
           <Image
             source={watermarkSource}

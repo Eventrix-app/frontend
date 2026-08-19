@@ -21,7 +21,6 @@ import EditProfileScreen from '../Pages/main/EditProfileScreen';
 import SettingsScreen from '../Pages/main/SettingsScreen';
 import VerifyEmailScreen from '../Pages/main/VerifyEmailScreen';
 import HelpCenterScreen from '../Pages/main/HelpCenterScreen';
-import LegalDocumentScreen from '../Pages/main/LegalDocumentScreen';
 import ActiveSessionsScreen from '../Pages/main/ActiveSessionsScreen';
 import BlockedUsersScreen from '../Pages/main/BlockedUsersScreen';
 import SavedEventsScreen from '../Pages/main/SavedEventsScreen';
@@ -239,7 +238,6 @@ const RootNavigator = () => {
         <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-        <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
         <Stack.Screen name="ActiveSessions" component={ActiveSessionsScreen} />
         <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />

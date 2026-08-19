@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch } from 'react-redux';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { RootStackParamList, LegalDocumentKey } from '../../navigation/types';
+import { RootStackParamList } from '../../navigation/types';
+import { openLegalDocument, type LegalDocumentKey } from '../../config/legalLinks';
 import { logout } from '../../store/slices/authSlice';
 import { ColorPalette } from '../../theme/colors.light';
 import { useTheme } from '../../theme/ThemeContext';
@@ -278,7 +279,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.row}
                 onPress={() => {
                   if (item.id === 'help') navigation.navigate('HelpCenter');
-                  else if (item.legalDoc) navigation.navigate('LegalDocument', { doc: item.legalDoc });
+                  else if (item.legalDoc) void openLegalDocument(item.legalDoc);
                 }}
               >
                 <Text style={styles.label}>{item.label}</Text>

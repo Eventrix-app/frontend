@@ -1,8 +1,8 @@
-// Business/legal details interpolated into the in-app Privacy Policy and Terms &
-// Conditions (see content/legalDocuments.ts). Centralized here so there's exactly one
-// place to fill in before shipping to real users or submitting to app stores — until
-// then, the values below render literally in-app, which is intentional: it's more honest
-// than silently shipping a fake company name or address.
+// Business/legal details surfaced in-app — currently the Help Center's grievance contact
+// block. The policy documents themselves now live on the website (see config/legalLinks),
+// so these values no longer feed a transcription; they are what the app itself displays.
+// Until they are filled in, the placeholders below render literally, which is intentional:
+// more honest than silently showing a fake company name or address.
 //
 // TODO before launch: replace every value below with the real, registered details.
 export const COMPANY_LEGAL_NAME = 'The Ladders Tech';
@@ -25,7 +25,8 @@ export const GRIEVANCE_OFFICER_EMAIL = 'grievance@eventrix.app';
 export const GRIEVANCE_ACK_SLA_HOURS = 24;
 export const GRIEVANCE_RESOLUTION_SLA_DAYS = 15;
 
-// Bump LAST_UPDATED (and EFFECTIVE_DATE, if the change is substantive) whenever the
-// content in content/legalDocuments.ts changes.
+// Mirrors the dates published on the website's legal pages. Bump LAST_UPDATED (and
+// EFFECTIVE_DATE, if the change is substantive) whenever those documents change, so the
+// in-app grievance block does not quote a stale revision.
 export const EFFECTIVE_DATE = 'July 24, 2026';
 export const LAST_UPDATED = 'July 24, 2026';
