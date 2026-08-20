@@ -619,12 +619,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginBottom: spacing.lg,
   },
   avatarRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     // Translucent over the gradient with a white rim, as the old header had — a solid
     // brandPink disc would vanish into the banner behind it. The border is inset, so the
-    // circle is still exactly 100pt.
+    // circle is still exactly 76pt.
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderWidth: 3,
     borderColor: colors.white,
@@ -634,13 +634,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     flexShrink: 0,
     overflow: 'hidden',
   },
-  avatarInitial: { fontSize: 40, lineHeight: 46, color: colors.white },
+  avatarInitial: { fontSize: 30, lineHeight: 36, color: colors.white },
   avatarImage: { width: '100%', height: '100%' },
   selfStatsRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    // The 24pt reclaimed from the avatar goes to the four numbers, which were reading as
+    // one crowded block. space-between plus an explicit gap keeps them apart even when a
+    // count grows to four digits and the labels start competing for the same width.
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   stat: { alignItems: 'center' },
   statValue: { marginBottom: 2 },

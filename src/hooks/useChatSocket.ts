@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseRealtimeClient } from '../utils/supabaseRealtimeClient';
 import { ChatMessageRecord, useGetChatHistoryQuery, useSendChatMessageMutation } from '../store/services/chatApi';
+import { useListBlockedUsersQuery } from '../store/services/moderationApi';
 
 // Live delivery via Supabase Realtime Broadcast, one channel per event ('event:<eventId>',
 // matching the topic ChatRealtimeService broadcasts to on the backend). Sending is a plain
@@ -22,6 +23,15 @@ export function useChatSocket(eventId: string | undefined) {
   // distinct from a loading/network failure.
   const isForbidden = (historyError as { status?: number } | undefined)?.status === 403;
   const [sendChatMessage] = useSendChatMessageMutation();
+
+  // Blocking used to appear to do nothing here. The backend filters blocked authors out of
+  // history at the query level, but chatApi declares no cache tags, so nothing invalidated
+  // the history after a block and the messages stayed on screen — and live broadcasts are
+  // not filtered server-side at all (see ChatService.getHistory's note), so a blocked user
+  // could keep appearing in real time regardless. Filtering here covers both: blockUser
+  // invalidates 'BlockedUsers', this query refetches, and the list re-renders without them.
+  const { data: blockedUsers = [] } = useListBlockedUsersQuery(undefined, { skip: !eventId });
+  const blockedIds = useMemo(() => new Set(blockedUsers.map((u) => u.id)), [blockedUsers]);
 
   const [liveMessages, setLiveMessages] = useState<ChatMessageRecord[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -78,7 +88,9 @@ export function useChatSocket(eventId: string | undefined) {
   // are simply appended. Dedup guards the (small) window where a message sent right as
   // history loads could appear in both.
   const seenIds = new Set(history.map((m) => m.id));
-  const messages = [...history, ...liveMessages.filter((m) => !seenIds.has(m.id))];
+  const messages = [...history, ...liveMessages.filter((m) => !seenIds.has(m.id))].filter(
+    (m) => !blockedIds.has(m.userId),
+  );
 
   return { messages, sendMessage, isConnected, isLoadingHistory, isForbidden };
 }
