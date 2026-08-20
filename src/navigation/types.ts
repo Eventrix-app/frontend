@@ -3,7 +3,11 @@ import type { ShortOverlay } from '../store/services/shortsApi';
 
 export type RootStackParamList = {
   Auth: undefined;
-  Main: { screen?: keyof MainTabParamList } | undefined;
+  // `params` forwards through to the tab screen — deep-linking a reel notification needs
+  // to reach the Shorts tab *with* a target, not just switch to it.
+  Main:
+    | { screen?: keyof MainTabParamList; params?: MainTabParamList[keyof MainTabParamList] }
+    | undefined;
   AdminRedirect: undefined;
   EventDetails: { eventId: string };
   TicketDetails: { bookingId: string };
@@ -98,6 +102,11 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Explore: undefined;
-  Shorts: undefined;
+  // Undefined for ordinary tab use, which keeps the public feed behaviour unchanged.
+  // shortId is only ever set by a notification tap: `short_liked`/`short_commented` are
+  // sent to the reel's uploader, so the target is always one of the viewer's own reels —
+  // which is why the screen can resolve it from the uploader feed rather than needing a
+  // single-short endpoint that does not exist.
+  Shorts: { shortId?: string; openComments?: boolean } | undefined;
   Bookings: undefined;
 };

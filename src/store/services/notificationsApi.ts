@@ -1,7 +1,12 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
 
-export type NotificationKind = 'event_changed' | 'waitlist_promoted' | 'refund_status';
+export type NotificationKind =
+  | 'event_changed'
+  | 'waitlist_promoted'
+  | 'refund_status'
+  | 'short_liked'
+  | 'short_commented';
 
 export interface NotificationRecord {
   id: string;
@@ -10,6 +15,9 @@ export interface NotificationRecord {
   body: string;
   createdAt: string;
   readAt: string | null;
+  // The same data the push carries. title/body are prose, so without this a row in the list
+  // has nothing to route on and could only be marked read.
+  payload?: Record<string, unknown>;
 }
 
 export const notificationsApi = createApi({

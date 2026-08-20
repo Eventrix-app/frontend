@@ -77,10 +77,16 @@ function navigateForPushData(
     navRef.navigate('Main', { screen: 'Shorts' });
     return;
   }
-  // Someone liked one of your reels. Opens the Shorts tab — there is no single-reel route
-  // to deep-link to yet, so this is the closest honest destination.
-  if (type === 'short_liked') {
-    navRef.navigate('Main', { screen: 'Shorts' });
+  // Someone liked or commented on one of your reels. Both carry {shortId}, and both are
+  // only ever sent to that reel's uploader — so the Shorts tab can resolve the target from
+  // the viewer's own reels. short_commented opens the comment sheet on arrival, since the
+  // comment is the thing the notification is about; a like has nothing further to show.
+  if (type === 'short_liked' || type === 'short_commented') {
+    const shortId = typeof data?.shortId === 'string' ? data.shortId : undefined;
+    navRef.navigate('Main', {
+      screen: 'Shorts',
+      params: shortId ? { shortId, openComments: type === 'short_commented' } : undefined,
+    });
     return;
   }
   if (

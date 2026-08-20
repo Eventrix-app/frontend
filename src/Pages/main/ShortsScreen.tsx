@@ -17,9 +17,10 @@ import { runOnJS } from 'react-native-reanimated';
 import LottieView from 'lottie-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/types';
+import { RootStackParamList, MainTabParamList } from '../../navigation/types';
 import { OVERLAY_BASE_TOP_RATIO, OVERLAY_BASE_SIDE_RATIO } from './EditReelScreen';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../../components/common/Text';
@@ -37,6 +38,7 @@ import {
   FeedShort,
   ShortOverlay,
   useGetShortsFeedQuery,
+  useGetShortsByUploaderQuery,
   useGetMyLikedShortIdsQuery,
   useLikeShortMutation,
   useUnlikeShortMutation,
@@ -344,12 +346,42 @@ const ShortsScreen: React.FC = () => {
   // user has walked away — which is why audio kept running over the Home feed.
   const isFocused = useIsFocused();
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetShortsFeedQuery({ page, limit: PAGE_SIZE });
+  const route = useRoute<RouteProp<MainTabParamList, 'Shorts'>>();
+  const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
+  // Latched out of the route rather than read from it directly: the params are cleared as
+  // soon as the target is handled (so returning to the tab later does not re-scroll), and
+  // reading them live would drop the target on that same clear.
+  const [targetShortId, setTargetShortId] = useState<string | null>(null);
+  const [pendingOpenComments, setPendingOpenComments] = useState(false);
+  const handledTargetRef = useRef<string | null>(null);
+  // Separate from handledTargetRef: that one debounces the *param*, this one debounces the
+  // *scroll*. `loaded` gets a fresh array identity on every render, so without this the
+  // effect below would re-scroll continuously and fight the user's own swiping.
+  const scrolledForRef = useRef<string | null>(null);
+  const listRef = useRef<FlatList<FeedShort>>(null);
+
+  const { data, isLoading, isFetching, isError, refetch } = useGetShortsFeedQuery(
+    { page, limit: PAGE_SIZE },
+    // The public feed is not what a notification tap wants, and fetching it would only
+    // compete for bandwidth with the uploader feed below.
+    { skip: targetShortId !== null },
+  );
+
+  // short_liked / short_commented are only ever delivered to the reel's uploader, so the
+  // target is always one of this viewer's own reels. That is what makes this resolvable
+  // without a GET /shorts/:id endpoint, which the API does not have.
+  const { data: ownFeed, isLoading: ownLoading, isError: ownError } = useGetShortsByUploaderQuery(
+    { userId: currentUserId ?? '' },
+    { skip: targetShortId === null || !currentUserId },
+  );
   // Pages are accumulated and deduped inside the cache entry itself (see getShortsFeed's
   // merge in shortsApi.ts), so this reads the merged feed directly. It deliberately does not
   // keep its own copy: a local snapshot could not see the like/comment counts patched into
   // the cache, which is exactly why those numbers used to lag behind the tap.
-  const loaded = data?.shorts ?? [];
+  const isTargeting = targetShortId !== null;
+  const loaded = isTargeting ? ownFeed?.shorts ?? [] : data?.shorts ?? [];
+  const listLoading = isTargeting ? ownLoading : isLoading;
+  const listError = isTargeting ? ownError : isError;
 
   // Liked state is per-user, so it is only requested when signed in — the feed itself is
   // public and must still render for a signed-out viewer.
@@ -443,10 +475,52 @@ const ShortsScreen: React.FC = () => {
   );
 
   const handleEndReached = useCallback(() => {
+    // Paging belongs to the public feed. The uploader feed is a bounded set fetched in one
+    // request, and advancing `page` here would mutate the feed query that is skipped anyway.
+    if (isTargeting) return;
     if (isFetching || !data) return;
     if (data.page >= data.totalPages) return;
     setPage(data.page + 1);
-  }, [data, isFetching]);
+  }, [data, isFetching, isTargeting]);
+
+  // A notification tap arrives as params on an already-mounted tab screen, so this reacts to
+  // params rather than reading them once at mount.
+  useEffect(() => {
+    const incoming = route.params?.shortId;
+    if (!incoming || incoming === handledTargetRef.current) return;
+    handledTargetRef.current = incoming;
+    setTargetShortId(incoming);
+    setPendingOpenComments(route.params?.openComments === true);
+  }, [route.params?.shortId, route.params?.openComments]);
+
+  // Leaving the tab returns it to the ordinary public feed. Without this, coming back later
+  // would still be pinned to one reel with no obvious way out.
+  useEffect(() => {
+    if (isFocused) return;
+    setTargetShortId(null);
+    setPendingOpenComments(false);
+    handledTargetRef.current = null;
+    scrolledForRef.current = null;
+    if (route.params?.shortId) navigation.setParams({ shortId: undefined, openComments: undefined } as never);
+  }, [isFocused, navigation, route.params?.shortId]);
+
+  // Scroll to the target once the uploader feed carrying it has arrived, then open the
+  // comment sheet if the notification was about a comment. Params are cleared here so a
+  // later visit to the tab does not replay this.
+  useEffect(() => {
+    if (!targetShortId || slideHeight === null) return;
+    if (scrolledForRef.current === targetShortId) return;
+    const index = loaded.findIndex((s) => s.id === targetShortId);
+    if (index < 0) return;
+    scrolledForRef.current = targetShortId;
+    listRef.current?.scrollToIndex({ index, animated: false });
+    setActiveId(targetShortId);
+    if (pendingOpenComments) {
+      setCommentsFor(loaded[index]);
+      setPendingOpenComments(false);
+    }
+    if (route.params?.shortId) navigation.setParams({ shortId: undefined, openComments: undefined } as never);
+  }, [targetShortId, loaded, slideHeight, pendingOpenComments, navigation, route.params?.shortId]);
 
   const renderItem = useCallback(
     ({ item }: { item: FeedShort }) => {
@@ -482,15 +556,15 @@ const ShortsScreen: React.FC = () => {
     [slideHeight],
   );
 
-  const showEmpty = !isLoading && !isError && loaded.length === 0;
+  const showEmpty = !listLoading && !listError && loaded.length === 0;
 
   // Reels are the heaviest thing this app fetches, so a slow connection shows up here first
   // and most painfully — a black screen with no explanation.
-  const { stage: slowStage } = useSlowNetwork(isLoading);
+  const { stage: slowStage } = useSlowNetwork(listLoading);
 
   return (
     <View style={styles.root} onLayout={handleLayout}>
-      {isLoading ? (
+      {listLoading ? (
         <>
           <ShortsFeedSkeleton />
           {/* Overlaid rather than stacked: the skeleton fills the viewport here, so there is
@@ -502,7 +576,7 @@ const ShortsScreen: React.FC = () => {
             style={[styles.slowNotice, { top: insets.top + 72 }]}
           />
         </>
-      ) : isError ? (
+      ) : listError ? (
         <View style={styles.centered}>
           <Text style={styles.emptyTitle}>Couldn't load reels</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
@@ -519,8 +593,15 @@ const ShortsScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={loaded}
           keyExtractor={(item) => item.id}
+          // getItemLayout means offsets are known without measuring, but a target beyond the
+          // realised window can still miss on the first attempt. Retrying after the list has
+          // settled is what makes deep-linking to a reel land rather than silently no-op.
+          onScrollToIndexFailed={({ index }) => {
+            requestAnimationFrame(() => listRef.current?.scrollToIndex({ index, animated: false }));
+          }}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           // Each slide is sized from the list's *measured* viewport rather than

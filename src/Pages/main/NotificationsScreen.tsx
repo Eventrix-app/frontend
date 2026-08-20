@@ -7,6 +7,7 @@ import {
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
+  type NotificationRecord,
 } from '../../store/services/notificationsApi';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
@@ -14,7 +15,7 @@ import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
 import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
-import { MegaphoneIcon, TicketIcon, WalletIcon, NotificationBell, IconProps } from '../../components/common/Icons';
+import { MegaphoneIcon, TicketIcon, WalletIcon, NotificationBell, HeartIcon, ChatIcon, IconProps } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
@@ -22,6 +23,8 @@ const TYPE_ICONS: Record<string, React.FC<IconProps>> = {
   event_changed: MegaphoneIcon,
   waitlist_promoted: TicketIcon,
   refund_status: WalletIcon,
+  short_liked: HeartIcon,
+  short_commented: ChatIcon,
 };
 
 function formatTimeAgo(createdAt: string): string {
@@ -48,6 +51,18 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const unreadCount = items.filter((n) => !n.readAt).length;
+
+  // Rows carry the same payload the push does, so tapping one lands where the push tap
+  // would. Only the reel kinds route today — the rest still just mark read, as before.
+  const openNotification = (item: NotificationRecord) => {
+    const shortId = typeof item.payload?.shortId === 'string' ? item.payload.shortId : undefined;
+    if ((item.type === 'short_liked' || item.type === 'short_commented') && shortId) {
+      navigation.navigate('Main', {
+        screen: 'Shorts',
+        params: { shortId, openComments: item.type === 'short_commented' },
+      });
+    }
+  };
 
   // Reachable directly via a push-notification tap with no data payload (see
   // navigateForPushData in RootNavigator.tsx), which can land here as the first screen in
@@ -100,6 +115,7 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.8}
             onPress={() => {
               if (!isRead) markRead(item.id);
+              openNotification(item);
             }}
           >
             <View style={[styles.iconWrap, !isRead && styles.iconWrapUnread]}>
