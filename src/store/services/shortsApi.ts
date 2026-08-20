@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_VOLATILE } from './cachePolicy';
 import { userApi } from './userApi';
 
 // Mirrors the limit getShortComments requests, and the server's own default.
@@ -101,6 +102,11 @@ export const shortsApi = createApi({
   reducerPath: 'shortsApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['MyShorts', 'MyShortLikes', 'ShortsFeed', 'ShortComments'],
+  // Left at the volatile tier on purpose: like and comment counts are the most visibly
+  // wrong thing in the app if they lag, and the feed is cheap to re-enter. Optimistic
+  // updates cover the acting user; this keeps other users' counts fresh.
+  keepUnusedDataFor: CACHE_VOLATILE,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     // The public reel feed. Invalidated by createShort/deleteMyShort below so a reel you
     // just uploaded appears without a manual refresh.

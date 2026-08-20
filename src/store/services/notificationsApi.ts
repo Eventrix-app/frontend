@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_DYNAMIC } from './cachePolicy';
 
 export type NotificationKind =
   | 'event_changed'
@@ -24,6 +25,10 @@ export const notificationsApi = createApi({
   reducerPath: 'notificationsApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Notifications'],
+  keepUnusedDataFor: CACHE_DYNAMIC,
+  // A notification that arrived while backgrounded should be in the list on return.
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     getNotifications: builder.query<NotificationRecord[], void>({
       query: () => 'notifications',

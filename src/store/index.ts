@@ -33,6 +33,7 @@ import { moderationApi } from './services/moderationApi';
 import { shortsApi } from './services/shortsApi';
 import { authErrorMiddleware } from './middleware/authErrorMiddleware';
 import { clearApiCacheOnLogout } from './middleware/clearApiCacheOnLogout';
+import { setupNativeListeners } from './rtkQueryListeners';
 
 // Persisted so a logged-in session survives an app restart — the 2-day inactivity logout
 // (POST /auth/refresh, called on every app foreground/launch — see AppStateSync in App.tsx)
@@ -112,7 +113,11 @@ export const store = configureStore({
 
 export const persistor = persistStore(store);
 
-setupListeners(store.dispatch);
+// Passing the native handler rather than relying on the default one. RTK Query's default
+// subscribes to window focus/online events, which React Native does not implement — so
+// without this, refetchOnFocus/refetchOnReconnect never fire anywhere in the app no matter
+// which slice declares them. See rtkQueryListeners.ts.
+setupListeners(store.dispatch, setupNativeListeners);
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

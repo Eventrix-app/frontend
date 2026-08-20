@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_STABLE } from './cachePolicy';
 
 export type ReportTargetType = 'user' | 'chat_message' | 'review';
 
@@ -23,6 +24,11 @@ export const moderationApi = createApi({
   reducerPath: 'moderationApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['BlockedUsers'],
+  // The blocked-user list changes only when this user blocks or unblocks, and both paths
+  // invalidate BlockedUsers. Worth holding: useChatSocket subscribes to it on every event
+  // chat open to filter messages, so a short window meant refetching it per screen visit.
+  keepUnusedDataFor: CACHE_STABLE,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     createReport: builder.mutation<void, CreateReportBody>({
       query: (body) => ({ url: 'reports', method: 'POST', body }),

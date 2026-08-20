@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_STABLE } from './cachePolicy';
 import type { BackendEvent } from './eventsApi';
 import { userApi } from './userApi';
 
@@ -88,6 +89,11 @@ export const organizerApi = createApi({
     'MyVerificationStatus',
     'MyBankAccount',
   ],
+  // Organizer-owned data changes only through this user's own mutations, all of which
+  // invalidate their tags — so a longer window costs nothing in freshness and saves a refetch
+  // every time the organizer moves between their dashboard screens.
+  keepUnusedDataFor: CACHE_STABLE,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     // null when nothing has been submitted yet — a fresh organizer, not an error.
     getMyBankAccount: builder.query<BankAccountSummary | null, void>({

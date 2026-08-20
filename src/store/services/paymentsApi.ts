@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_DYNAMIC } from './cachePolicy';
 import { eventsApi } from './eventsApi';
 
 export interface FeeBreakdown {
@@ -163,6 +164,8 @@ export const paymentsApi = createApi({
   reducerPath: 'paymentsApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['PendingRefunds', 'MyPayouts', 'MyRefunds'],
+  keepUnusedDataFor: CACHE_DYNAMIC,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     getFeeEstimate: builder.query<FeeBreakdown, FeeEstimateArg>({
       query: (arg) => {

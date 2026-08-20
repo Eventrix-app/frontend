@@ -64,6 +64,10 @@ export const authApi = createApi({
   // backend and ignore it when there's no token yet (state.auth.token is null pre-login).
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Auth', 'Sessions'],
+  // Deliberately left on RTK Query's 60s default rather than given a policy from
+  // cachePolicy.ts. Everything here is either a mutation or session state whose whole purpose
+  // is to be current: a retained Sessions list would keep showing a device the user just
+  // revoked, which reads as the revocation having failed.
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
       query: (credentials) => ({

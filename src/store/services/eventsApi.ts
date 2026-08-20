@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_DYNAMIC } from './cachePolicy';
 import type { TicketCategory } from '../../utils/ticketCategories';
 
 export interface BackendEvent {
@@ -260,6 +261,12 @@ export const eventsApi = createApi({
   // remount won't retry. refetchOnFocus is what actually fires on tab switch.
   refetchOnMountOrArgChange: 10,
   refetchOnFocus: true,
+  refetchOnReconnect: true,
+  // Pairs with refetchOnMountOrArgChange above: the entry survives navigation, so returning
+  // to a list paints instantly from cache and revalidates in the background if it is older
+  // than 10s — rather than the previous behaviour of discarding it after 60s and showing a
+  // skeleton again. Seat counts stay correct through tag invalidation on every booking path.
+  keepUnusedDataFor: CACHE_DYNAMIC,
   endpoints: (builder) => ({
     getEvents: builder.query<
       BackendEvent[],

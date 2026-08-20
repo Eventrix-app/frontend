@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
+import { CACHE_DYNAMIC } from './cachePolicy';
 
 export interface Category {
   id: string;
@@ -81,6 +82,9 @@ export const userApi = createApi({
   reducerPath: 'userApi',
   baseQuery: createFallbackBaseQuery(true),
   tagTypes: ['Categories', 'Me'],
+  keepUnusedDataFor: CACHE_DYNAMIC,
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
   endpoints: (builder) => ({
     // Public slice of another user's account — backs tapping a reel's author. Distinct from
     // getMe, which returns PII the server must never expose to a third party.
