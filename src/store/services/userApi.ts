@@ -40,7 +40,16 @@ export interface CurrentUser {
   // which provider to re-authenticate with when hasPassword is false.
   authProviders: string[];
   location: string | null;
+  // Self-editable profile fields. Returned by GET /users/me specifically so Edit Profile
+  // can prefill them: PATCH /participants/:id reads an explicitly-sent '' as "clear this
+  // field", so a field the client cannot read back would be wiped on the next save.
+  gender: string;
+  dateOfBirth: string;
+  addressLine: string;
   city: string;
+  state: string;
+  country: string;
+  pincode: string;
   latitude: number | null;
   longitude: number | null;
   pushEnabled: boolean;
@@ -58,7 +67,13 @@ export interface UpdateParticipantBody {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  addressLine?: string;
   city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
   profileImageUrl?: string;
 }
 

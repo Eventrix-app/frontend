@@ -4,7 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthInput } from '../../components/auth/AuthInput';
+import InlineDatePicker from '../../components/common/InlineDatePicker';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
+import { isAtLeastAge, latestDateOfBirthForMinAge } from '../../utils/dateFormat';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
@@ -18,6 +20,9 @@ import { showAlert } from '../../utils/crossPlatformAlert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
+// Mirrors the backend's @IsAdult(18) on UpdateParticipantDto.dateOfBirth, and RegisterScreen.
+const MIN_AGE = 18;
+
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const userId = useSelector((state: RootState) => state.auth.user?.id);
@@ -28,7 +33,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [addressLine, setAddressLine] = useState('');
   const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [country, setCountry] = useState('');
+  const [pincode, setPincode] = useState('');
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // A fast double-tap can fire before isSaving's re-render lands (same reasoning as
@@ -50,8 +61,19 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     setFirstName(me.firstName ?? '');
     setLastName(me.lastName ?? '');
     setPhone(me.phoneNumber ?? '');
+    setGender(me.gender ?? '');
+    setDateOfBirth(me.dateOfBirth ?? '');
+    setAddressLine(me.addressLine ?? '');
     setCity(me.city ?? '');
+    setState(me.state ?? '');
+    setCountry(me.country ?? '');
+    setPincode(me.pincode ?? '');
   }, [me]);
+
+  // The backend enforces @IsAdult(18) on dateOfBirth and rejects the whole PATCH if it
+  // fails, so the same rule is mirrored here to fail on the field rather than losing every
+  // other edit to a 400. An untouched empty DOB is left alone — see handleSave.
+  const isOldEnough = !dateOfBirth || isAtLeastAge(dateOfBirth, MIN_AGE);
 
   const handleSave = async () => {
     // `me` guards against the real bug: firstName/lastName/phone/city all start as '' and
@@ -59,11 +81,29 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     // backend treats an explicitly-sent '' as "clear this field" (not "leave unchanged"),
     // so saving before `me` loads would silently wipe the user's actual name/phone/city.
     if (!userId || !me || isSubmittingRef.current) return;
+    if (!isOldEnough) {
+      showAlert('Check your date of birth', `You must be at least ${MIN_AGE} years old.`);
+      return;
+    }
     isSubmittingRef.current = true;
     try {
       await updateParticipant({
         id: userId,
-        body: { firstName, lastName, phone, city },
+        body: {
+          firstName,
+          lastName,
+          phone,
+          gender,
+          addressLine,
+          city,
+          state,
+          country,
+          pincode,
+          // Omitted rather than sent as '' when unset: the DTO skips an absent optional
+          // field, but an empty string still reaches @IsAdult(18) and fails validation,
+          // which would reject the entire PATCH over a field the user never touched.
+          ...(dateOfBirth ? { dateOfBirth } : {}),
+        },
       }).unwrap();
       navigation.goBack();
     } catch (e: any) {
@@ -123,16 +163,67 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </>
         ) : null}
 
-        <Text style={styles.label}>Phone</Text>
-        <AuthInput
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Phone"
-          keyboardType="phone-pad"
-        />
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Text style={styles.label}>Phone</Text>
+            <AuthInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="Phone"
+              keyboardType="phone-pad"
+            />
+          </View>
+          <View style={styles.half}>
+            <Text style={styles.label}>Gender</Text>
+            <AuthInput value={gender} onChangeText={setGender} placeholder="Gender" />
+          </View>
+        </View>
 
-        <Text style={styles.label}>City</Text>
-        <AuthInput value={city} onChangeText={setCity} placeholder="City" />
+        {/* Full-width rather than paired: variant="auth" matches AuthInput's chrome (56pt
+            tall, 16 radius, same shadow and wrapper margin), but on iOS the picker expands
+            an inline calendar directly beneath the field, which a half-width column would
+            squeeze. */}
+        <Text style={styles.label}>Date of Birth</Text>
+        <InlineDatePicker
+          value={dateOfBirth}
+          onChange={setDateOfBirth}
+          placeholder="Date of birth"
+          maximumDate={latestDateOfBirthForMinAge(MIN_AGE)}
+          variant="auth"
+        />
+        {!isOldEnough ? (
+          <Text style={styles.ageHint}>You must be at least {MIN_AGE} years old.</Text>
+        ) : null}
+
+        <Text style={styles.label}>Address</Text>
+        <AuthInput value={addressLine} onChangeText={setAddressLine} placeholder="Address" />
+
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Text style={styles.label}>City</Text>
+            <AuthInput value={city} onChangeText={setCity} placeholder="City" />
+          </View>
+          <View style={styles.half}>
+            <Text style={styles.label}>State</Text>
+            <AuthInput value={state} onChangeText={setState} placeholder="State" />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Text style={styles.label}>Country</Text>
+            <AuthInput value={country} onChangeText={setCountry} placeholder="Country" />
+          </View>
+          <View style={styles.half}>
+            <Text style={styles.label}>Pincode</Text>
+            <AuthInput
+              value={pincode}
+              onChangeText={setPincode}
+              placeholder="Pincode"
+              keyboardType="number-pad"
+            />
+          </View>
+        </View>
       </ScrollView>
       )}
 
@@ -209,6 +300,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     color: colors.text,
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
+  },
+  ageHint: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: spacing.xs,
   },
   footer: {
     position: 'absolute',
