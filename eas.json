@@ -11,7 +11,6 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "384524317779-8oc72gm5u7bdimov1k8dmjb3c6igep0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
@@ -26,7 +25,6 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "384524317779-8oc72gm5u7bdimov1k8dmjb3c6igep0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
@@ -41,7 +39,6 @@
         "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
-        "GOOGLE_MAPS_API_KEY": "AIzaSyALq60TFGb7_ouYMoMJNsZiTKzdsiddSok",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "384524317779-8oc72gm5u7bdimov1k8dmjb3c6igep0t.apps.googleusercontent.com",
         "EXPO_PUBLIC_FACEBOOK_APP_ID": "1049670594306054"
