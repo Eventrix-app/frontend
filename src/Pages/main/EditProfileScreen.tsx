@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -116,10 +116,16 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const initial = (firstName || me?.email || '?').charAt(0).toUpperCase();
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    // 'padding' on Android too, not just iOS. Leaving Android to `undefined` relies on the
+    // window being resized by adjustResize, which no longer happens under the edge-to-edge
+    // display this app enables (app.config.js: edgeToEdgeEnabled) — the keyboard just draws
+    // over the form, hiding every field below the one being typed into.
+    //
+    // Safe on both platforms because KeyboardAvoidingView derives its padding by measuring
+    // its own frame against the keyboard's screenY: if the window ever does resize, the
+    // frame already sits above the keyboard and the computed padding is 0, so this cannot
+    // double-count.
+    <KeyboardAvoidingView style={[styles.root, { paddingTop: insets.top }]} behavior="padding">
       <ScreenHeader title="Edit Profile" onBack={() => navigation.goBack()} />
 
       {/* The form is only rendered once it can be prefilled. Showing it while getMe is in
