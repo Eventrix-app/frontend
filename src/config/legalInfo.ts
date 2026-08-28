@@ -1,22 +1,29 @@
 // Business/legal details surfaced in-app — currently the Help Center's grievance contact
 // block. The policy documents themselves now live on the website (see config/legalLinks),
 // so these values no longer feed a transcription; they are what the app itself displays.
-// Until they are filled in, the placeholders below render literally, which is intentional:
-// more honest than silently showing a fake company name or address.
 //
-// TODO before launch: replace every value below with the real, registered details.
+// Everything here is also published on the website's legal pages. The two are separate
+// copies of the same public statement, so a change to one is only half a change.
+//
+// TODO before launch: confirm COMPANY_LEGAL_NAME and REGISTERED_OFFICE_ADDRESS are the
+// registered values. A city alone is not a registered office address.
 export const COMPANY_LEGAL_NAME = 'The Ladders Tech';
 export const REGISTERED_OFFICE_ADDRESS = 'Pune, Maharashtra, India';
 export const JURISDICTION_CITY = 'Pune';
 
-// India's IT (Intermediary Guidelines) Rules, 2021 require a named Grievance Officer with
+// India's IT (Intermediary Guidelines) Rules, 2021 require a *named* Grievance Officer with
 // published contact details; the DPDP Act, 2023 has an equivalent expectation for a
-// grievance/consent-manager contact point. GRIEVANCE_OFFICER_NAME is a real placeholder —
-// fill in an actual named individual (a title alone, e.g. "Grievance Team," does not
-// satisfy the "named officer" requirement.
-// TODO before launch: name a real Grievance Officer.
-export const GRIEVANCE_OFFICER_NAME = '[Grievance Officer Name — to be finalized]';
+// grievance/consent-manager contact point. A title alone ("Grievance Team") does not satisfy
+// the named-officer requirement, which is why this is a person.
+//
+// Must stay in step with the officer designated in the website's published Contact &
+// Grievance Policy — that document is the legal designation, this is what the app shows.
+export const GRIEVANCE_OFFICER_NAME = 'Suffiyan Shaikh';
 export const GRIEVANCE_OFFICER_EMAIL = 'grievance@eventrix.app';
+// Same line as SUPPORT_PHONE by design — one number answers both. Rule 3(2) asks for
+// published contact details for the named officer, and a number that is only reachable in
+// theory satisfies the letter of that but not its point.
+export const GRIEVANCE_OFFICER_PHONE = '+91-7249210279';
 
 // Standard timelines under the IT Rules, 2021 (Rule 3(2)): acknowledge within 24 hours,
 // resolve within 15 days of receipt. Kept as named constants so the SLA is defined once
