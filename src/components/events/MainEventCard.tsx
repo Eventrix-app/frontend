@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MockEvent } from '../../data/mockEvents';
+import { badgeGradientFor } from './statusBadge';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
@@ -19,7 +20,6 @@ type MainEventCardProps = {
 };
 
 // Same gradient ramp as FeaturedCarousel's price badge, so both card styles stay consistent.
-const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
 const BADGE_HEIGHT = 36;
 const BADGE_RADIUS = 10;
 
@@ -67,13 +67,13 @@ export const MainEventCard: React.FC<MainEventCardProps> = React.memo(({
             would clip a badge positioned at top: 0. */}
         <View style={styles.priceBadgeWrap} pointerEvents="none">
           <LinearGradient
-            colors={BADGE_GRADIENT}
+            colors={badgeGradientFor(event.statusLabel)}
             locations={[0, 0.38, 0.72, 1]}
             start={{ x: 0.15, y: 0 }}
             end={{ x: 0.85, y: 1 }}
             style={styles.priceBadge}
           >
-            <Text style={styles.priceBadgeText} numberOfLines={1}>{event.price}</Text>
+            <Text style={styles.priceBadgeText} numberOfLines={1}>{event.statusLabel ?? event.price}</Text>
           </LinearGradient>
         </View>
 

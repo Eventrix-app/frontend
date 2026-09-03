@@ -10,6 +10,7 @@ import { extractErrorMessage } from '../../utils/apiError';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { badgeGradientFor } from './statusBadge';
 import { FallbackImage } from '../common/FallbackImage';
 
 // Extend your real event type/mock data with these optional fields as the
@@ -27,6 +28,9 @@ export interface InterestEvent {
   distanceKm?: string;
   attendeesAvailable?: number;
   isCompleted?: boolean;
+  // Replaces the price in the badge once the event can no longer be booked. Undefined for an
+  // upcoming event, where the price is what a browsing user actually needs.
+  statusLabel?: string;
 }
 
 interface Props {
@@ -154,13 +158,13 @@ export const EventInterestCard: React.FC<Props> = React.memo(({ event, width, on
           panel. pointerEvents none so it never intercepts a tap meant for the card. */}
       <View style={styles.priceBadgeWrap} pointerEvents="none">
         <LinearGradient
-          colors={BADGE_GRADIENT}
+          colors={badgeGradientFor(event.statusLabel)}
           locations={[0, 0.38, 0.72, 1]}
           start={{ x: 0.15, y: 0 }}
           end={{ x: 0.85, y: 1 }}
           style={styles.priceBadge}
         >
-          <Text style={styles.priceBadgeText} numberOfLines={1}>{event.price}</Text>
+          <Text style={styles.priceBadgeText} numberOfLines={1}>{event.statusLabel ?? event.price}</Text>
         </LinearGradient>
       </View>
 
@@ -217,7 +221,7 @@ const BADGE_RADIUS = 12;
 
 // Tint/shade ramp around brandPink. Literals because the palette has no ramp to derive from,
 // and brandPink is identical in both themes so this needs no theme-awareness.
-const BADGE_GRADIENT = ['#FF8FA8', '#FF3366', '#DE1F4C', '#A81038'] as const;
+
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {

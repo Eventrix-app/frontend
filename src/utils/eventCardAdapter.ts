@@ -1,6 +1,6 @@
 import { BackendEvent } from '../store/services/eventsApi';
 import { MockEvent } from '../data/mockEvents';
-import { isEventOver } from './eventDateTime';
+import { getEventStartDateTime, isEventOver } from './eventDateTime';
 
 // A bare 'YYYY-MM-DD' string parses as UTC midnight (per the Date spec), so formatting it
 // with the device's local timezone can roll the displayed calendar date back or forward a
@@ -38,6 +38,21 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-IN', {
 function formatEventPrice(event: BackendEvent): string {
   if (!event.isPaid || !event.pricePerTicket) return 'Free';
   return CURRENCY_FORMATTER.format(event.pricePerTicket);
+}
+
+// The badge label for an event that can no longer be booked, or undefined for one that can.
+//
+// Derived here rather than read from `event.status`, because that column only ever advances
+// to 'cancelled' — nothing in the backend ever writes 'completed' or 'ongoing', so a finished
+// event still reports itself as 'upcoming'. Cancellation is the one state the column is
+// authoritative for; the rest is decided from the clock.
+export function eventStatusLabel(event: BackendEvent): string | undefined {
+  if (event.status === 'cancelled') return 'Cancelled';
+  if (event.isCompleted ?? isEventOver(event)) return 'Completed';
+  // Between start and end. Deliberately last: a cancelled event that would otherwise be
+  // running is cancelled, not live.
+  if (getEventStartDateTime(event).getTime() <= Date.now()) return 'Live';
+  return undefined;
 }
 
 export function formatDistanceKm(distanceKm: number): string {
@@ -84,5 +99,6 @@ export function toCardEvent(event: BackendEvent, userLat?: number | null, userLn
     // through withComputedFields (events.service.ts) yet, e.g. an organizer's public
     // profile listing.
     isCompleted: event.isCompleted ?? isEventOver(event),
+    statusLabel: eventStatusLabel(event),
   };
 }
