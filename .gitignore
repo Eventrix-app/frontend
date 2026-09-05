@@ -63,3 +63,9 @@ offline-base64.txt
 
 # graphify skill output
 graphify-out/
+
+# Working notes and the screenshots behind them — reference material for a task in
+# progress, not part of the app. The illustrations the app actually ships are tracked
+# under assets/shared/placeholders.
+bugs.txt
+error-reference/
