@@ -835,8 +835,12 @@ const CreateEventScreen: React.FC<Props> = ({ navigation, route }) => {
         onConfirm={({ latitude: lat, longitude: lng, address }) => {
           setLatitude(lat);
           setLongitude(lng);
-          // Only autofills a blank address — never clobbers what the organizer already typed.
-          if (address && !venueAddress.trim()) setVenueAddress(address);
+          // Confirming a pin sets the address, even over one already typed. Autofilling only
+          // a blank field meant an organizer who typed something first could never correct it
+          // by dropping a pin — the map silently refused to update the very field it exists to
+          // fill. Closing the picker with Confirm is an explicit choice, so it wins; Close
+          // leaves everything untouched.
+          if (address) setVenueAddress(address);
           setShowLocationPicker(false);
         }}
       />

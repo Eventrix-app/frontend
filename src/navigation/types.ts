@@ -79,6 +79,8 @@ export type RootStackParamList = {
   
   ErrorNoInternet: undefined;
   ErrorGeneric: undefined;
+  // Optional override so a caller can say what was not found; the screen has a sensible default.
+  NotFound: { message?: string } | undefined;
 };
 
 export type AuthStackParamList = {

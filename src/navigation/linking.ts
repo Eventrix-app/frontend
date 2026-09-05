@@ -33,8 +33,13 @@ export const linking: LinkingOptions<RootStackParamList> = {
         },
       } as object,
       // Everything else (Auth, Settings, admin screens, etc.) is intentionally left
-      // unmapped — a URL that doesn't match falls through to the app's normal initial
-      // route (see RootNavigator's initialRouteName), not a broken/blank screen.
+      // unmapped. Anything that matches nothing above lands on the 404 below rather than
+      // falling through to the initial route: silently opening Home after someone taps a
+      // link is indistinguishable from the link having done nothing at all.
+      //
+      // Declared last — React Navigation resolves in key order, so a wildcard placed earlier
+      // would swallow every path defined after it.
+      NotFound: '*',
     },
   },
 };

@@ -28,6 +28,7 @@ import NotificationsScreen from '../Pages/main/NotificationsScreen';
 import AdminRedirectScreen from '../Pages/authenticationscreens/AdminRedirectScreen';
 import ErrorNoInternetScreen from '../Pages/screens/ErrorNoInternetScreen';
 import ErrorGenericScreen from '../Pages/screens/ErrorGenericScreen';
+import NotFoundScreen from '../Pages/screens/NotFoundScreen';
 import MyEventsScreen from '../Pages/main/MyEventsScreen';
 import CreateEventScreen from '../Pages/main/CreateEventScreen';
 import OrganizerVerificationScreen from '../Pages/main/OrganizerVerificationScreen';
@@ -276,6 +277,7 @@ const RootNavigator = () => {
         <Stack.Screen name="OrganizerProfile" component={ProfileScreen} />
         <Stack.Screen name="ErrorNoInternet" component={ErrorNoInternetScreen} />
         <Stack.Screen name="ErrorGeneric" component={ErrorGenericScreen} />
+        <Stack.Screen name="NotFound" component={NotFoundScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

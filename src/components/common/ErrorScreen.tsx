@@ -2,6 +2,11 @@ import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+
+// require() takes a static literal, so both variants are resolved at module load and
+// picked at render — the bundler cannot follow a computed path.
+const LIGHT_ILLUSTRATION = require('../../../assets/shared/placeholders/error.png');
+const DARK_ILLUSTRATION = require('../../../assets/shared/placeholders/error-black.png');
 import { LeftArrow } from './Icons';
 
 interface Props {
@@ -17,12 +22,12 @@ const ErrorScreen: React.FC<Props> = ({
   title = 'Oops, something went wrong',
   subtitle = 'Try again in a moment.',
 }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.root}>
       <Image
-        source={require('../../../assets/shared/placeholders/error.png')}
+        source={theme === 'dark' ? DARK_ILLUSTRATION : LIGHT_ILLUSTRATION}
         style={styles.illustration}
         resizeMode="contain"
       />
@@ -48,7 +53,7 @@ const ErrorScreen: React.FC<Props> = ({
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F3EF',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
