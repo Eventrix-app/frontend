@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthInput } from '../../components/auth/AuthInput';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
+import SelectField from '../../components/common/SelectField';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { isAtLeastAge, latestDateOfBirthForMinAge } from '../../utils/dateFormat';
 import { RootStackParamList } from '../../navigation/types';
@@ -22,6 +23,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
 // Mirrors the backend's @IsAdult(18) on UpdateParticipantDto.dateOfBirth, and RegisterScreen.
 const MIN_AGE = 18;
+
+// The backend stores gender as a free string, so nothing here is enforced server-side; this
+// exists so the same person is not recorded as "M", "male" and "Male" across three accounts.
+// A value already saved outside this list still renders and stays selected — see SelectField.
+const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'] as const;
 
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -181,7 +187,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <View style={styles.half}>
             <Text style={styles.label}>Gender</Text>
-            <AuthInput value={gender} onChangeText={setGender} placeholder="Gender" />
+            <SelectField
+              value={gender}
+              onChange={setGender}
+              options={GENDER_OPTIONS}
+              placeholder="Gender"
+              title="Select gender"
+            />
           </View>
         </View>
 
