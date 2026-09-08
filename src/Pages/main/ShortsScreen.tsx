@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import LottieView from 'lottie-react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused, useRoute } from '@react-navigation/native';
@@ -53,7 +54,7 @@ const PAGE_SIZE = 10;
 // Only the reel actually on screen plays. Mounting a player per slide and letting them all
 // run would decode every loaded video at once — on Android that exhausts the hardware
 // decoder pool within a handful of slides and the feed starts rendering black frames.
-const ReelVideo: React.FC<{ uri: string; active: boolean }> = ({ uri, active }) => {
+const ReelVideo: React.FC<{ uri: string; active: boolean; paused: boolean }> = ({ uri, active, paused }) => {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = false;
@@ -65,9 +66,9 @@ const ReelVideo: React.FC<{ uri: string; active: boolean }> = ({ uri, active }) 
   // nothing told the player the screen had gone away — a FlatList item is not unmounted by
   // a tab change.
   React.useEffect(() => {
-    if (active) player.play();
+    if (active && !paused) player.play();
     else player.pause();
-  }, [active, player]);
+  }, [active, paused, player]);
 
   // Belt and braces: releases playback when the slide is genuinely unmounted (scrolled out
   // of the render window, or the tab torn down), which the effect above cannot catch
@@ -226,6 +227,17 @@ const ReelSlide = React.memo<SlideProps>(({
   // object's identity changes. Rebuilding it on every render meant every re-render of a
   // slide tore down and re-registered a native gesture recogniser — on the one component in
   // this app that also owns a video player.
+  // Tap once to pause, again to resume. Held here rather than inside ReelVideo because the
+  // gesture that toggles it lives on the slide, and the pause badge draws over the whole frame.
+  const [paused, setPaused] = useState(false);
+  const togglePaused = useCallback(() => setPaused((p) => !p), []);
+
+  // Scrolling to another reel always resumes: a slide the viewer paused, scrolled past and
+  // came back to should play, not sit frozen with no clue why.
+  useEffect(() => {
+    if (!active) setPaused(false);
+  }, [active]);
+
   const doubleTap = useMemo(
     () =>
       Gesture.Tap()
@@ -241,6 +253,17 @@ const ReelSlide = React.memo<SlideProps>(({
         }),
     [playHeart, onLikeByDoubleTap, item.id, liked],
   );
+
+  const singleTap = useMemo(
+    () => Gesture.Tap().numberOfTaps(1).onEnd(() => runOnJS(togglePaused)()),
+    [togglePaused],
+  );
+
+  // Exclusive, not Race or Simultaneous: a double tap must like the reel *without* also
+  // toggling playback twice on its way there. Exclusive holds the single tap until the
+  // double-tap window lapses, so only one of the two ever fires.
+  const tapGestures = useMemo(() => Gesture.Exclusive(doubleTap, singleTap), [doubleTap, singleTap]);
+
 
   // Two regex passes over the caption, memoized together: they only depend on the caption
   // and the overlay, neither of which changes for the life of a slide, whereas this
@@ -258,9 +281,21 @@ const ReelSlide = React.memo<SlideProps>(({
   }, [item.caption, item.overlay]);
 
   return (
-    <GestureDetector gesture={doubleTap}>
+    <GestureDetector gesture={tapGestures}>
       <View style={[styles.slide, { height }]}>
-      <ReelVideo uri={item.mediaUrl} active={active} />
+      <ReelVideo uri={item.mediaUrl} active={active} paused={paused} />
+
+      {/* Only while this slide is the visible one — an off-screen paused slide would
+          otherwise flash its badge as it scrolls past. pointerEvents none so the badge never
+          swallows the tap that resumes playback. */}
+      {paused && active ? (
+        <View style={styles.pauseOverlay} pointerEvents="none">
+          <View style={styles.pauseBadge}>
+            <Feather name="pause" size={34} color="#FFFFFF" />
+          </View>
+        </View>
+      ) : null}
+
       {item.overlay ? <ReelOverlayText overlay={item.overlay} width={width} height={height} /> : null}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.bottomFade} />
 
@@ -638,6 +673,21 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  pauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Scrim behind the glyph: a white icon alone disappears over a pale frame, and reels are
+  // arbitrary video — there is no background colour to rely on.
+  pauseBadge: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   slide: {
     width: '100%',

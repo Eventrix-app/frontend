@@ -27,6 +27,8 @@ const MIN_AGE = 18;
 // The backend stores gender as a free string, so nothing here is enforced server-side; this
 // exists so the same person is not recorded as "M", "male" and "Male" across three accounts.
 // A value already saved outside this list still renders and stays selected — see SelectField.
+const PHONE_DIGITS = 10;
+
 const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'] as const;
 
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
@@ -180,9 +182,14 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.label}>Phone</Text>
             <AuthInput
               value={phone}
-              onChangeText={setPhone}
+              // Digits only, capped at 10. phone-pad still offers +, spaces and dashes, and
+              // the stored value is a bare national number — the country code lives nowhere
+              // in this field, so anything but digits is either a typo or a formatting
+              // habit that would be saved verbatim.
+              onChangeText={(text) => setPhone(text.replace(/\D/g, '').slice(0, PHONE_DIGITS))}
               placeholder="Phone"
               keyboardType="phone-pad"
+              maxLength={PHONE_DIGITS}
             />
           </View>
           <View style={styles.half}>

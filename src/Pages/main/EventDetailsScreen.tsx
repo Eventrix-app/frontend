@@ -1810,7 +1810,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                             </View>
 
                             {benefits.length > 0 && (
-                              <View style={styles.ticketStubCol}>
+                              <View style={[styles.ticketStubCol, styles.ticketStubColRight]}>
                                 <Text style={[styles.ticketStubLabel, !isVip && styles.ticketStubLabelOnLight]}>
                                   Benefits
                                 </Text>
@@ -2449,6 +2449,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     gap: spacing.md,
   },
   ticketStubCol: { flex: 1 },
+  // The benefits column sits against the left column's longest line (a price, or "Sold out —
+  // join waitlist") with only the row gap between them, which read as one crowded block on
+  // the narrow stub art. Padding rather than a wider row gap so the extra space lands on the
+  // right column alone, leaving the left column's own width untouched — those lines are
+  // already single-line and ellipsized, so widening the gap would truncate both sides.
+  ticketStubColRight: { paddingLeft: spacing.sm },
   // Fixed-height card + up to 6 organizer-entered benefit lines (CreateTicketTypeDto's cap)
   // meant this content routinely ran taller than the 190px stub and got silently clipped by
   // ticketStubWrap's overflow:hidden — shrunk enough (fonts, line-height, spacing, single-
