@@ -2454,7 +2454,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   // the narrow stub art. Padding rather than a wider row gap so the extra space lands on the
   // right column alone, leaving the left column's own width untouched — those lines are
   // already single-line and ellipsized, so widening the gap would truncate both sides.
-  ticketStubColRight: { paddingLeft: spacing.sm },
+  ticketStubColRight: { paddingLeft: spacing.xl },
   // Fixed-height card + up to 6 organizer-entered benefit lines (CreateTicketTypeDto's cap)
   // meant this content routinely ran taller than the 190px stub and got silently clipped by
   // ticketStubWrap's overflow:hidden — shrunk enough (fonts, line-height, spacing, single-
