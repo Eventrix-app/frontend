@@ -1,10 +1,8 @@
-import React from 'react';
-import { TextInput, View, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import React, { useMemo } from 'react';
+import { TextInput, View, Platform, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from './GlassSurface';
 import { Text } from './Text';
 
 interface InputProps extends TextInputProps {
@@ -20,22 +18,26 @@ const Input: React.FC<InputProps> = ({
   style,
   ...props
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <GlassSurface style={[styles.glass, error && styles.glassError]} contentStyle={styles.glassContent}>
-        <TextInput
-          style={[styles.input, error && styles.inputError, style]}
-          placeholderTextColor={colors.textSecondary}
-          {...props}
-        />
-      </GlassSurface>
+      <View style={[styles.glass, error && styles.glassError]}>
+        <View style={styles.glassContent}>
+          <TextInput
+            style={[styles.input, error && styles.inputError, style]}
+            placeholderTextColor={colors.textSecondary}
+            {...props}
+          />
+        </View>
+      </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
@@ -48,6 +50,16 @@ const styles = StyleSheet.create({
   glass: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   glassError: {
     borderColor: 'rgba(239,68,68,0.55)',

@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import InlineDatePicker from '../../components/common/InlineDatePicker';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import {
@@ -20,7 +20,19 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import { extractErrorMessage } from '../../utils/apiError';
 import { dateOnlyToStartOfDayIso, dateOnlyToEndOfDayIso } from '../../utils/dateFormat';
+import { TICKET_CATEGORIES, TICKET_CATEGORY_LABELS, TicketCategory } from '../../utils/ticketCategories';
+import TicketCategoryPicker from '../../components/events/TicketCategoryPicker';
 import { Text } from '../../components/common/Text';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { WarningIcon, LockIcon } from '../../components/common/Icons';
+
+function benefitsToText(benefits?: string[]): string {
+  return (benefits ?? []).join('\n');
+}
+
+function textToBenefits(text: string): string[] {
+  return text.split('\n').map((line) => line.trim()).filter(Boolean);
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ManageTicketTypes'>;
 
@@ -33,54 +45,81 @@ const ManageTicketTypesScreen: React.FC<Props> = ({ navigation, route }) => {
   const { eventId } = route.params;
 
   const { data: ticketTypes = [], isLoading, isError, refetch } = useGetTicketTypesQuery(eventId);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Manage Ticket Types" onBack={() => navigation.goBack()} />
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <SimpleListSkeleton />
       ) : isError ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
+          <WarningIcon color={colors.textSecondary} size={48} />
           <Text style={styles.emptyTitle}>Couldn't load ticket types</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {ticketTypes.map((tier) =>
             tier.quantitySold > 0 ? (
               <LockedTierCard key={tier.id} tier={tier} />
             ) : (
-              <EditableTierCard key={tier.id} eventId={eventId} tier={tier} />
+              <EditableTierCard
+                key={tier.id}
+                eventId={eventId}
+                tier={tier}
+                // Every *other* tier's category — this one keeps its own pill selectable.
+                takenByOthers={ticketTypes.filter((t) => t.id !== tier.id).map((t) => t.category)}
+              />
             ),
           )}
 
-          <Text style={styles.sectionTitle}>Add a New Tier</Text>
-          <AddTierForm eventId={eventId} />
+          {ticketTypes.length < TICKET_CATEGORIES.length && (
+            <>
+              <Text style={styles.sectionTitle}>Add a New Tier</Text>
+              <AddTierForm eventId={eventId} takenCategories={ticketTypes.map((t) => t.category)} />
+            </>
+          )}
         </ScrollView>
       )}
+    </KeyboardAvoidingView>
+  );
+};
+
+const LockedTierCard: React.FC<{ tier: TicketTypeRecord }> = ({ tier }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.card, styles.lockedCard]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.tierName}>{tier.name}</Text>
+        <View style={styles.lockedBadgeRow}>
+          <LockIcon color="#92400E" size={13} />
+          <Text style={styles.lockedBadge}>Has sales</Text>
+        </View>
+      </View>
+      <Text style={styles.meta}>{tier.price > 0 ? `₹${tier.price}` : 'Free'} · {tier.quantitySold} sold{tier.quantityTotal != null ? ` of ${tier.quantityTotal}` : ''}</Text>
+      <Text style={styles.lockedNote}>Tiers with sales can't be edited or removed — this protects buyers who already hold a ticket.</Text>
     </View>
   );
 };
 
-const LockedTierCard: React.FC<{ tier: TicketTypeRecord }> = ({ tier }) => (
-  <View style={[styles.card, styles.lockedCard]}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.tierName}>{tier.name}</Text>
-      <Text style={styles.lockedBadge}>🔒 Has sales</Text>
-    </View>
-    <Text style={styles.meta}>{tier.price > 0 ? `₹${tier.price}` : 'Free'} · {tier.quantitySold} sold{tier.quantityTotal != null ? ` of ${tier.quantityTotal}` : ''}</Text>
-    <Text style={styles.lockedNote}>Tiers with sales can't be edited or removed — this protects buyers who already hold a ticket.</Text>
-  </View>
-);
-
-const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = ({ eventId, tier }) => {
-  const [name, setName] = useState(tier.name);
+const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord; takenByOthers: TicketCategory[] }> = ({
+  eventId,
+  tier,
+  takenByOthers,
+}) => {
+  const [category, setCategory] = useState<TicketCategory>(tier.category);
   const [price, setPrice] = useState(String(tier.price ?? 0));
   const [quantityTotal, setQuantityTotal] = useState(tier.quantityTotal != null ? String(tier.quantityTotal) : '');
+  const [benefitsText, setBenefitsText] = useState(benefitsToText(tier.benefits));
   const [minPerOrder, setMinPerOrder] = useState(String(tier.minPerOrder ?? 1));
   const [maxPerOrder, setMaxPerOrder] = useState(tier.maxPerOrder != null ? String(tier.maxPerOrder) : '');
   const [salesStartAt, setSalesStartAt] = useState(isoDateOnly(tier.salesStartAt));
@@ -92,15 +131,21 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
   // double-tap on "Save Changes" can fire twice before that happens, so a synchronous
   // ref closes the gap (same pattern as CreateEventScreen's isSubmittingRef).
   const isSubmittingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const debouncedPrice = useDebouncedValue(Number(price) || 0, 400);
   const { data: feeEstimate } = useGetFeeEstimateQuery(debouncedPrice, { skip: debouncedPrice <= 0 });
 
   const handleSave = async () => {
     if (isSubmittingRef.current) return;
-    if (!name.trim()) { showAlert('Validation', 'Name is required'); return; }
     if (!price.trim() || Number.isNaN(Number(price)) || Number(price) < 0) {
       showAlert('Validation', 'Enter a valid price');
+      return;
+    }
+    const benefits = textToBenefits(benefitsText);
+    if (benefits.length > 6) {
+      showAlert('Validation', 'A ticket type can list at most 6 benefits');
       return;
     }
     const min = minPerOrder ? Number(minPerOrder) : 1;
@@ -119,7 +164,8 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
         eventId,
         ticketTypeId: tier.id,
         body: {
-          name: name.trim(),
+          category,
+          benefits,
           price: Number(price) || 0,
           quantityTotal: quantityTotal ? parseInt(quantityTotal, 10) : undefined,
           minPerOrder: min,
@@ -128,7 +174,7 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
           salesEndAt: salesEndAt ? dateOnlyToEndOfDayIso(salesEndAt) : undefined,
         },
       }).unwrap();
-      showAlert('Saved', `"${name.trim()}" was updated.`);
+      showAlert('Saved', `"${TICKET_CATEGORY_LABELS[category]}" was updated.`);
     } catch (e: any) {
       showAlert("Couldn't save changes", extractErrorMessage(e, 'Something went wrong. Please try again.'));
     } finally {
@@ -161,8 +207,8 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.fieldLabel}>Name *</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholderTextColor={colors.textSecondary} />
+      <Text style={styles.fieldLabel}>Ticket Type *</Text>
+      <TicketCategoryPicker value={category} onChange={setCategory} takenByOthers={takenByOthers} />
 
       <Text style={styles.fieldLabel}>Price (INR) *</Text>
       <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholderTextColor={colors.textSecondary} />
@@ -172,6 +218,17 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
 
       <Text style={styles.fieldLabel}>Quantity Available</Text>
       <TextInput style={styles.input} value={quantityTotal} onChangeText={setQuantityTotal} placeholder="Unlimited" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+
+      <Text style={styles.fieldLabel}>Benefits</Text>
+      <TextInput
+        style={[styles.input, styles.multiline]}
+        value={benefitsText}
+        onChangeText={setBenefitsText}
+        placeholder={'One per line, e.g.\nFinisher medal'}
+        placeholderTextColor={colors.textSecondary}
+        multiline
+        numberOfLines={3}
+      />
 
       <View style={styles.advancedRow}>
         <View style={styles.advancedField}>
@@ -202,10 +259,18 @@ const EditableTierCard: React.FC<{ eventId: string; tier: TicketTypeRecord }> = 
   );
 };
 
-const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
-  const [name, setName] = useState('');
+const AddTierForm: React.FC<{ eventId: string; takenCategories: TicketCategory[] }> = ({
+  eventId,
+  takenCategories,
+}) => {
+  // Pre-picks whichever category isn't on the event yet, same reasoning as
+  // TicketTypeEditor.addTier — the organizer usually wants the next one, not a blank choice.
+  const [category, setCategory] = useState<TicketCategory | null>(
+    () => TICKET_CATEGORIES.find((c) => !takenCategories.includes(c)) ?? null,
+  );
   const [price, setPrice] = useState('');
   const [quantityTotal, setQuantityTotal] = useState('');
+  const [benefitsText, setBenefitsText] = useState('');
   const [minPerOrder, setMinPerOrder] = useState('1');
   const [maxPerOrder, setMaxPerOrder] = useState('');
   const [salesStartAt, setSalesStartAt] = useState('');
@@ -216,15 +281,22 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
   // "Add Ticket Type" can fire two createTicketType calls before isLoading flips true,
   // creating two identical tiers.
   const isSubmittingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const debouncedPrice = useDebouncedValue(Number(price) || 0, 400);
   const { data: feeEstimate } = useGetFeeEstimateQuery(debouncedPrice, { skip: debouncedPrice <= 0 });
 
   const handleAdd = async () => {
     if (isSubmittingRef.current) return;
-    if (!name.trim()) { showAlert('Validation', 'Name is required'); return; }
+    if (!category) { showAlert('Validation', 'Pick a ticket type'); return; }
     if (!price.trim() || Number.isNaN(Number(price)) || Number(price) < 0) {
       showAlert('Validation', 'Enter a valid price (0 for free)');
+      return;
+    }
+    const benefits = textToBenefits(benefitsText);
+    if (benefits.length > 6) {
+      showAlert('Validation', 'A ticket type can list at most 6 benefits');
       return;
     }
     const min = minPerOrder ? Number(minPerOrder) : 1;
@@ -242,7 +314,8 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
       await createTicketType({
         eventId,
         body: {
-          name: name.trim(),
+          category,
+          benefits,
           price: Number(price) || 0,
           quantityTotal: quantityTotal ? parseInt(quantityTotal, 10) : undefined,
           minPerOrder: min,
@@ -251,14 +324,16 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
           salesEndAt: salesEndAt ? dateOnlyToEndOfDayIso(salesEndAt) : undefined,
         },
       }).unwrap();
-      setName('');
+      const addedLabel = TICKET_CATEGORY_LABELS[category];
+      setCategory(TICKET_CATEGORIES.find((c) => ![...takenCategories, category].includes(c)) ?? null);
       setPrice('');
       setQuantityTotal('');
+      setBenefitsText('');
       setMinPerOrder('1');
       setMaxPerOrder('');
       setSalesStartAt('');
       setSalesEndAt('');
-      showAlert('Tier added', `"${name.trim()}" is now available for booking.`);
+      showAlert('Tier added', `"${addedLabel}" is now available for booking.`);
     } catch (e: any) {
       showAlert("Couldn't add tier", extractErrorMessage(e, 'Something went wrong. Please try again.'));
     } finally {
@@ -268,8 +343,8 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.fieldLabel}>Name *</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. VIP" placeholderTextColor={colors.textSecondary} />
+      <Text style={styles.fieldLabel}>Ticket Type *</Text>
+      <TicketCategoryPicker value={category} onChange={setCategory} takenByOthers={takenCategories} />
 
       <Text style={styles.fieldLabel}>Price (INR) *</Text>
       <TextInput style={styles.input} value={price} onChangeText={setPrice} placeholder="0 for free" keyboardType="decimal-pad" placeholderTextColor={colors.textSecondary} />
@@ -279,6 +354,17 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
 
       <Text style={styles.fieldLabel}>Quantity Available</Text>
       <TextInput style={styles.input} value={quantityTotal} onChangeText={setQuantityTotal} placeholder="Unlimited" keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+
+      <Text style={styles.fieldLabel}>Benefits</Text>
+      <TextInput
+        style={[styles.input, styles.multiline]}
+        value={benefitsText}
+        onChangeText={setBenefitsText}
+        placeholder={'One per line, e.g.\nFinisher medal'}
+        placeholderTextColor={colors.textSecondary}
+        multiline
+        numberOfLines={3}
+      />
 
       <View style={styles.advancedRow}>
         <View style={styles.advancedField}>
@@ -309,7 +395,7 @@ const AddTierForm: React.FC<{ eventId: string }> = ({ eventId }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
   loader: { marginTop: spacing.xxl },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
@@ -334,6 +420,7 @@ const styles = StyleSheet.create({
   lockedCard: { backgroundColor: '#F9FAFB' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   tierName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  lockedBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lockedBadge: { fontSize: 12, fontWeight: '600', color: '#92400E' },
   meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   lockedNote: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 17 },
@@ -349,6 +436,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  multiline: { minHeight: 72, textAlignVertical: 'top' },
   payoutHint: { fontSize: 12, color: '#059669', fontWeight: '600', marginTop: 4 },
   advancedRow: { flexDirection: 'row', gap: spacing.sm },
   advancedField: { flex: 1 },

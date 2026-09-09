@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
-import { colors } from '../theme';
+import { Animated, Pressable, StyleSheet } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
   value: boolean;
@@ -13,6 +13,7 @@ const THUMB = 22;
 const PAD = 3;
 
 export const AnimatedToggle: React.FC<Props> = ({ value, onChange }) => {
+  const { colors } = useTheme();
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {

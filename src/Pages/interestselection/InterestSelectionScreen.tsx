@@ -14,6 +14,7 @@ import { setInterests } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
 import { useSelector } from 'react-redux';
 import { Text } from '../../components/common/Text';
+import { LeftArrow } from '../../components/common/Icons';
 
 const { width: screenWidth } = Dimensions.get('window');
 const MIN_SELECTIONS = 3;
@@ -96,9 +97,6 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
                   style={[styles.chip, selected && styles.chipSelected]}
                   onPress={() => toggle(cat.id)}
                 >
-                  {cat.emoji ? (
-                    <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-                  ) : null}
                   <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                     {cat.name}
                   </Text>
@@ -135,7 +133,7 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <Text style={styles.backArrow}>←</Text>
+            <LeftArrow color="#FF3366" size={18} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -229,7 +227,6 @@ const styles = StyleSheet.create({
     borderColor: '#FF3366',
     backgroundColor: 'rgba(255,51,102,0.07)',
   },
-  chipEmoji: { fontSize: 16 },
   chipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
   chipTextSelected: { color: '#FF3366', fontWeight: '600' },
   hintText: {
@@ -256,7 +253,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backArrow: { fontSize: 18, color: '#FF3366', fontWeight: '800' },
   continueButton: {
     paddingVertical: 14,
     paddingHorizontal: 22,

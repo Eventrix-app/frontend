@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { authApi } from '../services/authApi';
 
 interface User {
@@ -62,6 +61,24 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.isLoading = false;
         state.error = null;
+      })
+      .addMatcher(authApi.endpoints.socialLogin.matchFulfilled, (state, { payload }) => {
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
+        state.token = payload.accessToken;
+        state.isAuthenticated = true;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addMatcher(authApi.endpoints.refresh.matchFulfilled, (state, { payload }) => {
+        // refresh() is fired-and-forgotten from AppStateSync (on launch/foreground) with no
+        // await at the call site, so it can still be in flight when the user explicitly logs
+        // out. Without this guard, a refresh that resolves after logout() has already run
+        // would blindly repopulate user/token and flip isAuthenticated back to true,
+        // resurrecting a session the user just ended.
+        if (!state.isAuthenticated) return;
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
+        state.token = payload.accessToken;
+        state.isAuthenticated = true;
       });
   },
 });

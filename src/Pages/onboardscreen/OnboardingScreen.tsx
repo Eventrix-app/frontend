@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -6,7 +6,6 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   View,
@@ -16,7 +15,8 @@ import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
 import { Dots } from '../../components/Dots';
-import { colors } from '../../theme/colors';
+import { colorsLight } from '../../theme/colors.light';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Text } from '../../components/common/Text';
@@ -29,19 +29,19 @@ type Slide = {
 
 const slides: Slide[] = [
   {
-    image: require('../../../assets/carousel/onboarding-carousel/1.jpg'),
+    image: require('../../../assets/onboarding/1.jpg'),
     title: 'Find events near you',
     subtitle:
       'Explore events happening around you based on your interests, location and schedule.',
   },
   {
-    image: require('../../../assets/carousel/onboarding-carousel/2.jpg'),
+    image: require('../../../assets/onboarding/2.jpg'),
     title: 'Join what excites you',
     subtitle:
       'From workshops and concerts to sports and meetups — choose what fits your vibe.',
   },
   {
-    image: require('../../../assets/carousel/onboarding-carousel/3.jpg'),
+    image: require('../../../assets/onboarding/3.jpg'),
     title: 'Connect beyond events',
     subtitle:
       'Watch reels, chat with attendees and be part of the event community.',
@@ -73,6 +73,11 @@ const LeftArrow = ({ color }: { color: string }) => (
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const [index, setIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
+  const styles = useMemo(() => createStyles(colorsLight), []);
+
+  // react-native's SafeAreaView is iOS-only and gave Android no insets, so the button row
+  // sat under the nav bar. Insets applied explicitly, once per edge.
+  const insets = useSafeAreaInsets();
 
   // Screen-level slide transition
   const screenX = useRef(new Animated.Value(0)).current;
@@ -178,8 +183,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
         transform: [{ translateY: mountTranslateY }],
       },
     ]}>
-      <SafeAreaView style={styles.fill}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {/* Plain View, not SafeAreaView: keeping it would double-count the inset on iOS */}
+      <View style={[styles.fill, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={colorsLight.white} />
 
         <View pointerEvents="none" style={styles.glow} />
 
@@ -197,7 +203,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
             'rgba(255, 51, 102, 0)',
             'rgba(255, 51, 102, 0.18)',
             'rgba(255, 51, 104, 0.95)',
-            colors.primaryDark,
+            colorsLight.primaryDark,
           ]}
           locations={[0, 0.25, 0.7, 1]}
           style={styles.gradient}
@@ -218,14 +224,20 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
             <Dots total={slides.length} index={index} />
           </View>
 
-          <Animated.View style={[styles.bottom, { opacity: btnOpacity }]}>
+          <Animated.View
+            style={[
+              styles.bottom,
+              // Floored so the row never sits flush on a device reporting inset 0
+              { opacity: btnOpacity, paddingBottom: Math.max(insets.bottom, spacing.md) },
+            ]}
+          >
             {isFirst ? (
               <Pressable
                 onPress={handleNext}
                 style={({ pressed }) => [styles.btnOnGradient, { flex: 1, opacity: pressed ? 0.82 : 1 }]}
               >
                 <Text style={styles.btnOnGradientText}>Next</Text>
-                <RightArrow color={colors.primary} />
+                <RightArrow color={colorsLight.primary} />
               </Pressable>
             ) : (
               <>
@@ -241,18 +253,18 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
                   style={({ pressed }) => [styles.btnOnGradient, { flex: 1.2, opacity: pressed ? 0.82 : 1 }]}
                 >
                   <Text style={styles.btnOnGradientText}>Next</Text>
-                  <RightArrow color={colors.primary} />
+                  <RightArrow color={colorsLight.primary} />
                 </Pressable>
               </>
             )}
           </Animated.View>
         </LinearGradient>
-      </SafeAreaView>
+      </View>
     </Animated.View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.white,

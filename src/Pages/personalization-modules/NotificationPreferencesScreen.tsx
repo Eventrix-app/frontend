@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -15,10 +15,13 @@ import { AuthStackParamList } from '../../navigation/types';
 import { AnimatedToggle } from '../../components/AnimatedToggle';
 import { CheckBadge } from '../../components/CheckBadge';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, spacing } from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { colorsLight } from '../../theme/colors.light';
 import { setNotificationPrefs } from '../../store/slices/onboardingDraftSlice';
-import { AppDispatch, RootState } from '../../store';
+import { AppDispatch, RootState, store } from '../../store';
 import { Text } from '../../components/common/Text';
+import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
 
 type Pref = 'eventReminders' | 'nearbyEvents' | 'reelsAndCommunity' | 'specialOffers';
 
@@ -47,6 +50,7 @@ export const NotificationsModal: React.FC<ModalProps> = ({ visible, onClose, onC
     reelsAndCommunity: true,
     specialOffers: true,
   });
+  const styles = useMemo(() => createStyles(colorsLight), []);
 
   useEffect(() => {
     if (persistedPrefs) {
@@ -143,7 +147,7 @@ export const NotificationsModal: React.FC<ModalProps> = ({ visible, onClose, onC
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -207,6 +211,7 @@ type ScreenProps = NativeStackScreenProps<AuthStackParamList, 'NotificationPrefe
 
 export const NotificationPreferencesScreen: React.FC<ScreenProps> = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch<AppDispatch>();
   const [visible, setVisible] = useState(true);
 
   const handleClose = () => {
@@ -214,9 +219,20 @@ export const NotificationPreferencesScreen: React.FC<ScreenProps> = () => {
     navigation.goBack();
   };
 
-  const handleContinue = () => {
+  // This is the last step of the post-login onboarding chain (Onboarding -> Interests ->
+  // LocationAccess -> here) — Login has already happened by this point, so push the
+  // collected interests/location/prefs (syncOnboardingDraft also marks the account as
+  // onboarded once that sync succeeds — see its own comment), then land on Main.
+  // Awaited (not fire-and-forget) so the account's hasCompletedOnboarding flag is durably
+  // set server-side before the user can leave/background the app — otherwise a login
+  // shortly after would still see hasCompletedOnboarding: false and re-run onboarding.
+  const handleContinue = async () => {
     setVisible(false);
-    navigation.navigate('Login' as never);
+    await syncOnboardingDraft(dispatch, store.getState);
+    // Request OS push notification permission at the natural end of onboarding
+    // (after the user has set their in-app preferences) rather than right after login.
+    registerForPushNotifications(dispatch);
+    navigation.getParent()?.navigate('Main' as never);
   };
 
   return (

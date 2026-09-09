@@ -1,50 +1,56 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Dimensions, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, AppState, AppStateStatus, Dimensions, Image, RefreshControl, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SvgXml } from 'react-native-svg';
 import FeaturedCarousel from '../../components/events/FeaturedCarousel';
-import { CategoryIconCard, CATEGORIES, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
+import { CategoryIconCard, ViewAllCategoryIconCard } from '../../components/events/CategoryIconCard';
 import { EventInterestCard } from '../../components/events/EventInterestCard';
 import { EventHighlightCard, HighlightItem } from '../../components/events/EventHighlightCard';
 import { SectionHeader } from '../../components/events/SectionHeader';
-import HalfScreenModal from '../../components/common/halfscreenmodal';
-import InterestSelectionScreen from '../interestselection/InterestSelectionScreen';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
-import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useDisplayAddress } from '../../hooks/useDisplayAddress';
+import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
+import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
+import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
 import { toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
+import { NotificationBell, LocationPin, MicIcon } from '../../components/common/Icons';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
+import VoiceListeningDialog from '../../components/common/VoiceListeningDialog';
+import Skeleton from '../../components/common/Skeleton';
+import { FeaturedCarouselSkeleton, InterestCardSkeleton } from '../../components/common/HomeFeedSkeleton';
 
-const bgImage = require('../../../assets/bg.png');
+const bgImage = require('../../../assets/shared/backgrounds/bg.png');
 
-const micSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="22px" viewBox="0 -960 960 960" width="22px" fill="#888"><path d="M395-435q-35-35-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35q-50 0-85-35Zm85-205Zm-40 520v-123q-104-14-172-93t-68-184h80q0 83 58.5 141.5T480-320q83 0 141.5-58.5T680-520h80q0 105-68 184t-172 93v123h-80Zm68.5-371.5Q520-503 520-520v-240q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v240q0 17 11.5 28.5T480-480q17 0 28.5-11.5Z"/></svg>`;
-
-const notificationSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></svg>`;
-
-const notificationUnreadSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M480-80q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm0-420ZM160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v13q-11 22-16 45t-4 47q-10-2-19.5-3.5T480-720q-66 0-113 47t-47 113v280h320v-257q18 8 38.5 12.5T720-520v240h80v80H160Zm475-435q-35-35-35-85t35-85q35-35 85-35t85 35q35 35 35 85t-35 85q-35 35-85 35t-85-35Z"/></svg>`;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// TODO: source from user profile / auth state instead of hardcoding
-const CURRENT_USER = {
-  name: 'Mubeen',
-  address: 'Sr. No. 1/2/3, Street Name, Residence, State...',
-  avatar: require('../../../assets/profile/avatar-placeholder.png'),
-};
-
-// TODO: pull from a real "shorts"/highlights endpoint once available
-const HIGHLIGHTS: HighlightItem[] = [
-  { id: 'h1', thumbnail: require('../../../assets/highlights/h1.jpg'), title: 'Event highlight title...', views: '14k views', postedAgo: '40m ago' },
-  { id: 'h2', thumbnail: require('../../../assets/highlights/h2.jpg'), title: 'Event highlight title...', views: '9k views', postedAgo: '2h ago' },
-  { id: 'h3', thumbnail: require('../../../assets/highlights/h3.jpg'), title: 'Event highlight title...', views: '3k views', postedAgo: '1d ago' },
+// Shown in the space revealed above the header while the user pulls down to refresh —
+// picked fresh each time a pull gesture starts, no backend call needed for these.
+const HEALTH_QUOTES = [
+  'A 10-minute walk can lift your mood for hours.',
+  'Drinking enough water keeps your mind sharp.',
+  'A few deep breaths can calm a racing mind.',
+  'Good sleep tonight means a better you tomorrow.',
+  'Stretching for five minutes eases the whole day.',
+  'Small steps every day add up to big health wins.',
+  'Fresh air and sunlight are free mood boosters.',
+  'Laughing with friends is good for your heart, literally.',
 ];
+
+function randomHealthQuote(): string {
+  return HEALTH_QUOTES[Math.floor(Math.random() * HEALTH_QUOTES.length)];
+}
 
 const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -53,7 +59,8 @@ const HomeScreen: React.FC = () => {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const isSynced = useSelector((state: RootState) => state.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
-  const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -67,33 +74,203 @@ const HomeScreen: React.FC = () => {
     return () => subscription.remove();
   }, [dispatch, isAuthenticated, isSynced]);
 
-  const { data: events = [] } = useGetEventsQuery({});
-  const cardEvents = events.map(toCardEvent);
-  const featured = cardEvents.filter((event) => event.featured);
-  const recommended = cardEvents;
+  const { events, refetch, isRefreshing, isLoading: isLoadingEvents } = usePaginatedEvents({ sortBy: 'newest' });
+  // Real reels for the "Event Highlights" strip, replacing three bundled jpgs with invented
+  // titles and view counts. Only the newest few — this is a teaser row into the Shorts tab,
+  // not a feed.
+  const { data: shortsFeed } = useGetShortsFeedQuery({ page: 1, limit: 6 });
+  const highlights = useMemo<HighlightItem[]>(
+    () =>
+      (shortsFeed?.shorts ?? []).map((short) => ({
+        id: short.id,
+        // A reel has no generated thumbnail (no client-side video thumbnailing in this app),
+        // so it falls back to the event's cover image and then to FallbackImage's own
+        // skeleton if neither exists.
+        thumbnail: short.thumbnailUrl
+          ? { uri: short.thumbnailUrl }
+          : short.event?.coverImageUrl
+            ? { uri: short.event.coverImageUrl }
+            : undefined,
+        // Not rendered on the tile — used only as its accessibility label.
+        title: short.caption?.trim() || short.event?.title || 'Event highlight',
+      })),
+    [shortsFeed],
+  );
+  const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
+  const { data: categories = [] } = useGetCategoriesQuery();
+  // toCardEvent runs over every loaded event and does distance maths per item, so it is
+  // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
+  // change, a notifications poll landing, a theme toggle).
+  const cardEvents = useMemo(
+    () => events.map((event) => toCardEvent(event, me?.latitude, me?.longitude)),
+    [events, me?.latitude, me?.longitude],
+  );
+  // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
+  // here defensively so a stale cached response or a future relaxation of that cap can never
+  // blow out this carousel.
+  const featured = useMemo(
+    () => cardEvents.filter((event) => event.featured).slice(0, 5),
+    [cardEvents],
+  );
+  // Home shows a fixed-size latest feed (not an infinite one) — full browsing/pagination
+  // lives on the Explore screen via "View All Events" below. Excludes whatever is already
+  // in the Featured carousel just above it — without this, any event both featured and
+  // recent (the common case) rendered twice on the same screen. Falls back to the
+  // unfiltered list when there's no non-featured inventory left (a near-empty catalog
+  // where every current event happens to be featured) — a still-empty feed below the
+  // carousel reads as "no events at all", which is worse than one visible repeat.
+  const recommended = useMemo(() => {
+    const featuredIds = new Set(featured.map((event) => event.id));
+    const nonFeatured = cardEvents.filter((event) => !featuredIds.has(event.id));
+    const pool = nonFeatured.length > 0 ? nonFeatured : cardEvents;
+    return pool.slice(0, 15);
+  }, [cardEvents, featured]);
 
-  // TODO: replace with real unread count from notification context/API
-  const hasUnread = true;
+  // Home-screen-only pull-to-refresh: dragging past the top shifts the header + feed
+  // down together (via pullDistance below) and reveals a random health quote behind
+  // them. Driven straight off the ScrollView's own native bounce (contentOffset.y going
+  // negative) rather than a custom PanResponder, so it rides the platform's native
+  // over-scroll physics instead of fighting them.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [pullQuote, setPullQuote] = useState(randomHealthQuote);
 
-  const openEvent = (eventId: string) => {
+  // A fast fling-to-top can make the native scroll view overshoot a few px past 0 on its
+  // own (pure momentum/rubber-band settle, finger already lifted) — with no dead zone, that
+  // alone was enough to nudge the header down and flash a gap above it near the status bar,
+  // even though the user never meant to trigger the pull-reveal. Below PULL_DEAD_ZONE the
+  // header stays fully pinned; only a deliberate drag past it starts moving anything.
+  const PULL_DEAD_ZONE = 24;
+  const pullDistance = scrollY.interpolate({
+    inputRange: [-150, -PULL_DEAD_ZONE, 0],
+    outputRange: [150 - PULL_DEAD_ZONE, 0, 0],
+    extrapolate: 'clamp',
+  });
+  const pullQuoteOpacity = scrollY.interpolate({
+    inputRange: [-70, -PULL_DEAD_ZONE, 0],
+    outputRange: [1, 0, 0],
+    extrapolate: 'clamp',
+  });
+
+  // Home shows a fixed latest-15 feed (see `recommended` above), so this only feeds scrollY
+  // to the quote-reveal interpolations — the refresh itself is triggered by the
+  // RefreshControl on the ScrollView below, not from here.
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true },
+  );
+
+  // Picks the quote as the drag begins so it's already in place behind the header by the
+  // time the pull reveals it.
+  const handlePullStart = useCallback(() => {
+    setPullQuote(randomHealthQuote());
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+    refetchMe();
+  }, [refetch, refetchMe]);
+
+  const displayName = me?.firstName || me?.fullName?.trim().split(' ')[0] || 'there';
+  // Shared with ProfileScreen (useDisplayAddress) so both show the exact same resolved
+  // location instead of computing/displaying it differently.
+  const displayAddress = useDisplayAddress(me);
+  const avatarInitial = (me?.fullName ?? me?.email ?? '').trim().charAt(0).toUpperCase() || '?';
+
+  const { data: notifications = [] } = useGetNotificationsQuery();
+  const hasUnread = notifications.some((n) => !n.readAt);
+
+  const openEvent = useCallback((eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
-  };
+  }, [navigation]);
 
-  const openCategory = (categoryKey: string) => {
-    navigation.navigate('Search', { category: categoryKey } as never);
-  };
+  const openCategory = useCallback((categoryId: string) => {
+    navigation.navigate('Search', { categoryId });
+  }, [navigation]);
 
   // "View All Events" (bottom of the events sections) goes to the full Explore screen.
-  const openExplore = () => {
+  const openExplore = useCallback(() => {
     navigation.navigate('Explore' as never);
-  };
+  }, [navigation]);
 
-  // "View All" on categories opens the half-screen interest-selection popup.
-  const openInterestSheet = () => setShowInterestSheet(true);
-  const closeInterestSheet = () => setShowInterestSheet(false);
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+
+  // Built once per data change rather than per render. `pullQuote` updates on every
+  // pull-to-refresh drag, which would otherwise rebuild every card element in both lists.
+  const topInterestCards = useMemo(
+    () => recommended.slice(0, 1).map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={openEvent} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
+  const allInterestCards = useMemo(
+    () => recommended.map((event) => (
+      <EventInterestCard key={event.id} event={event as any} onPress={openEvent} onRequireAuth={requireAuth} />
+    )),
+    [recommended, openEvent, requireAuth],
+  );
+
+  // Same reasoning as the card lists above: this was built inline in the JSX, so every
+  // re-render handed FeaturedCarousel a brand-new array of brand-new objects and defeated
+  // any memoization inside it. `pullQuote` alone changes on every pull-to-refresh drag.
+  const featuredSlides = useMemo(
+    () => featured.map((event) => ({
+      id: event.id,
+      title: event.title,
+      date: event.date,
+      location: event.venue,
+      price: event.price,
+      image: event.image,
+      featured: event.featured,
+    })),
+    [featured],
+  );
+
+  // The highlights rail always routes to the same place regardless of which tile is tapped,
+  // so it is one stable callback rather than a fresh closure per tile per render.
+  const openShortsTab = useCallback(() => {
+    (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
+      'Main',
+      { screen: 'Shorts' },
+    );
+  }, [navigation]);
+
+  // Keyed off the events feed rather than /me: the header already degrades gracefully into
+  // its own skeleton, whereas an empty body is the part that leaves the user wondering
+  // whether anything is happening.
+  const { stage: slowStage } = useSlowNetwork(isLoadingEvents);
+
+  const openProfile = useCallback(() => navigation.navigate('Profile'), [navigation]);
+  // Dictation lands here and stays put rather than jumping straight to results — the point
+  // of showing it word by word is that the user gets to read it back before searching.
+  const [spokenQuery, setSpokenQuery] = useState('');
+  const voice = useVoiceSearch({ onResult: setSpokenQuery, onPartial: setSpokenQuery });
+
+  const openSearch = useCallback(
+    () => navigation.navigate('Search', spokenQuery.trim() ? { initialQuery: spokenQuery.trim() } : undefined),
+    [navigation, spokenQuery],
+  );
+  const openNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
+
 
   return (
     <View style={styles.root}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pullQuoteBanner, { paddingTop: insets.top, opacity: pullQuoteOpacity }]}
+      >
+        <Text style={styles.pullQuoteText} numberOfLines={2}>
+          {pullQuote}
+        </Text>
+      </Animated.View>
+
+      {/* Only the header rides the pull-down transform — the ScrollView's own native
+          rubber-band bounce already displaces its content by the same amount on its own,
+          so wrapping both in one transform double-applies the motion (header moves by
+          pullDistance, content moves by pullDistance *and* its own bounce), which is what
+          opened the gap between them. Keeping the transform on the header alone means both
+          move by the same amount through independent, exactly-matching means. */}
+      <Animated.View style={[styles.headerShift, { transform: [{ translateY: pullDistance }] }]}>
       <LinearGradient
         colors={[colors.brandPink, '#F43362']}
         style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
@@ -104,13 +281,34 @@ const HomeScreen: React.FC = () => {
         {/* Row 1: greeting + address on the left, avatar on the right */}
         <View style={styles.headerTop}>
           <View style={styles.greetingCol}>
-            <Text style={styles.greeting}>Welcome, {CURRENT_USER.name} 👋</Text>
-            <Text style={styles.location} numberOfLines={1}>
-              📍 {CURRENT_USER.address}
-            </Text>
+            {isLoadingMe ? (
+              // Placeholder rather than the real Text: displayName falls back to "there" and
+              // displayAddress to a placeholder while /me is in flight, so without this the
+              // header renders plausible-but-wrong copy and then visibly rewrites itself.
+              <View style={styles.greetingSkeleton}>
+                <Skeleton width={170} height={20} />
+                <Skeleton width={120} height={13} />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.greeting}>Welcome, {displayName} 👋</Text>
+                <View style={styles.locationRow}>
+                  <LocationPin size={12} color="rgba(255,255,255,0.88)" />
+                  <Text style={styles.location} numberOfLines={1}>
+                    {displayAddress}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Image source={CURRENT_USER.avatar} style={styles.avatarImg} />
+          <TouchableOpacity onPress={openProfile}>
+            {me?.profilePictureUrl ? (
+              <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>{avatarInitial}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -119,43 +317,77 @@ const HomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.search}
             activeOpacity={0.95}
-            onPress={() => navigation.navigate('Search')}
+            onPress={openSearch}
           >
             <Image
-              source={require('../../../assets/location/search.png')}
+              source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchImg}
               resizeMode="contain"
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search 'events'"
+              placeholder={voice.isListening ? 'Listening…' : "Search 'events'"}
               placeholderTextColor="#aaa"
+              // Fills word by word as the recogniser reports each one, then keeps the final
+              // wording. The bar is a button, so this is display-only.
+              value={spokenQuery}
               editable={false}
             />
             <View style={styles.divider} />
-            <TouchableOpacity style={styles.micBtn}>
-              <SvgXml xml={micSvg} width={22} height={22} />
+            <TouchableOpacity
+              style={styles.micBtn}
+              onPress={(e) => {
+                // The whole bar navigates to Search — without this the tap does both.
+                e.stopPropagation();
+                // Cleared up front so a new attempt does not sit under the previous phrase
+                // until the first word of this one lands.
+                setSpokenQuery('');
+                voice.start();
+              }}
+              accessibilityLabel="Search by voice"
+            >
+              <MicIcon color="#F43362" size={22} />
             </TouchableOpacity>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.bell}
-            onPress={() => navigation.navigate('Notifications')}
+            onPress={openNotifications}
           >
-            <SvgXml
-              xml={hasUnread ? notificationUnreadSvg : notificationSvg}
-              width={24}
-              height={24}
-            />
+            <NotificationBell unread={hasUnread} color="#000000" size={24} />
             {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      </Animated.View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <Animated.ScrollView
+        style={styles.scrollFlex}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        onScroll={handleScroll}
+        onScrollBeginDrag={handlePullStart}
+        scrollEventThrottle={16}
+        bounces
+        overScrollMode="always"
+        // The actual refresh trigger. The quote-reveal animation above is driven off
+        // contentOffset.y going negative, which only ever happens on iOS — Android's
+        // overscroll is an EdgeEffect (glow/stretch) rendered without the scroll position
+        // ever leaving 0, so the old release handler's threshold check could never pass and
+        // pulling down on Android refreshed nothing at all. RefreshControl is the platform's
+        // own gesture on both, so it fires regardless of whether the bounce exists.
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.brandPink} />
+        }
+      >
+
         {/* Full-bleed pink section that visually continues from the header,
             but lives inside the ScrollView so it scrolls with the page. */}
-        {featured.length > 0 && (
+        <SlowNetworkNotice stage={slowStage} onRetry={handleRefresh} style={styles.slowNotice} />
+
+        {isLoadingEvents && <FeaturedCarouselSkeleton />}
+
+        {!isLoadingEvents && featured.length > 0 && (
           <LinearGradient
             colors={[colors.brandPink, '#ff6b8a']}
             style={styles.featuredWrap}
@@ -163,56 +395,39 @@ const HomeScreen: React.FC = () => {
             <View style={styles.featuredBgWrap}>
               <Image source={bgImage} style={styles.featuredBg} resizeMode="cover" />
             </View>
-            <SectionHeader title="Featured Near You" light />
+            <SectionHeader title="Featured Near You" light hideLine />
             <FeaturedCarousel
               cardWidth={SCREEN_WIDTH - spacing.sm * 2}
-              events={featured.map((event) => ({
-                id: event.id,
-                title: event.title,
-                date: event.date,
-                location: event.venue,
-                price: event.price,
-                image: event.image,
-                featured: event.featured,
-              }))}
-              onEventPress={(eventId) => openEvent(eventId)}
+              events={featuredSlides}
+              onEventPress={openEvent}
             />
           </LinearGradient>
         )}
 
         <SectionHeader title="Browse by Category" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-          {CATEGORIES.map((category) => (
-            <CategoryIconCard key={category.key} item={category} onPress={openCategory} />
+          {categories.slice(0, 5).map((category) => (
+            <CategoryIconCard key={category.id} item={category} onPress={openCategory} />
           ))}
-          <ViewAllCategoryIconCard onPress={openInterestSheet} />
+          <ViewAllCategoryIconCard onPress={openExplore} />
         </ScrollView>
 
         <SectionHeader title="Based on Interest" />
-        {recommended.slice(0, 1).map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
-        ))}
+        {isLoadingEvents && <InterestCardSkeleton />}
+        {!isLoadingEvents && topInterestCards}
 
-        <SectionHeader title="Event Highlights" />
+        {/* Hidden entirely when nobody has posted a reel yet, rather than showing a header
+            above an empty rail. */}
+        {highlights.length > 0 && <SectionHeader title="Event Highlights" />}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {HIGHLIGHTS.map((item) => (
-            <EventHighlightCard
-              key={item.id}
-              item={item}
-              onPress={() =>
-                (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
-                  'Main',
-                  { screen: 'Shorts' },
-                )
-              }
-            />
+          {highlights.map((item) => (
+            <EventHighlightCard key={item.id} item={item} onPress={openShortsTab} />
           ))}
         </ScrollView>
 
         <SectionHeader title="You Might Also Like" />
-        {recommended.map((event) => (
-          <EventInterestCard key={event.id} event={event as any} onPress={() => openEvent(event.id)} />
-        ))}
+        {isLoadingEvents && <InterestCardSkeleton count={2} />}
+        {!isLoadingEvents && allInterestCards}
 
         <TouchableOpacity style={styles.viewAllBtn} onPress={openExplore} activeOpacity={0.85}>
           <Text style={styles.viewAllText}>View All Events</Text>
@@ -222,27 +437,59 @@ const HomeScreen: React.FC = () => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Ⓡ All Rights Reserved. © Eventrix</Text>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
-     <HalfScreenModal visible={showInterestSheet} onClose={closeInterestSheet}>
-      <InterestSelectionScreen
-    mode="sheet"
-    onComplete={closeInterestSheet}
-    onDismiss={closeInterestSheet}
-  />
-</HalfScreenModal>
+      <VoiceListeningDialog
+        visible={voice.isListening}
+        transcript={voice.partial}
+        isSpeaking={voice.isSpeaking}
+        onDone={voice.stop}
+        onCancel={() => {
+          voice.cancel();
+          setSpokenQuery('');
+        }}
+      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
   },
+  headerShift: {
+    flexShrink: 0,
+    // Subtle depth so the header reads as sitting above the scroll content rather than
+    // fusing flat into it — matches the shadow language already used on cards elsewhere.
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  scrollFlex: {
+    flex: 1,
+  },
+  pullQuoteBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.sm,
+  },
+  pullQuoteText: {
+    color: colors.brandPink,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   header: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     overflow: 'hidden',
@@ -265,8 +512,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
+  greetingSkeleton: { gap: spacing.sm },
   greetingCol: {
     flex: 1,
     marginRight: spacing.sm,
@@ -278,15 +526,35 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.7)',
   },
+  avatarFallback: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
+  },
   greeting: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '700',
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   location: {
     color: 'rgba(255,255,255,0.88)',
     fontSize: 12,
-    marginTop: 2,
   },
   searchRow: {
     flexDirection: 'row',
@@ -302,7 +570,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 48,
     gap: 8,
-    shadowColor: '#000',
+    // Was hardcoded '#000' — themed so this reads correctly in both light and dark mode
+    // rather than always rendering a plain black shadow regardless of theme.
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -354,15 +624,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,   // was: spacing.md — a touch more breathing room before "Browse by Category"
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     overflow: 'hidden',
   },
   featuredBg: {
     position: 'absolute',
-    top: -18,
-    left: -68,
+    top: -62,
+    left: -80,
     width: '135%',
     height: '135%',
     transform: [{ scale: 0.78 }],
@@ -376,10 +646,14 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
+  slowNotice: {
+    marginBottom: spacing.md,
+  },
   categoryRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingBottom: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingBottom: spacing.md,   // was: spacing.sm — a bit more separation before "Based on Interest"
   },
   footer: {
     alignItems: 'center',
@@ -398,7 +672,7 @@ const styles = StyleSheet.create({
     borderColor: colors.brandPink,
     borderRadius: 14,
     paddingVertical: spacing.sm + 2,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,   // was: spacing.sm — a touch more separation from "You Might Also Like" cards above it
   },
   viewAllText: {
     color: colors.brandPink,

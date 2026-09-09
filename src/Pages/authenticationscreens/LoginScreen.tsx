@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
-import GlassSurface from '../../components/common/GlassSurface';
 import AnimatedLink from '../../components/common/AnimatedLink';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
+import { registerForPushNotifications } from '../../utils/registerForPushNotifications';
+import { getDeviceLabel } from '../../utils/getDeviceLabel';
+import { prefetchPostLoginData } from '../../utils/prefetchPostLoginData';
+import { showAlert } from '../../utils/crossPlatformAlert';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-};
+import { WarningIcon } from '../../components/common/Icons';
+import { AuthStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -33,6 +33,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [login, { isLoading }] = useLoginMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
   
@@ -49,16 +51,31 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       setErrorMessage(null);
-      const result = await login({ email, password }).unwrap();
+      // isFormValid checks email.trim() below, but previously sent the raw value — a
+      // pasted email with trailing/leading whitespace passed validation (button enabled)
+      // but then failed an exact-match backend lookup with a confusing "invalid email or
+      // password" error.
+      const result = await login({ email: email.trim(), password, deviceLabel: getDeviceLabel() }).unwrap();
       // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
+      // Warm the queries the landing screens subscribe to while the navigation transition
+      // animates, so Home renders with data rather than skeletons. Must come after unwrap():
+      // these endpoints need the Bearer token, which only reaches the store when the login
+      // mutation settles.
+      prefetchPostLoginData(dispatch);
       if ((result?.roles ?? []).includes('admin')) {
         navigation.getParent()?.navigate('AdminRedirect' as never);
+      } else if (!result.hasCompletedOnboarding) {
+        // Push notification permission is requested at the end of onboarding
+        // (NotificationPreferencesScreen), not here, so the OS dialog doesn't
+        // interrupt the user before the first onboarding slide.
+        navigation.navigate('Onboarding');
       } else {
+        registerForPushNotifications(dispatch);
         navigation.getParent()?.navigate('Main' as never);
       }
     } catch (err: any) {
-      console.error('Login error details:', err);
+      if (__DEV__) console.error('Login error details:', err);
       // Check if email or password are incorrect (401 Unauthorized)
       if (
         err.status === 401 ||
@@ -66,7 +83,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         err.data?.message?.toLowerCase()?.includes('invalid email or password') ||
         err.message?.toLowerCase()?.includes('invalid email or password')
       ) {
-        Alert.alert('Error', 'invalid email or password');
+        showAlert('Error', 'invalid email or password');
       } else {
         if (err.data && err.data.message) {
           if (Array.isArray(err.data.message)) {
@@ -93,7 +110,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       title="Log in"
       subtitle="Enter your credentials and log in to continue."
       centerTitle
-      scrollable={false}
+      scrollable={true}
+      brandCardHeight={150}
     >
       <View onLayout={handleContentLayout}>
         <AuthInput
@@ -105,7 +123,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           autoCapitalize="none"
         />
         <AuthInput
-          icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+          icon={require('../../../assets/auth/lock.png')}
           placeholder="Password"
           value={password}
           onChangeText={setPassword}
@@ -131,51 +149,57 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {errorMessage ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <View style={[styles.errorContainer, styles.errorRow]}>
+            <WarningIcon color="#D32F2F" size={16} />
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
-        <TouchableOpacity
+        {/* Scale, not fade: loginBtn is an elevated solid surface, and fading a subtree
+            containing an Android elevation paints its shadow as an opaque rectangle over
+            the button while pressed. loginBtnDisabled already zeroes elevation next to its
+            opacity for the same reason. */}
+        <SpringPressable
           style={[
             styles.loginWrap,
             { marginTop: isCompact ? spacing.sm : spacing.md },
           ]}
           onPress={handleLogin}
           disabled={!isFormValid || isLoading}
-          activeOpacity={0.9}
+          scaleTo={0.97}
+          accessibilityLabel="Login"
         >
-          <GlassSurface
-            variant="solid"
+          <View
             style={[
               styles.loginBtn,
               { height: loginBtnHeight, borderRadius: loginBtnRadius },
               (!isFormValid || isLoading) && styles.loginBtnDisabled,
             ]}
-            contentStyle={styles.loginContent}
           >
-            <Text
-              style={[
-                styles.loginBtnText,
-                { fontSize: loginBtnTextSize },
-                (!isFormValid || isLoading) && styles.loginBtnTextDisabled,
-              ]}
-            >
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Text>
-            {!isLoading && (
+            <View style={styles.loginContent}>
               <Text
                 style={[
                   styles.loginBtnText,
                   { fontSize: loginBtnTextSize },
-                  !isFormValid && styles.loginBtnTextDisabled,
+                  (!isFormValid || isLoading) && styles.loginBtnTextDisabled,
                 ]}
               >
-                →
+                {isLoading ? 'Logging in...' : 'Login'}
               </Text>
-            )}
-          </GlassSurface>
-        </TouchableOpacity>
+              {!isLoading && (
+                <Text
+                  style={[
+                    styles.loginBtnText,
+                    { fontSize: loginBtnTextSize },
+                    !isFormValid && styles.loginBtnTextDisabled,
+                  ]}
+                >
+                  →
+                </Text>
+              )}
+            </View>
+          </View>
+        </SpringPressable>
 
         <View style={styles.registerLinkWrap}>
           <Text style={styles.registerHint}>Don&apos;t have an account?</Text>
@@ -189,7 +213,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -226,10 +250,20 @@ const styles = StyleSheet.create({
   loginBtn: {
     // width: 'auto',
     backgroundColor: colors.primary,
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm + 2,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   loginWrap: {
     borderRadius: 20,
@@ -261,6 +295,12 @@ const styles = StyleSheet.create({
   registerHint: {
     fontSize: 14,
     color: colors.textMuted,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
     backgroundColor: '#FFEBEB',

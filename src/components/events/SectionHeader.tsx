@@ -1,35 +1,64 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 
 type SectionHeaderProps = {
   title: string;
   light?: boolean;
+  hideLine?: boolean;
+  /** When true, renders a small brandPink vertical accent bar before the title */
+  accent?: boolean;
 };
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, light }) => (
-  <View style={styles.row}>
-    <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
-    <View style={[styles.line, light && styles.lineLight]} />
-  </View>
-);
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const SectionHeader: React.FC<SectionHeaderProps> = React.memo(({ title, light, hideLine, accent }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      {accent && (
+        <View style={[styles.accentBar, light && styles.accentBarLight]} />
+      )}
+      <Text style={[styles.title, light && styles.titleLight, accent && styles.titleAccent]}>{title}</Text>
+      {!hideLine && <View style={[styles.line, light && styles.lineLight]} />}
+    </View>
+  );
+});
+SectionHeader.displayName = 'SectionHeader';
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
     gap: spacing.sm,
   },
+  accentBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: colors.brandPink,
+  },
+  accentBarLight: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
   title: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
+    fontFamily: 'ZalandoSansExpanded_600SemiBold',
+  },
+  titleAccent: {
+    fontSize: 13,
+    color: colors.text,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.3,
+  },
   line: {
     flex: 1,
     height: 1,

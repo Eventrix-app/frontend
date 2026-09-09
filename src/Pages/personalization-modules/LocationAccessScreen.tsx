@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -17,7 +19,8 @@ import * as Location from 'expo-location';
 import { useDispatch, useSelector } from 'react-redux';
 import { setLocation, setManualCity } from '../../store/slices/onboardingDraftSlice';
 import { AppDispatch, RootState } from '../../store';
-import { colors, spacing } from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { colorsLight } from '../../theme/colors.light';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Text } from '../../components/common/Text';
 
@@ -33,6 +36,7 @@ const LocationAccessScreen: React.FC = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const styles = useMemo(() => createStyles(colorsLight), []);
 
   // ── Animation (identical to NotificationsModal) ──────────────────────────
   const slide = useRef(new Animated.Value(height)).current;
@@ -135,7 +139,7 @@ const LocationAccessScreen: React.FC = () => {
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Dimmed backdrop — tap to go back */}
         <Animated.View style={[styles.backdrop, { opacity: fade }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -155,7 +159,7 @@ const LocationAccessScreen: React.FC = () => {
           {/* Map image */}
           <View style={styles.imageContainer}>
             <Image
-              source={require('../../../assets/location/location.png')}
+              source={require('../../../assets/location/pin.png')}
               style={styles.locationImage}
               resizeMode="cover"
             />
@@ -168,7 +172,7 @@ const LocationAccessScreen: React.FC = () => {
           {/* Manual city input */}
           <View style={styles.inputContainer}>
             <Image
-              source={require('../../../assets/location/search.png')}
+              source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchIcon}
               resizeMode="contain"
               tintColor="#9CA3AF"
@@ -189,7 +193,7 @@ const LocationAccessScreen: React.FC = () => {
               label={isLocating ? '  Locating…  ' : 'Allow Location Access'}
               variant="solid"
               onPress={handleAllowLocation}
-              style={[styles.primaryBtn, (isLocating || isGeocoding) && styles.btnDisabled]}
+              style={StyleSheet.flatten([styles.primaryBtn, (isLocating || isGeocoding) ? styles.btnDisabled : undefined])}
             />
           </View>
 
@@ -201,7 +205,7 @@ const LocationAccessScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               {isGeocoding ? (
-                <ActivityIndicator color={colors.primary} />
+                <ActivityIndicator color={colorsLight.primary} />
               ) : (
                 <Text style={styles.manualCityText}>
                   {cityInput.trim() ? 'Continue with city name' : 'Skip'}
@@ -216,12 +220,12 @@ const LocationAccessScreen: React.FC = () => {
             ) : null}
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   // ── Shell (mirrors NotificationsModal exactly) ──────────────────────────
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {

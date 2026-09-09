@@ -58,3 +58,20 @@ export function dateOnlyToStartOfDayIso(dateStr: string): string {
 export function dateOnlyToEndOfDayIso(dateStr: string): string {
   return `${dateStr}T23:59:59.999Z`;
 }
+
+// Mirrors the backend's IsAdult(18) validator (is-adult.validator.ts) — checked client-side
+// too so a too-young signup gets caught before the request round-trips, not just after.
+export function isAtLeastAge(dateOfBirth: string, minAge: number): boolean {
+  const dob = parseDateValue(dateOfBirth);
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - minAge);
+  return dob.getTime() <= cutoff.getTime();
+}
+
+// For a date picker's `maximumDate` — the latest DOB that still satisfies the minimum age,
+// so the picker itself can't select an underage date rather than only rejecting on submit.
+export function latestDateOfBirthForMinAge(minAge: number): Date {
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - minAge);
+  return cutoff;
+}

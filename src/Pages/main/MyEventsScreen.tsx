@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import GlassSurface from '../../components/common/GlassSurface';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { useGetMyEventsQuery } from '../../store/services/eventsApi';
 import { Text } from '../../components/common/Text';
+import { ScreenHeader } from '../../components/common/ScreenHeader';
+import SimpleListSkeleton from '../../components/common/SimpleListSkeleton';
+import { EventBusyIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyEvents'>;
 
@@ -26,8 +28,13 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState<StatusFilter>('All');
   const { data: events = [], isLoading } = useGetMyEventsQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const filtered = events.filter((e) => {
+  // Re-filtering the whole list on every render meant each keystroke elsewhere on the
+  // screen walked every event again; scoped to the inputs that actually change it.
+  const filtered = useMemo(
+    () => events.filter((e) => {
     if (activeFilter === 'All') return true;
     const map: Record<StatusFilter, string> = {
       All: '',
@@ -37,22 +44,26 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
       Rejected: 'rejected',
     };
     return e.approvalStatus === map[activeFilter];
-  });
+    }),
+    [events, activeFilter],
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>My Events</Text>
-        <TouchableOpacity
-          style={styles.createBtn}
-          onPress={() => navigation.navigate('CreateEvent', {})}
-        >
-          <Text style={styles.createBtnText}>+ Create</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="My Events"
+        onBack={() => navigation.goBack()}
+        rightAction={
+          <View style={styles.headerActions}>
+            {/* <TouchableOpacity style={styles.refundsBtn} onPress={() => navigation.navigate('RefundApproval')}>
+              <Text style={styles.refundsBtnText}>Refunds</Text>
+            </TouchableOpacity> */}
+            <TouchableOpacity style={styles.createBtn} onPress={() => navigation.navigate('CreateEvent', {})}>
+              <Text style={styles.createBtnText}>+ Create</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       <ScrollView
         horizontal
@@ -72,12 +83,12 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
       </ScrollView>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.brandPink} />
+        <SimpleListSkeleton />
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}>
           {filtered.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🎪</Text>
+              <EventBusyIcon color={colors.textSecondary} size={56} />
               <Text style={styles.emptyTitle}>No events yet</Text>
               <Text style={styles.emptySubtitle}>Create your first event and it will appear here.</Text>
               <TouchableOpacity
@@ -93,15 +104,30 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
                 key={event.id}
                 onPress={() => navigation.navigate('EventDetails', { eventId: event.id })}
               >
-                <GlassSurface style={styles.card} contentStyle={styles.cardContent}>
-                  <View style={styles.cardText}>
-                    <Text style={styles.cardTitle}>{event.title}</Text>
-                    <Text style={styles.cardDate}>{event.eventDate}</Text>
+                <View style={styles.card}>
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardTitle}>{event.title}</Text>
+                      <Text style={styles.cardDate}>{event.eventDate}</Text>
+                    </View>
+                    {event.status === 'cancelled' ? (
+                      // Cancelling only flips `status`, not `approvalStatus` — an organizer's
+                      // cancelled event would otherwise still show a green "approved" badge
+                      // here with no indication it's been cancelled at all.
+                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                        <Text style={styles.badgeText}>Event cancelled</Text>
+                      </View>
+                    ) : event.isCompleted ? (
+                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                        <Text style={styles.badgeText}>Completed</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
+                        <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
+                      </View>
+                    )}
                   </View>
-                  <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
-                    <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
-                  </View>
-                </GlassSurface>
+                </View>
               </TouchableOpacity>
             ))
           )}
@@ -111,27 +137,9 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.neutralBg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { fontSize: 22, color: colors.text },
-  title: { fontSize: 20, color: colors.text, flex: 1,
-      fontFamily: 'ZalandoSansExpanded_700Bold'
-},
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   createBtn: {
     backgroundColor: colors.brandPink,
     borderRadius: borderRadius.md,
@@ -139,6 +147,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   createBtnText: { color: colors.white, fontWeight: '600', fontSize: 14 },
+  refundsBtn: {
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  refundsBtnText: { color: colors.text, fontWeight: '600', fontSize: 14 },
   filterRow: { maxHeight: 48 },
   filterContent: { paddingHorizontal: spacing.md, gap: spacing.sm, alignItems: 'center' },
   pill: {
@@ -168,7 +183,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   emptyCreateText: { color: colors.white, fontWeight: '600' },
-  card: { borderRadius: borderRadius.lg, marginBottom: spacing.sm },
+  card: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
+  },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,265 +1,772 @@
-import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import GlassSurface from '../../components/common/GlassSurface';
+import { Image } from 'expo-image';
+import Feather from '@expo/vector-icons/Feather';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { MOCK_USER } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { useGetMeQuery } from '../../store/services/userApi';
+import { useGetMyEnrollmentsQuery, useGetMyEventsQuery, useGetMyFavoritesQuery } from '../../store/services/eventsApi';
+import {
+  useFollowOrganizerMutation,
+  useGetMyBankAccountQuery,
+  useGetMyVerificationStatusQuery,
+  useGetOrganizerEventsQuery,
+  useGetOrganizerProfileQuery,
+  useUnfollowOrganizerMutation,
+} from '../../store/services/organizerApi';
+import { EventInterestCard } from '../../components/events/EventInterestCard';
+import { toCardEvent } from '../../utils/eventCardAdapter';
+import { showAlert } from '../../utils/crossPlatformAlert';
+import { extractErrorMessage } from '../../utils/apiError';
+import ProfileHeaderSkeleton from '../../components/common/ProfileHeaderSkeleton';
+import ProfileCompletionCard, { type CompletionTask } from '../../components/profile/ProfileCompletionCard';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+const bgImage = require('../../../assets/shared/backgrounds/bg.png');
+const VERIFIED_BADGE_IMG = require('../../../assets/shared/icons/checked.png');
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Profile' | 'OrganizerProfile'>;
 
 type MenuItem = {
-  icon: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   subtitle?: string;
   onPress: (nav: Props['navigation']) => void;
 };
 
-const MENU_ITEMS: MenuItem[] = [
-  {
-    icon: '✏️',
-    label: 'Edit Profile',
-    onPress: (nav) => nav.navigate('EditProfile'),
-  },
-  {
-    icon: '❤️',
-    label: 'Saved Events',
-    subtitle: `${MOCK_USER.savedCount} events`,
-    onPress: (nav) => nav.navigate('SavedEvents'),
-  },
-  {
-    icon: '🎫',
-    label: 'My Bookings',
-    onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }),
-  },
-  {
-    icon: '➕',
-    label: 'Create Event',
-    onPress: (nav) => nav.navigate('CreateEvent', {}),
-  },
-  {
-    icon: '📅',
-    label: 'My Events',
-    onPress: (nav) => nav.navigate('MyEvents'),
-  },
-  {
-    icon: '🔔',
-    label: 'Notifications',
-    onPress: (nav) => nav.navigate('Notifications'),
-  },
-  {
-    icon: '⚙️',
-    label: 'Settings',
-    onPress: (nav) => nav.navigate('Settings'),
-  },
-];
+const EVENT_CARD_WIDTH = 165;
+const MEMBER_SINCE_FORMATTER = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' });
 
-const ProfileScreen: React.FC<Props> = ({ navigation }) => {
+function websiteHostname(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
+// Soft, colored (not flat-android-gray) shadow — the one directional-shadow treatment used
+// on every card surface across both branches, so they read as one system. shadow (brandPink)
+// is identical in both themes, so this constant doesn't need to be theme-aware.
+const cardShadow = Platform.select({
+  android: { elevation: 6 },
+  default: {
+    shadowColor: '#FF3366',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+});
+
+const ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
 
-  return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={[colors.brandPink, '#ff6b8a']}
-        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
-      >
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.avatarWrap}>
-          <Text style={styles.avatar}>{MOCK_USER.avatar}</Text>
-        </View>
-        <Text style={styles.name}>
-          {MOCK_USER.firstName} {MOCK_USER.lastName}
-        </Text>
-        <Text style={styles.username}>{MOCK_USER.username}</Text>
-        <Text style={styles.location}>📍 {MOCK_USER.city}, India</Text>
+  // Profile (no params) vs OrganizerProfile ({ organizerId }) — the only two routes this
+  // component is registered against (see navigation/types.ts + RootNavigator.tsx).
+  const routeParams = route.params as { organizerId?: string } | undefined;
+  const organizerId = routeParams?.organizerId;
+  const isOwnProfile = !organizerId;
 
-        <GlassSurface style={styles.statsGlass} contentStyle={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{MOCK_USER.eventsAttended}</Text>
-            <Text style={styles.statLabel}>Events</Text>
+  return isOwnProfile ? (
+    <SelfProfile navigation={navigation} insets={insets} />
+  ) : (
+    <OrganizerProfile navigation={navigation} insets={insets} organizerId={organizerId} />
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Self branch — private membership-card view of the logged-in user's own account.
+// ---------------------------------------------------------------------------
+
+const SelfProfile: React.FC<{ navigation: Props['navigation']; insets: { top: number; bottom: number } }> = ({
+  navigation,
+  insets,
+}) => {
+  const { data: me } = useGetMeQuery();
+  const { data: enrollments = [] } = useGetMyEnrollmentsQuery();
+  const { data: favorites = [] } = useGetMyFavoritesQuery();
+  const { data: myEvents = [] } = useGetMyEventsQuery();
+  const { data: verificationStatus } = useGetMyVerificationStatusQuery();
+  // Skipped only for someone who has never applied — the endpoint 404s without an organizer
+  // profile. Applicants can set up payouts before approval, so this must load for them too.
+  const { data: bankAccount } = useGetMyBankAccountQuery(undefined, {
+    skip: !verificationStatus || verificationStatus.status === 'not_submitted',
+  });
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // Reachable directly via a push-notification tap (organizer_followed, see
+  // navigateForPushData in RootNavigator.tsx), which can land here as the first screen in
+  // the stack — goBack() throws "GO_BACK was not handled" with nothing to pop to.
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main', { screen: 'Home' });
+    }
+  };
+
+  // "Events" here means events this account has created/organizes, not attended — the
+  // "Bookings" stat right next to it already covers the enrolled/attended side, so having
+  // both measure enrollment would be redundant. findMyEvents returns [] for an account with
+  // no organizer profile, so this is safe to show for plain participants too.
+  const createdEventsCount = myEvents.length;
+  const savedCount = favorites.length;
+  const bookingsCount = enrollments.length;
+  const followingCount = me?.followingCount ?? 0;
+
+  const displayName = (me?.fullName ?? '').trim() || me?.email || '';
+  const initial = displayName.charAt(0).toUpperCase() || '?';
+  const memberSince = me?.createdAt ? MEMBER_SINCE_FORMATTER.format(new Date(me.createdAt)) : '';
+
+  const verificationSubtitle: Record<'pending' | 'approved' | 'rejected', string> = {
+    pending: 'Pending review',
+    approved: 'Approved',
+    rejected: 'Rejected — resubmit',
+  };
+
+  // Mirrors the server's toTenDigitMobile: what counts as "has a phone" here must be what
+  // checkout will accept, or the banner clears while payment still refuses.
+  const phoneDigits = (me?.phoneNumber ?? '').replace(/\D/g, '');
+  const hasPayablePhone = (phoneDigits.length > 10 ? phoneDigits.slice(-10) : phoneDigits).length === 10;
+  const isEmailVerified = !!me?.isEmailVerified;
+
+  // Dismissal is per-session on purpose: persisting it would let someone permanently hide
+  // the one prompt that stops checkout failing, and this reappears on the next launch.
+  const [completionDismissed, setCompletionDismissed] = useState(false);
+
+  const completionTasks: CompletionTask[] = [
+    ...(hasPayablePhone
+      ? []
+      : [
+          {
+            key: 'phone' as const,
+            label: 'Add your mobile number',
+            description: 'Required by our payment provider to book a ticket',
+            icon: 'phone' as const,
+            onPress: () => navigation.navigate('EditProfile'),
+          },
+        ]),
+    ...(isEmailVerified
+      ? []
+      : [
+          {
+            key: 'email' as const,
+            label: 'Verify your email',
+            description: 'Needed before you can book or create an event',
+            icon: 'mail' as const,
+            onPress: () => navigation.navigate('VerifyEmail', {}),
+          },
+        ]),
+  ];
+
+  // Edit Profile is no longer a row — it is the button above the list. The Mobile Number row
+  // is gone with it: the number is still editable inside Edit Profile (checkout depends on
+  // being able to add one), it just no longer takes a line of its own here.
+  const menuItems: MenuItem[] = [
+    {
+      icon: 'mail',
+      label: 'Email Address',
+      subtitle: isEmailVerified ? `${me?.email ?? ''} — verified` : 'Not verified',
+      onPress: (nav) => (isEmailVerified ? nav.navigate('EditProfile') : nav.navigate('VerifyEmail', {})),
+    },
+    {
+      icon: 'bookmark',
+      label: 'Saved Events',
+      subtitle: `${savedCount} event${savedCount === 1 ? '' : 's'}`,
+      onPress: (nav) => nav.navigate('SavedEvents'),
+    },
+    { icon: 'calendar', label: 'My Bookings', onPress: (nav) => nav.navigate('Main', { screen: 'Bookings' }) },
+    { icon: 'plus-circle', label: 'Create Event', onPress: (nav) => nav.navigate('CreateEvent', {}) },
+    {
+      icon: 'grid',
+      label: 'My Events',
+      subtitle: `${createdEventsCount} event${createdEventsCount === 1 ? '' : 's'}`,
+      onPress: (nav) => nav.navigate('MyEvents'),
+    },
+    // Only shown once the user has actually applied for organizer verification — a plain
+    // participant who's never touched that flow has nothing to see here.
+    ...(verificationStatus && verificationStatus.status !== 'not_submitted'
+      ? [
+          {
+            icon: 'shield' as const,
+            label: 'Organizer Verification',
+            subtitle: verificationSubtitle[verificationStatus.status],
+            onPress: (nav: Props['navigation']) => nav.navigate('OrganizerVerification'),
+          },
+        ]
+      : []),
+    // Shown from submission, not approval: the two reviews run independently, and an
+    // organizer approved without an account cannot be paid until they come back for this.
+    // The subtitle still reads the bank account's own status rather than the KYC one —
+    // conflating them would tell an approved organizer they are ready to be paid when no
+    // account exists.
+    ...(verificationStatus && verificationStatus.status !== 'not_submitted'
+      ? [
+          {
+            icon: 'credit-card' as const,
+            label: 'Payout Account',
+            subtitle: bankAccount
+              ? bankAccount.isPayoutReady
+                ? `•••• ${bankAccount.accountNumberLast4} — verified`
+                : bankAccount.status === 'rejected'
+                  ? 'Rejected — resubmit'
+                  : 'Awaiting verification'
+              : 'Not set up — required to get paid',
+            onPress: (nav: Props['navigation']) => nav.navigate('PayoutBankAccount'),
+          },
+        ]
+      : []),
+    // Still approval-gated, unlike the account above: an organizer awaiting review has no
+    // settlements yet, so this would open on a permanently empty list.
+    ...(verificationStatus?.status === 'approved'
+      ? [
+          {
+            icon: 'trending-up' as const,
+            label: 'Payouts',
+            subtitle: 'What you have earned and been paid',
+            onPress: (nav: Props['navigation']) => nav.navigate('PayoutHistory'),
+          },
+        ]
+      : []),
+    { icon: 'bell', label: 'Notifications', onPress: (nav) => nav.navigate('Notifications') },
+    { icon: 'settings', label: 'Settings', onPress: (nav) => nav.navigate('Settings') },
+  ];
+
+  return (
+    <View style={styles.selfRoot}>
+      {/* The brand banner is back: same brandPink→#F43362 gradient and the same bg.png
+          watermark the old header carried, sized to the compact layout rather than to the
+          old tall centred one. Everything inside keeps the position and dimensions it had
+          on the flat white version — only the colours change, because coral-on-coral text
+          and a coral-outlined button would not survive on this backdrop. */}
+      <LinearGradient
+        colors={[colors.brandPink, '#F43362']}
+        style={[styles.selfBanner, { paddingTop: insets.top }]}
+      >
+        <View style={styles.headerBgWrap}>
+          <Image source={bgImage} style={styles.headerBg} contentFit="cover" />
+        </View>
+
+        <View style={styles.selfBannerInner}>
+          <View style={styles.selfHeader}>
+            <TouchableOpacity style={styles.selfBack} onPress={handleGoBack} hitSlop={8}>
+              <Feather name="arrow-left" size={20} color={colors.white} />
+            </TouchableOpacity>
+            {/* Absolutely-positioned back button so the name lands on the true centre of the
+                screen rather than the centre of what is left beside it. */}
+            <Text variant="h2" color="white" numberOfLines={1} style={styles.selfName}>
+              {displayName || 'Your Profile'}
+            </Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{MOCK_USER.savedCount}</Text>
-            <Text style={styles.statLabel}>Saved</Text>
+
+          {/* Avatar and stats read as one line: the picture identifies the account, the four
+              numbers summarise it, and neither needs a full row of its own. */}
+          <View style={styles.profileRow}>
+            <View style={styles.avatarRing}>
+              {me?.profilePictureUrl ? (
+                <Image source={{ uri: me.profilePictureUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text variant="h2" style={styles.avatarInitial}>{initial}</Text>
+              )}
+            </View>
+
+            <View style={styles.selfStatsRow}>
+              <StatBlock value={createdEventsCount} label="Events" onGradient />
+              <StatBlock value={savedCount} label="Saved" onGradient />
+              <StatBlock value={bookingsCount} label="Bookings" onGradient />
+              <StatBlock value={followingCount} label="Following" onGradient />
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>4</Text>
-            <Text style={styles.statLabel}>Bookings</Text>
-          </View>
-        </GlassSurface>
+
+          <TouchableOpacity
+            style={styles.editProfileBtn}
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+          >
+            <Feather name="edit-2" size={16} color={colors.white} />
+            <Text variant="button" color="white" style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        {MENU_ITEMS.map((item) => (
-          <TouchableOpacity key={item.label} onPress={() => item.onPress(navigation)} activeOpacity={0.7}>
-            <GlassSurface style={styles.menuGlass} contentStyle={styles.menuItem}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
+      <ScrollView
+        contentContainerStyle={[styles.selfScroll, { paddingBottom: insets.bottom + spacing.xxl }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {!completionDismissed && (
+          <ProfileCompletionCard tasks={completionTasks} onDismiss={() => setCompletionDismissed(true)} />
+        )}
+
+        <Text variant="label" style={styles.eyebrow}>Account Settings</Text>
+
+        <View style={styles.menuCard}>
+          {menuItems.map((item, i) => (
+            <TouchableOpacity
+              key={item.label}
+              onPress={() => item.onPress(navigation)}
+              activeOpacity={0.6}
+              style={[styles.menuRow, i > 0 && styles.menuRowDivider]}
+            >
+              <Feather name={item.icon} size={18} color={colors.brandPink} style={styles.menuIcon} />
               <View style={styles.menuText}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Text variant="label" color="text">{item.label}</Text>
                 {item.subtitle ? (
-                  <Text style={styles.menuSub}>{item.subtitle}</Text>
+                  <Text variant="caption" color="textSecondary" style={styles.menuSub}>{item.subtitle}</Text>
                 ) : null}
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </GlassSurface>
-          </TouchableOpacity>
-        ))}
-
-        <View style={styles.memberSince}>
-          <Text style={styles.memberText}>Member since {MOCK_USER.memberSince}</Text>
+              <Feather name="chevron-right" size={18} color={colors.placeholder} />
+            </TouchableOpacity>
+          ))}
         </View>
+
+        {memberSince ? (
+          <Text variant="caption" color="textSecondary" style={styles.memberSince}>
+            Member since {memberSince}
+          </Text>
+        ) : null}
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.neutralBg,
-  },
-  header: {
-    alignItems: 'center',
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
+// `onGradient` switches the pair to white for the self banner, where the default brandPink
+// value would be coral text on a coral background. The organizer branch renders these on a
+// white card and keeps the default.
+const StatBlock: React.FC<{ value: number; label: string; onGradient?: boolean }> = ({
+  value,
+  label,
+  onGradient = false,
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.stat}>
+      <Text
+        variant="h4"
+        color={onGradient ? 'white' : 'brandPink'}
+        style={styles.statValue}
+      >
+        {value}
+      </Text>
+      <Text
+        variant="caption"
+        color={onGradient ? undefined : 'textSecondary'}
+        style={onGradient ? styles.statLabelOnGradient : undefined}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Organizer branch — public pass view of someone else's organizer account.
+// ---------------------------------------------------------------------------
+
+const OrganizerProfile: React.FC<{
+  navigation: Props['navigation'];
+  insets: { top: number; bottom: number };
+  organizerId: string;
+}> = ({ navigation, insets, organizerId }) => {
+  const { data: profile, isLoading, isError, refetch } = useGetOrganizerProfileQuery(organizerId);
+  const { data: events = [] } = useGetOrganizerEventsQuery(organizerId);
+  const [followOrganizer, { isLoading: isFollowLoading }] = useFollowOrganizerMutation();
+  const [unfollowOrganizer, { isLoading: isUnfollowLoading }] = useUnfollowOrganizerMutation();
+
+  // Mutation isLoading only flips true on the next render — same double-tap gap as
+  // EventDetailsScreen's isEnrollingRef, closed the same way.
+  const isTogglingRef = useRef(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const handleToggleFollow = async () => {
+    if (!profile || isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    try {
+      if (profile.isFollowing) {
+        await unfollowOrganizer(organizerId).unwrap();
+      } else {
+        await followOrganizer(organizerId).unwrap();
+      }
+    } catch (e: any) {
+      showAlert('Something went wrong', extractErrorMessage(e, 'Please try again.'));
+    } finally {
+      isTogglingRef.current = false;
+    }
+  };
+
+  const cardEvents = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
+
+  // Stable across renders so EventInterestCard's React.memo actually holds — an inline
+  // renderItem rebuilt both of these per card on every render of this screen.
+  const openEvent = useCallback(
+    (eventId: string) => navigation.navigate('EventDetails', { eventId }),
+    [navigation],
+  );
+  const requireAuth = useCallback(() => navigation.navigate('Auth' as never), [navigation]);
+  const renderEventCard = useCallback(
+    ({ item }: { item: (typeof cardEvents)[number] }) => (
+      <EventInterestCard
+        event={item as any}
+        width={EVENT_CARD_WIDTH}
+        onPress={openEvent}
+        onRequireAuth={requireAuth}
+      />
+    ),
+    [openEvent, requireAuth],
+  );
+
+  if (isLoading) {
+    return <ProfileHeaderSkeleton />;
+  }
+
+  if (isError || !profile) {
+    return (
+      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
+        <Text variant="body" color="textSecondary" style={styles.centerText}>Couldn't load this organizer.</Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text variant="button" color="white">Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backLinkBtn} onPress={() => navigation.goBack()}>
+            <Text variant="button" color="textSecondary">Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const isToggling = isFollowLoading || isUnfollowLoading;
+  const memberSince = MEMBER_SINCE_FORMATTER.format(new Date(profile.memberSince));
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.topBarBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="arrow-left" size={20} color={colors.text} />
+        </TouchableOpacity>
+        <Text variant="label" color="text" numberOfLines={1} style={styles.topBarTitle}>{profile.companyName}</Text>
+        <View style={styles.topBarBtn} />
+      </View>
+
+      <FlatList
+        data={cardEvents}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={cardEvents.length > 0 ? styles.eventsRow : undefined}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+        ListHeaderComponent={
+          <View style={[styles.organizerCard, cardShadow]}>
+            <View style={styles.topRow}>
+              <View style={styles.orgAvatarRing}>
+                <View style={styles.orgAvatar}>
+                  {profile.companyLogoUrl ? (
+                    <Image source={{ uri: profile.companyLogoUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <Feather name="briefcase" size={30} color={colors.textSecondary} />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.statsRow}>
+                <StatBlock value={profile.eventCount} label="Events" />
+                <View style={styles.statDivider} />
+                <StatBlock value={profile.followerCount} label="Followers" />
+              </View>
+            </View>
+
+            <View style={styles.identityBlock}>
+              <View style={styles.nameRow}>
+                <Text variant="h4" color="text">{profile.companyName}</Text>
+                {profile.verified && (
+                  <View style={styles.verifiedPill}>
+                    <Image source={VERIFIED_BADGE_IMG} style={styles.verifiedBadge} />
+                    <Text variant="caption" style={styles.verifiedText}>Verified</Text>
+                  </View>
+                )}
+              </View>
+
+              {profile.companyDescription ? (
+                <Text variant="body" color="text" style={styles.description}>{profile.companyDescription}</Text>
+              ) : null}
+
+              {profile.companyWebsite ? (
+                <TouchableOpacity style={styles.websiteRow} onPress={() => Linking.openURL(profile.companyWebsite!)}>
+                  <Feather name="external-link" size={13} color={colors.brandPink} />
+                  <Text variant="caption" color="brandPink" style={styles.websiteText}>
+                    {websiteHostname(profile.companyWebsite)}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <Text variant="caption" color="textSecondary" style={styles.memberSinceInline}>
+                Organizing events since {memberSince}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.followBtn, profile.isFollowing && styles.followingBtn]}
+              onPress={handleToggleFollow}
+              disabled={isToggling}
+            >
+              {isToggling ? (
+                <ActivityIndicator color={profile.isFollowing ? colors.brandPink : colors.white} size="small" />
+              ) : (
+                <>
+                  <Feather
+                    name={profile.isFollowing ? 'user-check' : 'user-plus'}
+                    size={15}
+                    color={profile.isFollowing ? colors.brandPink : colors.white}
+                  />
+                  <Text variant="button" style={[styles.followBtnText, profile.isFollowing && styles.followingBtnText]}>
+                    {profile.isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        }
+        renderItem={renderEventCard}
+        ListHeaderComponentStyle={styles.eventsHeader}
+        ListEmptyComponent={
+          <View style={styles.emptyEvents}>
+            <Feather name="calendar" size={28} color={colors.placeholder} />
+            <Text variant="caption" color="textSecondary" style={styles.emptyText}>
+              No upcoming events from this organizer right now.
+            </Text>
+          </View>
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.neutralBg },
+  center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
+  centerText: { textAlign: 'center' },
+  errorActions: { flexDirection: 'row', gap: spacing.sm },
+  retryBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  backLinkBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+
+  // --- Self layout ---
+  //
+  // The whole self branch sits on one flat white surface now: the pink gradient banner is
+  // gone, and with it the stats card that used to float on top of it. Name, then identity +
+  // numbers on one line, then the single action, then the list.
+  selfRoot: { flex: 1, backgroundColor: colors.white },
+  selfBanner: {
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    paddingBottom: spacing.md,
+    // Clips the watermark to the rounded corners — without it the image paints over them.
+    overflow: 'hidden',
   },
-  back: {
-    alignSelf: 'flex-start',
+  // Full-bleed gradient, but its contents obey the same 520pt cap as the list below so the
+  // two halves of the screen stay aligned with each other on a wide display.
+  selfBannerInner: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  headerBgWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  headerBg: {
+    position: 'absolute',
+    top: -60,
+    left: -68,
+    width: '135%',
+    height: '135%',
+    transform: [{ scale: 0.78 }],
+    opacity: 0.15,
+  },
+  selfHeader: {
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+  },
+  selfBack: {
+    position: 'absolute',
+    left: spacing.xs,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    zIndex: 1,
   },
-  backText: {
-    color: colors.white,
-    fontSize: 22,
+  selfName: { textAlign: 'center', marginHorizontal: 48 },
+  // Capped rather than a percentage width: the spec's "60–70% of screen" keeps the content
+  // from sprawling on a tablet or on web, but applied literally on a phone it would leave
+  // 30% of a 390pt screen empty on either side. A max width does the same job at the size it
+  // actually matters and stays edge-to-edge (with padding) on a handset.
+  selfScroll: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
-  avatarWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  avatarRing: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    // Translucent over the gradient with a white rim, as the old header had — a solid
+    // brandPink disc would vanish into the banner behind it. The border is inset, so the
+    // circle is still exactly 76pt.
     backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
     borderWidth: 3,
     borderColor: colors.white,
-  },
-  avatar: {
-    fontSize: 40,
-  },
-  name: {
-    fontSize: 22,
-    fontFamily: 'ZalandoSansExpanded_700Bold',
-    color: colors.white,
-  },
-  username: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-  },
-  location: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: spacing.xs,
-  },
-  statsGlass: {
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    width: '100%',
-    marginTop: spacing.lg,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'space-around',
-  },
-  stat: {
     alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  scroll: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
-      fontFamily: 'ZalandoSansExpanded_600SemiBold'
-},
-  menuGlass: {
-    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    // Never squeezed by the stats beside it, however many stats there are.
+    flexShrink: 0,
     overflow: 'hidden',
-    marginBottom: spacing.sm,
   },
-  menuItem: {
+  avatarInitial: { fontSize: 30, lineHeight: 36, color: colors.white },
+  avatarImage: { width: '100%', height: '100%' },
+  selfStatsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    // The 24pt reclaimed from the avatar goes to the four numbers, which were reading as
+    // one crowded block. space-between plus an explicit gap keeps them apart even when a
+    // count grows to four digits and the labels start competing for the same width.
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  stat: { alignItems: 'center' },
+  statValue: { marginBottom: 2 },
+  statLabelOnGradient: { color: 'rgba(255,255,255,0.85)' },
+  statDivider: { width: 1, alignSelf: 'stretch', backgroundColor: colors.borderLight },
+
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    // Same outlined shape and 14pt padding as before, just legible on the gradient.
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: borderRadius.md,
+    paddingVertical: 14,
+  },
+  editProfileText: { fontWeight: '700' },
+
+  // --- Self account list ---
+  eyebrow: {
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  menuCard: {
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    overflow: 'hidden',
+  },
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.md,
   },
-  menuIcon: {
-    fontSize: 22,
-    width: 32,
-    textAlign: 'center',
-  },
-  menuText: {
-    flex: 1,
-  },
-  menuLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  menuSub: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  chevron: {
-    fontSize: 22,
-    color: colors.textSecondary,
-  },
-  memberSince: {
+  menuRowDivider: { borderTopWidth: 1, borderTopColor: colors.borderLight },
+  menuIcon: { width: 18 },
+  menuText: { flex: 1 },
+  menuSub: { marginTop: 2 },
+  memberSince: { textAlign: 'center', marginTop: spacing.xl },
+
+  // --- Organizer branch ---
+  scroll: { padding: spacing.md },
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xl,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  memberText: {
-    fontSize: 13,
-    color: colors.textSecondary,
+  topBarBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  topBarTitle: { flex: 1, textAlign: 'center', marginHorizontal: spacing.sm },
+
+  organizerCard: {
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  orgAvatarRing: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.lg,
+  },
+  orgAvatar: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  statsRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' },
+
+  identityBlock: { marginBottom: spacing.md, gap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
+  verifiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  verifiedText: { color: colors.success, fontWeight: '700' },
+  verifiedBadge: { width: 12, height: 12 },
+  description: { marginTop: 2 },
+  websiteRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
+  websiteText: { fontWeight: '600' },
+  memberSinceInline: { marginTop: spacing.xs },
+
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.brandPink,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  followingBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.borderLight },
+  followBtnText: { color: colors.white },
+  followingBtnText: { color: colors.text },
+
+  eventsHeader: { marginBottom: 0 },
+  eventsRow: { justifyContent: 'space-between' },
+  emptyEvents: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  emptyText: { textAlign: 'center', paddingHorizontal: spacing.xl },
 });
 
 export default ProfileScreen;

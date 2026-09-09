@@ -1,31 +1,38 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ErrorGeneric'>;
 
-const ErrorGenericScreen: React.FC<Props> = ({ navigation }) => (
-  <View style={styles.root}>
-    <Text style={styles.icon}>⚠️</Text>
-    <Text style={styles.title}>Something Went Wrong</Text>
-    <Text style={styles.subtitle}>
-      We couldn't complete your request. Please try again in a moment.
-    </Text>
-    <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()}>
-      <Text style={styles.btnText}>Go Back</Text>
-    </TouchableOpacity>
-    <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Main')}>
-      <Text style={styles.linkText}>Return to Home</Text>
-    </TouchableOpacity>
-  </View>
-);
+const ErrorGenericScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.root}>
+      <View style={styles.icon}>
+        <WarningIcon color={colors.error ?? '#DC2626'} size={64} />
+      </View>
+      <Text style={styles.title}>Something Went Wrong</Text>
+      <Text style={styles.subtitle}>
+        We couldn't complete your request. Please try again in a moment.
+      </Text>
+      <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()}>
+        <Text style={styles.btnText}>Go Back</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Main')}>
+        <Text style={styles.linkText}>Return to Home</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
@@ -34,7 +41,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   icon: {
-    fontSize: 64,
     marginBottom: spacing.lg,
   },
   title: {

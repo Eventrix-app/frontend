@@ -1,65 +1,117 @@
-import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MockEvent } from '../../data/mockEvents';
-import { colors } from '../../theme/colors';
+import { badgeGradientFor } from './statusBadge';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
+import { EventBusyIcon, LocationPin, PersonIcon, CalendarIcon, ClockIcon } from '../common/Icons';
+import { FallbackImage } from '../common/FallbackImage';
 
 type MainEventCardProps = {
   event: MockEvent;
   onPress?: () => void;
   width?: number;
+  // Only rendered when provided — callers that don't need a per-card menu (e.g.
+  // SearchScreen) see no visual change.
+  onMenuPress?: () => void;
 };
 
-export const MainEventCard: React.FC<MainEventCardProps> = ({
+// Same gradient ramp as FeaturedCarousel's price badge, so both card styles stay consistent.
+const BADGE_HEIGHT = 36;
+const BADGE_RADIUS = 10;
+
+// Memoized: these render inside lists that re-render whenever the parent screen does.
+// Props are compared shallowly, so this only pays off where the parent passes stable
+// values — the screens now memoize their derived arrays and callbacks for that reason.
+export const MainEventCard: React.FC<MainEventCardProps> = React.memo(({
   event,
   onPress,
   width,
-}) => (
-  <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
-    <GlassSurface style={styles.glass} contentStyle={styles.glassContent}>
-      <View style={styles.image}>
-        <View style={styles.imageTopRow}>
-          <Text style={styles.categoryPill}>{event.category}</Text>
-          <View style={styles.pricePill}>
-            <Text style={styles.pricePillText}>{event.price}</Text>
+  onMenuPress,
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={[styles.card, width ? { width } : null]} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.glass}>
+        <View style={styles.glassContent}>
+        <View style={styles.image}>
+          <View style={styles.imageTopRow}>
+            <Text style={styles.categoryPill}>{event.category}</Text>
+            {onMenuPress && (
+              <TouchableOpacity style={styles.menuBtn} onPress={onMenuPress} hitSlop={8}>
+                <Text style={styles.menuBtnText}>⋮</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          {typeof event.image === 'string' && event.image.startsWith('http') ? (
+            <FallbackImage source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
+          ) : typeof event.image !== 'string' ? (
+            <FallbackImage source={event.image} style={styles.cardImage} resizeMode="cover" />
+          ) : (
+            <EventBusyIcon color={colors.textSecondary} size={48} />
+          )}
+          {event.featured ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Featured</Text>
+            </View>
+          ) : null}
         </View>
-        {typeof event.image === 'string' && event.image.startsWith('http') ? (
-          <Image source={{ uri: event.image }} style={styles.cardImage} resizeMode="cover" />
-        ) : typeof event.image !== 'string' ? (
-          <Image source={event.image} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <Text style={styles.emoji}>🎪</Text>
-        )}
-        {event.featured ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Featured</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.body}>
-        <Text style={styles.category}>{event.category}</Text>
-        <Text style={styles.title} numberOfLines={2}>
-          {event.title}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>📍 {event.venue}</Text>
-          <Text style={styles.meta}>👤 {event.organizer}</Text>
-        </View>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>📅 {event.date}</Text>
-          <Text style={styles.meta}>🕐 {event.time}</Text>
-        </View>
-        <Text style={styles.price}>{event.price}</Text>
-      </View>
-    </GlassSurface>
-  </TouchableOpacity>
-);
 
-const styles = StyleSheet.create({
+        {/* Hangs off the top-right edge of the card, flush with the outer edge — matches
+            FeaturedCarousel's price badge (flat top, rounded bottom, gradient fill). Rendered
+            as a sibling of `image` (not inside it) since `image` has overflow: hidden and
+            would clip a badge positioned at top: 0. */}
+        <View style={styles.priceBadgeWrap} pointerEvents="none">
+          <LinearGradient
+            colors={badgeGradientFor(event.statusLabel)}
+            locations={[0, 0.38, 0.72, 1]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={styles.priceBadge}
+          >
+            <Text style={styles.priceBadgeText} numberOfLines={1}>{event.statusLabel ?? event.price}</Text>
+          </LinearGradient>
+        </View>
+
+        <View style={styles.body}>
+          <Text style={styles.category}>{event.category}</Text>
+          <Text style={styles.title} numberOfLines={2}>
+            {event.title}
+          </Text>
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <LocationPin color={colors.textSecondary} size={12} />
+              <Text style={styles.meta} numberOfLines={1}>{event.venue}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <PersonIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.organizer}</Text>
+            </View>
+          </View>
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <CalendarIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.date}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <ClockIcon color={colors.textSecondary} size={13} />
+              <Text style={styles.meta} numberOfLines={1}>{event.time}</Text>
+            </View>
+          </View>
+          <Text style={styles.price}>{event.price}</Text>
+        </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+MainEventCard.displayName = 'MainEventCard';
+
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   card: {
     borderRadius: 24,
     overflow: 'hidden',
@@ -68,6 +120,16 @@ const styles = StyleSheet.create({
   glass: {
     borderRadius: 24,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   glassContent: {
     padding: 2,
@@ -107,8 +169,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   categoryPill: {
+    // Always a light glass pill over the event photo, independent of app theme — so its
+    // text must stay a fixed dark color too. colors.text flips to near-white in dark mode
+    // (meant for surfaces that flip with the theme, not this fixed-light pill), which made
+    // the label unreadable — near-white text on a near-white background.
     backgroundColor: 'rgba(255,255,255,0.85)',
-    color: colors.text,
+    color: '#1A1A2E',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -117,16 +183,49 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
     overflow: 'hidden',
   },
-  pricePill: {
-    backgroundColor: 'rgba(20,39,102,0.92)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: borderRadius.pill,
-  },
-  pricePillText: {
-    color: colors.white,
-    fontSize: 11,
+ priceBadgeWrap: {
+  position: 'absolute',
+  top: 3,          // was: 0 — now sits below the category pill / menu row
+  right: spacing.md,
+  zIndex: 3,
+  elevation: 8,
+},
+priceBadge: {
+  minWidth: 60,
+  height: BADGE_HEIGHT,
+  paddingHorizontal: 12,
+  // Flat top / rounded bottom "ribbon" shape — even though it's no longer flush
+  // with the card's outer edge, this reads better than a floating pill.
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+  borderBottomLeftRadius: BADGE_RADIUS,
+  borderBottomRightRadius: BADGE_RADIUS,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+  priceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(120,6,36,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  menuBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBtnText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   badgeText: {
     color: colors.white,
@@ -154,6 +253,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  metaItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   meta: {
     flex: 1,

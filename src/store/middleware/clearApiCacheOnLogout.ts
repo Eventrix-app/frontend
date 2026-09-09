@@ -1,0 +1,34 @@
+import { Middleware } from '@reduxjs/toolkit';
+import { logout } from '../slices/authSlice';
+import { eventsApi } from '../services/eventsApi';
+import { authApi } from '../services/authApi';
+import { userApi } from '../services/userApi';
+import { paymentsApi } from '../services/paymentsApi';
+import { notificationsApi } from '../services/notificationsApi';
+import { organizerApi } from '../services/organizerApi';
+import { chatApi } from '../services/chatApi';
+import { moderationApi } from '../services/moderationApi';
+import { shortsApi } from '../services/shortsApi';
+
+// dispatch(logout()) only ever clears `auth` state — every RTK Query slice's cache
+// (enrollments, favorites, current user, notifications...) survives untouched. On a
+// shared device, a second user logging in right after would be served the first user's
+// cached data instantly on mount, before any refetch. This is the single choke point
+// for logout regardless of which screen/middleware dispatches it (SettingsScreen,
+// AdminRedirectScreen, or authErrorMiddleware's 401 handler).
+export const clearApiCacheOnLogout: Middleware = (storeApi) => (next) => (action) => {
+  const result = next(action);
+  if (logout.match(action)) {
+    [eventsApi, authApi, userApi, paymentsApi, notificationsApi, organizerApi, chatApi, moderationApi, shortsApi].forEach((api) => {
+      storeApi.dispatch(api.util.resetApiState());
+    });
+
+    // Google's native SDK caches the signed-in account independently of our auth state, so
+    // the next "Continue with Google" silently reused it instead of offering the chooser.
+    // Imported lazily and best-effort — logging out must never depend on it resolving.
+    void import('@react-native-google-signin/google-signin')
+      .then(({ GoogleSignin }) => GoogleSignin.signOut())
+      .catch(() => undefined);
+  }
+  return result;
+};

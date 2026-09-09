@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   Easing,
@@ -10,10 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
-import GlassSurface from '../common/GlassSurface';
 import { Text } from '../common/Text';
 
 type AuthLayoutProps = {
@@ -22,6 +21,7 @@ type AuthLayoutProps = {
   subtitle: string;
   centerTitle?: boolean;
   scrollable?: boolean;
+  brandCardHeight?: number;
 };
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({
@@ -30,8 +30,11 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   subtitle,
   centerTitle = false,
   scrollable = false,
+  brandCardHeight,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const logoTranslateY = useRef(new Animated.Value(-40)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -59,11 +62,17 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
 
   const body = (
     <>
-      <View style={[styles.brandCard, !scrollable && styles.brandCardCompact]}>
+      <View
+        style={[
+          styles.brandCard,
+          !scrollable && styles.brandCardCompact,
+          brandCardHeight != null && { height: brandCardHeight },
+        ]}
+      >
         <View style={[styles.brandCardContent, { paddingTop: insets.top }]}>
           <Animated.View style={{ opacity: logoOpacity, transform: [{ translateY: logoTranslateY }] }}>
             <Image
-              source={require('../../../assets/logo/logo.jpg')}
+              source={require('../../../assets/app/logo.jpg')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -74,14 +83,16 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </View>
       </View>
 
-      <GlassSurface style={styles.bodyCard} contentStyle={styles.bodyContent} intensity={42}>
-        <View style={[styles.headingBlock, centerTitle && styles.headingCenter]}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-        </View>
+      <View style={styles.bodyCard}>
+        <View style={styles.bodyContent}>
+          <View style={[styles.headingBlock, centerTitle && styles.headingCenter]}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          </View>
 
-        {children}
-      </GlassSurface>
+          {children}
+        </View>
+      </View>
     </>
   );
 
@@ -95,7 +106,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         style={StyleSheet.absoluteFill}
       />
       <Image
-        source={require('../../../assets/Background.png')}
+        source={require('../../../assets/auth/background.png')}
         style={styles.orbTop}
         resizeMode="cover"
       />
@@ -126,7 +137,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#FFF8FA',
@@ -212,8 +223,19 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
     marginBottom: spacing.sm,
     borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.6)',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   bodyContent: {
     paddingHorizontal: spacing.md,
@@ -226,11 +248,11 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'ZalandoSansExpanded_500Medium',
     fontSize: 32,
-    lineHeight: 24,
+    lineHeight: 40,
     letterSpacing: 0,
     textAlign: 'center',
     textAlignVertical: 'center',
-    color: '#0D0D0D',
+    color: colors.text,
   },
   subtitle: {
     fontFamily: 'ZalandoSansExpanded_500Medium',
@@ -239,6 +261,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     textAlign: 'center',
     textAlignVertical: 'center',
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
   },
 });

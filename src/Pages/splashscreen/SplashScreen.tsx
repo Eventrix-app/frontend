@@ -1,141 +1,124 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Image, Animated, Easing, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackParamList } from '../../navigation/types';
-import { RootState } from '../../store';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { borderRadius } from '../../theme/borderRadius';
 
-const easeOut = Easing.out(Easing.bezier(0.25, 0.1, 0.25, 1));
-const INTRO_MS = 900;
-const EXIT_MS  = 700;
+const logoVideoSource = require('../../../assets/splash/logo-reveal.mp4');
 
+// 4s video + buffer — guarantees we move on even if `playToEnd` never fires (e.g. a
+// player stuck in a bad state on some device).
+const FALLBACK_TIMEOUT_MS = 8000;
+
+// The entire splash screen is this video — no logo image, no brand-name text, no
+// tagline. It fills the screen (contentFit="cover" + flex:1, so it fits any device
+// size dynamically) and starts playing the moment this screen mounts. The native
+// splash (app.json `splash.image`) is left up behind it until the video reports
+// readyToPlay, so there's no blank/white gap between the native splash and this one.
 const SplashScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList, 'Splash'>>();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  // Persisted per-device (see onboardingDraftSlice) — a returning user who has already
-  // been through the onboarding chain on this device (or just authenticated) skips
-  // straight to Login instead of replaying Onboarding/InterestSelection/etc. every time.
-  const hasCompletedOnboarding = useSelector(
-    (state: RootState) => state.onboardingDraft.hasCompletedOnboarding,
-  );
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AuthStackParamList, 'Splash'>>();
+  const insets = useSafeAreaInsets();
 
-  const isSmallScreen  = windowWidth < 375;
-  const isMediumScreen = windowWidth >= 375 && windowWidth < 414;
+  // Guards against playToEnd/error/timeout/Skip racing each other and firing
+  // navigation.replace more than once (or after the screen has already unmounted).
+  const hasNavigatedRef = useRef(false);
+  const hasHiddenNativeSplashRef = useRef(false);
 
-  const getResponsiveLogoSize    = () => isSmallScreen ? 120 : isMediumScreen ? 140 : 160;
-  const getResponsiveAppNameSize = () => isSmallScreen ? 48  : isMediumScreen ? 56  : 64;
-  const getResponsiveTaglineSize = () => isSmallScreen ? 20  : isMediumScreen ? 22  : 24;
+  const hideNativeSplash = useCallback(() => {
+    if (hasHiddenNativeSplashRef.current) return;
+    hasHiddenNativeSplashRef.current = true;
+    ExpoSplashScreen.hideAsync().catch(() => {});
+  }, []);
 
-  // Intro animations
-  const logoOpacity     = useRef(new Animated.Value(0)).current;
-  const logoTranslateY  = useRef(new Animated.Value(-60)).current;
-  const brandOpacity    = useRef(new Animated.Value(0)).current;
-  const brandTranslateY = useRef(new Animated.Value(60)).current;
-  const taglineOpacity  = useRef(new Animated.Value(0)).current;
+  const goNext = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    // Safety net: if the video errored or timed out before ever reaching readyToPlay,
+    // the native splash would otherwise never get hidden.
+    hideNativeSplash();
+    if (navigation.isFocused()) {
+      // Login always comes right after the splash video now — the onboarding chain
+      // (carousel/interests/location/notifications) runs after a successful login/register
+      // instead of before it, gated there by the account's hasCompletedOnboarding flag.
+      navigation.replace('Login');
+    }
+  }, [navigation, hideNativeSplash]);
 
-  // Exit animation — whole screen slides up and fades out
-  const screenTranslateY = useRef(new Animated.Value(0)).current;
-  const screenOpacity    = useRef(new Animated.Value(1)).current;
+  const player = useVideoPlayer(logoVideoSource, (p) => {
+    p.muted = true;
+    p.volume = 0;
+    p.loop = false;
+  });
 
   useEffect(() => {
-    // Phase 1: intro sequence
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(logoOpacity,    { toValue: 1, duration: INTRO_MS, easing: easeOut, useNativeDriver: true }),
-        Animated.timing(logoTranslateY, { toValue: 0, duration: INTRO_MS, easing: easeOut, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(brandOpacity,    { toValue: 1, duration: INTRO_MS - 100, easing: easeOut, useNativeDriver: true }),
-        Animated.timing(brandTranslateY, { toValue: 0, duration: INTRO_MS - 100, easing: easeOut, useNativeDriver: true }),
-      ]),
-      Animated.timing(taglineOpacity, { toValue: 1, duration: 600, easing: easeOut, useNativeDriver: true }),
-    ]).start();
+    const statusSub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') {
+        hideNativeSplash();
+      } else if (status === 'error') {
+        goNext();
+      }
+    });
+    const endSub = player.addListener('playToEnd', goNext);
+    const fallback = setTimeout(goNext, FALLBACK_TIMEOUT_MS);
 
-    // Phase 2: after pause, slide screen up + fade out, then replace
-    const timeout = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(screenTranslateY, {
-          toValue: -windowHeight,
-          duration: EXIT_MS,
-          easing: easeOut,
-          useNativeDriver: true,
-        }),
-        Animated.timing(screenOpacity, {
-          toValue: 0,
-          duration: EXIT_MS,
-          easing: easeOut,
-          useNativeDriver: true,
-        }),
-      ]).start(() => navigation.replace(hasCompletedOnboarding ? 'Login' : 'Onboarding'));
-    }, 3200);
+    // Not called from useVideoPlayer's setup callback: on web, expo-video's player has no
+    // <video> element attached yet at that point (VideoView mounts it in its own effect,
+    // which — since it's a descendant — commits before this one), so play() there
+    // silently no-ops and the view's own mount-sync sees a fresh, still-paused element and
+    // never starts it. Calling it here, after the view is guaranteed mounted, is what
+    // actually starts playback on web; it's a harmless already-playing call on native.
+    player.play();
 
-    return () => clearTimeout(timeout);
-  }, [hasCompletedOnboarding]);
+    return () => {
+      statusSub.remove();
+      endSub.remove();
+      clearTimeout(fallback);
+    };
+  }, [player, goNext, hideNativeSplash]);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { opacity: screenOpacity, transform: [{ translateY: screenTranslateY }] },
-      ]}
-    >
-      <Animated.View
-        style={[styles.logo, { opacity: logoOpacity, transform: [{ translateY: logoTranslateY }] }]}
-      >
-        <Image
-          source={require('../../../assets/logo/logo.jpg')}
-          style={{
-            width: getResponsiveLogoSize(),
-            height: getResponsiveLogoSize(),
-            borderRadius: borderRadius.lg,
-          }}
-          resizeMode="contain"
-        />
-      </Animated.View>
-
-      <Animated.Text
+    <>
+      <VideoView
+        player={player}
+        style={styles.video}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Skip intro"
+        onPress={goNext}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={[
-          styles.appName,
-          { fontSize: getResponsiveAppNameSize(), opacity: brandOpacity, transform: [{ translateY: brandTranslateY }] },
+          styles.skipButton,
+          { top: insets.top + 12, right: insets.right + 16 },
         ]}
       >
-        Eventrix
-      </Animated.Text>
-
-      <Animated.Text
-        style={[styles.tagline, { fontSize: getResponsiveTaglineSize(), opacity: taglineOpacity }]}
-      >
-        Discover Events Near You
-      </Animated.Text>
-    </Animated.View>
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  video: {
     flex: 1,
-    backgroundColor: '#F43362',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  logo: {
-    marginBottom: spacing.lg,
+  skipButton: {
+    position: 'absolute',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  appName: {
-    color: colors.white,
-    fontFamily: 'ZalandoSansExpanded_800ExtraBold',
-    lineHeight: 60,
-    marginBottom: spacing.sm,
-  },
-  tagline: {
-    color: colors.white,
-    fontFamily: 'ZalandoSansExpanded_600SemiBold',
-    lineHeight: 30,
-    opacity: 0.9,
+  skipText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

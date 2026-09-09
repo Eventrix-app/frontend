@@ -1,28 +1,51 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import React, { useMemo } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
+import { RootStackParamList } from '../../navigation/types';
+import { openLegalDocument } from '../../config/legalLinks';
 
 type LegalFooterProps = {
   compact?: boolean;
 };
 
-export const LegalFooter: React.FC<LegalFooterProps> = ({ compact = false }) => (
-  <View style={[styles.wrap, compact && styles.wrapCompact]}>
-    <Text style={styles.note}>By continuing, you agree to our</Text>
-    <View style={styles.links}>
-      {['Terms of use', 'Privacy Policy', 'Contact Us'].map((label, i) => (
-        <React.Fragment key={label}>
-          {i > 0 ? <Text style={styles.dot}>•</Text> : null}
-          <Text style={styles.link}>{label}</Text>
-        </React.Fragment>
-      ))}
-    </View>
-  </View>
-);
+// The legal documents open on the website instead of in-app, so only Contact Us still
+// needs the navigator. Auth-stack screens (Register/Login/ForgotPassword/UpdatePassword)
+// sit inside the "Auth" child navigator and HelpCenter is a RootStack screen, so that one
+// goes through the parent — same pattern RegisterScreen uses for its post-register redirect.
+const LINKS: { label: string; onPress: (root: NativeStackNavigationProp<RootStackParamList> | undefined) => void }[] = [
+  { label: 'Terms of use', onPress: () => void openLegalDocument('terms') },
+  { label: 'Privacy Policy', onPress: () => void openLegalDocument('privacy') },
+  { label: 'Contact Us', onPress: (root) => root?.navigate('HelpCenter') },
+];
 
-const styles = StyleSheet.create({
+export const LegalFooter: React.FC<LegalFooterProps> = ({ compact = false }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const navigation = useNavigation();
+  const root = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+
+  return (
+    <View style={[styles.wrap, compact && styles.wrapCompact]}>
+      <Text style={styles.note}>By continuing, you agree to our</Text>
+      <View style={styles.links}>
+        {LINKS.map(({ label, onPress }, i) => (
+          <React.Fragment key={label}>
+            {i > 0 ? <Text style={styles.dot}>•</Text> : null}
+            <TouchableOpacity onPress={() => onPress(root)} hitSlop={6}>
+              <Text style={styles.link}>{label}</Text>
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrap: {
     alignItems: 'center',
     marginTop: 0,
@@ -34,7 +57,7 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   links: {
@@ -52,6 +75,6 @@ const styles = StyleSheet.create({
   },
   dot: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
   },
 });

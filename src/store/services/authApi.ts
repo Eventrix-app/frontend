@@ -5,6 +5,7 @@ import { createFallbackBaseQuery } from './baseQuery';
 export interface LoginCredentials {
   email: string;
   password: string;
+  deviceLabel?: string; // e.g. "iPhone 14 Pro · iOS 17.4" — shown in Settings → Active Sessions
 }
 
 export interface RegisterCredentials {
@@ -12,7 +13,11 @@ export interface RegisterCredentials {
   password: string;
   firstName: string;
   lastName: string;
-  phone?: string;
+  // Required: CreateUserDto rejects a signup without one, and the server normalises it to
+  // the 10 digits PayU needs so checkout never has to stop and ask.
+  phoneNumber: string;
+  dateOfBirth: string; // 'YYYY-MM-DD' — backend enforces a minimum age of 18
+  deviceLabel?: string;
 }
 
 export interface User {
@@ -27,6 +32,12 @@ export interface User {
   updatedAt: string;
 }
 
+export interface SocialLoginCredentials {
+  provider: 'google';
+  token: string; // id_token
+  deviceLabel?: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   id: string;
@@ -37,10 +48,26 @@ export interface AuthResponse {
   expiresIn?: number;
 }
 
+export interface SessionRecord {
+  id: string;
+  deviceLabel: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  isCurrent: boolean;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: createFallbackBaseQuery(),
-  tagTypes: ['Auth'],
+  // withAuth=true so POST /auth/refresh (the only endpoint here that requires a token) gets
+  // its Authorization header; login/register/forgot/reset-password are all @Public() on the
+  // backend and ignore it when there's no token yet (state.auth.token is null pre-login).
+  baseQuery: createFallbackBaseQuery(true),
+  tagTypes: ['Auth', 'Sessions'],
+  // Deliberately left on RTK Query's 60s default rather than given a policy from
+  // cachePolicy.ts. Everything here is either a mutation or session state whose whole purpose
+  // is to be current: a retained Sessions list would keep showing a device the user just
+  // revoked, which reads as the revocation having failed.
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginCredentials>({
       query: (credentials) => ({
@@ -54,6 +81,16 @@ export const authApi = createApi({
         url: 'auth/register',
         method: 'POST',
         body: credentials,
+      }),
+    }),
+    // Re-issues a token with a fresh 2-day expiry — called on app foreground/launch (see
+    // AppStateSync in App.tsx) to keep an actively-used session from expiring. If the
+    // previous token had already expired (2+ days of not opening the app), this 401s and
+    // authErrorMiddleware turns that into an automatic logout.
+    refresh: builder.mutation<AuthResponse, void>({
+      query: () => ({
+        url: 'auth/refresh',
+        method: 'POST',
       }),
     }),
     logout: builder.mutation<void, void>({
@@ -76,9 +113,44 @@ export const authApi = createApi({
         body: { token, password },
       }),
     }),
+    socialLogin: builder.mutation<AuthResponse, SocialLoginCredentials>({
+      query: (body) => ({
+        url: 'auth/social',
+        method: 'POST',
+        body,
+      }),
+    }),
+    // Both deliberately not passed an email — always acts on the logged-in caller's own
+    // account (see auth.controller.ts), so withAuth's Bearer header is what identifies them.
+    sendEmailVerificationOtp: builder.mutation<void, void>({
+      query: () => ({
+        url: 'auth/verify-email/send',
+        method: 'POST',
+      }),
+    }),
+    confirmEmailVerification: builder.mutation<void, { otp: string }>({
+      query: (body) => ({
+        url: 'auth/verify-email/confirm',
+        method: 'POST',
+        body,
+      }),
+    }),
     getCurrentUser: builder.query<User, void>({
       query: () => 'users/me',
       providesTags: ['Auth'],
+    }),
+    // Settings → Active Sessions.
+    listSessions: builder.query<SessionRecord[], void>({
+      query: () => 'auth/sessions',
+      providesTags: ['Sessions'],
+    }),
+    revokeSession: builder.mutation<void, string>({
+      query: (id) => ({ url: `auth/sessions/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Sessions'],
+    }),
+    revokeOtherSessions: builder.mutation<{ revoked: number }, void>({
+      query: () => ({ url: 'auth/sessions/others', method: 'DELETE' }),
+      invalidatesTags: ['Sessions'],
     }),
   }),
 });
@@ -86,8 +158,15 @@ export const authApi = createApi({
 export const {
   useLoginMutation,
   useRegisterMutation,
+  useRefreshMutation,
   useLogoutMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
+  useSocialLoginMutation,
+  useSendEmailVerificationOtpMutation,
+  useConfirmEmailVerificationMutation,
   useGetCurrentUserQuery,
+  useListSessionsQuery,
+  useRevokeSessionMutation,
+  useRevokeOtherSessionsMutation,
 } = authApi;

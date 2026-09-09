@@ -1,6 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -11,63 +15,134 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainEventCard } from '../../components/events/MainEventCard';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import GlassSurface from '../../components/common/GlassSurface';
-import { CATEGORIES, MOCK_RECENT_SEARCHES } from '../../data/mockEvents';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import { useGetEventsQuery } from '../../store/services/eventsApi';
+import { usePaginatedEvents } from '../../hooks/usePaginatedEvents';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRecentSearches } from '../../hooks/useRecentSearches';
 import { toCardEvent } from '../../utils/eventCardAdapter';
+import { useGetCategoriesQuery } from '../../store/services/userApi';
 import { Text } from '../../components/common/Text';
+import Noevents from '../../components/common/Noevents';
+import EventListSkeleton from '../../components/common/EventListSkeleton';
+import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
+import { useSlowNetwork } from '../../hooks/useSlowNetwork';
+import { SearchIcon, WarningIcon, ClockIcon, MicIcon } from '../../components/common/Icons';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
+import VoiceListeningDialog from '../../components/common/VoiceListeningDialog';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
-const SearchScreen: React.FC<Props> = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
-  const { data: events = [], isLoading, isError, refetch } = useGetEventsQuery({});
-  const cardEvents = useMemo(() => events.map(toCardEvent), [events]);
+const CHIP_ICON_SIZE = 20;
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return cardEvents.filter((event) => {
-      const matchesQuery =
-        !q ||
-        event.title.toLowerCase().includes(q) ||
-        event.venue.toLowerCase().includes(q) ||
-        event.category.toLowerCase().includes(q);
-      const matchesCategory = !category || event.category.toLowerCase() === category;
-      return matchesQuery && matchesCategory;
-    });
-  }, [cardEvents, query, category]);
+const SearchScreen: React.FC<Props> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
+  // Seeded from voice search on Home, whose search bar is only a button.
+  const [query, setQuery] = useState(route.params?.initialQuery ?? '');
+  // Snapshot taken when dictation starts, so cancelling restores whatever was typed rather
+  // than leaving a half-heard phrase behind.
+  const queryBeforeVoice = useRef('');
+  const { data: categories = [] } = useGetCategoriesQuery();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  // Pre-selects the category chip when arriving from a category tap on Home/Explore
+  // (navigation.navigate('Search', { categoryId })).
+  const [categoryId, setCategoryId] = useState<string | null>(route.params?.categoryId ?? null);
+
+  // Debounced so typing doesn't fire a request per keystroke; the trimmed, settled value is
+  // sent to the backend so search runs over the full catalog, not just already-loaded pages.
+  const debouncedQuery = useDebouncedValue(query.trim(), 400);
+
+  // Held back while dictating so each interim word is shown but not searched on — otherwise
+  // "rock festival" fires a request for "rock" first and the list churns mid-sentence.
+  const [searchTerm, setSearchTerm] = useState(debouncedQuery);
+
+  // Interim results only fill the box; the settled transcript also runs the search, straight
+  // away. It cannot be left to the debounce below: the user pressed "Search" on the dialog
+  // and expects a result now, and at the moment dictation ends the debounced value is still
+  // whatever the box held 400ms ago — so nothing would search until the timer caught up.
+  const voice = useVoiceSearch({
+    onResult: (transcript) => {
+      setQuery(transcript);
+      setSearchTerm(transcript.trim());
+    },
+    onPartial: setQuery,
+  });
+
+  useEffect(() => {
+    if (voice.isListening) return;
+    // Adopted only once the debounce has caught up with what is actually in the box.
+    // Without this the end of dictation would immediately overwrite the final transcript
+    // that onResult just searched on with the pre-dictation term, and leave it wrong for a
+    // full debounce period before correcting itself.
+    if (debouncedQuery !== query.trim()) return;
+    setSearchTerm(debouncedQuery);
+  }, [debouncedQuery, query, voice.isListening]);
+
+  // Category now goes through the same server-side param as search (GET /events?categoryId=)
+  // instead of filtering only the already-loaded page — previously "load more" while a
+  // category was selected silently returned thin/incomplete results.
+  const { events, loadMore, isLoading, isFetchingMore, isError, refetch } = usePaginatedEvents({
+    search: searchTerm || undefined,
+    categoryId: categoryId ?? undefined,
+  });
+  const results = useMemo(() => events.map((event) => toCardEvent(event)), [events]);
+
+  // Search is debounced by 400ms before it even fires, so a slow round trip on top of
+  // that is exactly where a query feels like it silently did nothing.
+  const { stage: slowStage } = useSlowNetwork(isLoading);
+
+  // Real, device-local search history replacing the hardcoded sample terms.
+  const { recent, addRecentSearch, clearRecentSearches } = useRecentSearches();
+  // Recorded once the debounced term has actually been searched, not on every keystroke —
+  // otherwise every prefix along the way ("m", "mu", "mus"…) would be stored as its own
+  // entry and the list would fill with fragments of a single search.
+  useEffect(() => {
+    if (debouncedQuery) addRecentSearch(debouncedQuery);
+  }, [debouncedQuery, addRecentSearch]);
 
   const openEvent = (eventId: string) => {
     navigation.navigate('EventDetails', { eventId });
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader title="Search" onBack={() => navigation.goBack()} />
 
-      <GlassSurface style={styles.searchGlass} contentStyle={styles.searchWrap}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          autoFocus
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search events, venues, organizers..."
-          placeholderTextColor={colors.placeholder}
-          style={styles.searchInput}
-          returnKeyType="search"
-        />
-        {query.length > 0 ? (
-          <TouchableOpacity onPress={() => setQuery('')}>
-            <Text style={styles.clear}>✕</Text>
+      <View style={styles.searchGlass}>
+        <View style={styles.searchWrap}>
+          <SearchIcon color={colors.textSecondary} size={18} />
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search events, venues, organizers..."
+            placeholderTextColor={colors.placeholder}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Text style={styles.clear}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            onPress={() => {
+              queryBeforeVoice.current = query;
+              voice.start();
+            }}
+            hitSlop={8}
+            accessibilityLabel="Search by voice"
+          >
+            <MicIcon color={colors.textSecondary} size={18} />
           </TouchableOpacity>
-        ) : null}
-      </GlassSurface>
+        </View>
+      </View>
 
       <ScrollView
         horizontal
@@ -77,99 +152,148 @@ const SearchScreen: React.FC<Props> = ({ navigation }) => {
       >
         <TouchableOpacity
           style={styles.chipWrap}
-          onPress={() => setCategory(null)}
+          onPress={() => setCategoryId(null)}
         >
-          <GlassSurface style={[styles.chipGlass, !category && styles.chipActive]} contentStyle={styles.chipContent}>
-            <Text style={[styles.chipText, !category && styles.chipTextActive]}>All</Text>
-          </GlassSurface>
-        </TouchableOpacity>
-        {CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={styles.chipWrap}
-            onPress={() =>
-              setCategory((prev) => (prev === cat.name.toLowerCase() ? null : cat.name.toLowerCase()))
-            }
-          >
-            <GlassSurface
-              style={[styles.chipGlass, category === cat.name.toLowerCase() && styles.chipActive]}
-              contentStyle={styles.chipContent}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  category === cat.name.toLowerCase() && styles.chipTextActive,
-                ]}
-              >
-                {cat.emoji} {cat.name}
-              </Text>
-            </GlassSurface>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {!query && !category ? (
-          <>
-            <Text style={styles.sectionTitle}>Recent searches</Text>
-            <View style={styles.recentRow}>
-              {MOCK_RECENT_SEARCHES.map((term) => (
-                <TouchableOpacity
-                  key={term}
-                  style={styles.recentChipWrap}
-                  onPress={() => setQuery(term)}
-                >
-                  <GlassSurface style={styles.recentChip} contentStyle={styles.recentChipContent}>
-                    <Text style={styles.recentText}>🕐 {term}</Text>
-                  </GlassSurface>
-                </TouchableOpacity>
-              ))}
+          <View style={[styles.chipGlass, !categoryId && styles.chipActive]}>
+            <View style={styles.chipContent}>
+              <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>All</Text>
             </View>
-          </>
-        ) : null}
-
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} color={colors.brandPink} />
-        ) : isError ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>⚠️</Text>
-            <Text style={styles.emptyTitle}>Couldn't load events</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
           </View>
-        ) : (
-          <>
-            <Text style={styles.sectionTitle}>
-              {results.length} result{results.length === 1 ? '' : 's'}
-            </Text>
-            {results.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>🔎</Text>
-                <Text style={styles.emptyTitle}>No events found</Text>
-                <Text style={styles.emptySub}>Try a different keyword or category</Text>
+        </TouchableOpacity>
+        {categories.map((cat) => {
+          const isSelected = categoryId === cat.id;
+          const icon = isSelected ? cat.iconUrl : undefined;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={styles.chipWrap}
+              onPress={() => setCategoryId((prev) => (prev === cat.id ? null : cat.id))}
+            >
+              <View style={[styles.chipGlass, isSelected && styles.chipActive]}>
+                <View style={[styles.chipContent, !!icon && styles.chipContentWithIcon]}>
+                  {icon ? (
+                    <View style={styles.chipIcon}>
+                      <Image source={{ uri: icon }} style={styles.chipIconImage} resizeMode="contain" />
+                    </View>
+                  ) : null}
+                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                    {cat.name}
+                  </Text>
+                </View>
               </View>
-            ) : (
-              results.map((event) => (
-                <MainEventCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
-              ))
-            )}
-          </>
-        )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
-    </View>
+
+      {isLoading ? (
+        <>
+          <SlowNetworkNotice stage={slowStage} onRetry={refetch} style={styles.slowNotice} />
+          <EventListSkeleton />
+        </>
+      ) : isError ? (
+        <View style={styles.empty}>
+          <WarningIcon color={colors.textSecondary} size={48} />
+          <Text style={styles.emptyTitle}>Couldn't load events</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => (
+            <MainEventCard event={item} onPress={() => openEvent(item.id)} />
+          )}
+          contentContainerStyle={styles.scroll}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListHeaderComponent={
+            <>
+              {!query && !categoryId && recent.length > 0 ? (
+                <>
+                  <View style={styles.recentHeaderRow}>
+                    <Text style={styles.sectionTitle}>Recent searches</Text>
+                    <TouchableOpacity onPress={clearRecentSearches} hitSlop={8}>
+                      <Text style={styles.clearRecentText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.recentRow}>
+                    {recent.map((term) => (
+                      <TouchableOpacity
+                        key={term}
+                        style={styles.recentChipWrap}
+                        onPress={() => setQuery(term)}
+                      >
+                        <View style={styles.recentChip}>
+                          <View style={styles.recentChipContent}>
+                            <ClockIcon color={colors.textSecondary} size={13} />
+                            <Text style={styles.recentText}>{term}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+              <Text style={styles.sectionTitle}>
+                {results.length} result{results.length === 1 ? '' : 's'}
+              </Text>
+            </>
+          }
+          ListEmptyComponent={
+            <Noevents
+              inline
+              subtitle={query ? `No events matching "${query}"` : 'Try a different keyword or category'}
+            />
+          }
+          ListFooterComponent={
+            isFetchingMore ? <ActivityIndicator style={styles.loadMoreLoader} color={colors.brandPink} /> : null
+          }
+        />
+      )}
+
+      <VoiceListeningDialog
+        visible={voice.isListening}
+        transcript={voice.partial}
+        isSpeaking={voice.isSpeaking}
+        onDone={voice.stop}
+        onCancel={() => {
+          voice.cancel();
+          // The box was filling live, so abandoning has to put back what was there before.
+          setQuery(queryBeforeVoice.current);
+        }}
+      />
+    </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  slowNotice: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.neutralBg,
   },
   searchGlass: {
     borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   searchWrap: {
     flexDirection: 'row',
@@ -208,10 +332,35 @@ const styles = StyleSheet.create({
   chipGlass: {
     borderRadius: borderRadius.pill,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   chipContent: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  chipContentWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs ?? 6,
+  },
+  chipIcon: {
+    width: CHIP_ICON_SIZE,
+    height: CHIP_ICON_SIZE,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  chipIconImage: {
+    width: CHIP_ICON_SIZE,
+    height: CHIP_ICON_SIZE,
   },
   chipActive: {
     backgroundColor: 'rgba(244,51,98,0.16)',
@@ -235,6 +384,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
       fontFamily: 'ZalandoSansExpanded_600SemiBold'
 },
+  // Puts "Clear" on the same baseline as the section title, so the row keeps the title's
+  // own vertical rhythm instead of adding a second stacked line above the chips.
+  recentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearRecentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.brandPink,
+  },
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -247,8 +408,22 @@ const styles = StyleSheet.create({
   },
   recentChip: {
     borderRadius: borderRadius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   recentChipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -275,6 +450,9 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: spacing.xxl,
+  },
+  loadMoreLoader: {
+    marginVertical: spacing.md,
   },
   retryBtn: {
     marginTop: spacing.sm,
