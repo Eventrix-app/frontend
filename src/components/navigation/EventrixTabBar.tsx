@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SvgXml, Svg, Circle } from 'react-native-svg';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
@@ -25,15 +26,14 @@ const PLUS_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xm
 // fully keep the left/right segments — there's no "shorter" in that model. This draws it as
 // an SVG stroke instead, dashed down to one arc centered on the bottom (where the FAB
 // overlaps the bar), so its length is exact and independently tunable via FAB_RING_ARC_DEGREES.
-const FAB_SIZE = 56;
+const FAB_SIZE = 52;
 const FAB_RING_WIDTH = 4;
 // Centers the stroke on the button's edge, matching how a CSS border sits on the box edge
 // (half the stroke inside, half outside) rather than fully inside or outside it.
 const FAB_RING_RADIUS = FAB_SIZE / 2 - FAB_RING_WIDTH / 2;
 const FAB_RING_CIRCUMFERENCE = 2 * Math.PI * FAB_RING_RADIUS;
-// Shortened from ~270° (only the top quadrant removed) — the arcs running up the left and
-// right sides read as too long. Tune this single number to make the visible arc longer/shorter.
-const FAB_RING_ARC_DEGREES = 150;
+// Tune this single number to make the visible arc longer/shorter.
+const FAB_RING_ARC_DEGREES = 190;
 const FAB_RING_VISIBLE_LENGTH = FAB_RING_CIRCUMFERENCE * (FAB_RING_ARC_DEGREES / 360);
 const FAB_RING_GAP_LENGTH = FAB_RING_CIRCUMFERENCE - FAB_RING_VISIBLE_LENGTH;
 // The circle's path starts at 3 o'clock; `rotation={-90}` below moves that start to 12
@@ -83,6 +83,40 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [reelPickerOpen, setReelPickerOpen] = useState(false);
 
+  // Single shared indicator, not one rendered per active tab — that's what makes it slide
+  // rather than jump: it's the same element, its `left` just animates to the new tab's slot.
+  const [barWidth, setBarWidth] = useState(0);
+  const numTabs = state.routes.length;
+  const slotWidth = numTabs > 0 ? barWidth / numTabs : 0;
+  // Same 62%-of-slot pill the old per-tab indicator used, just centered by math now
+  // instead of by `alignSelf: 'center'` inside its own tab.
+  const indicatorWidth = slotWidth * 0.62;
+  const indicatorLeft = useSharedValue(0);
+  // Skips the animation on the very first measurement so the indicator doesn't visibly
+  // slide in from the left edge (x=0) before barWidth is known — only real tab switches
+  // after that should animate.
+  const hasPositionedIndicator = useRef(false);
+
+  useEffect(() => {
+    if (!slotWidth) return;
+    const target = state.index * slotWidth + (slotWidth - indicatorWidth) / 2;
+    if (!hasPositionedIndicator.current) {
+      indicatorLeft.value = target;
+      hasPositionedIndicator.current = true;
+    } else {
+      indicatorLeft.value = withTiming(target, { duration: 250 });
+    }
+  }, [state.index, slotWidth, indicatorWidth, indicatorLeft]);
+
+  const indicatorAnimatedStyle = useAnimatedStyle(() => ({
+    left: indicatorLeft.value,
+    width: indicatorWidth,
+  }));
+
+  const handleBarLayout = (e: LayoutChangeEvent) => {
+    setBarWidth(e.nativeEvent.layout.width);
+  };
+
   // CreateEvent/RecordReel are root-stack screens, not tabs — this navigation prop is the
   // nested tab navigator's, so the request has to go up to the parent (same pattern as
   // HomeScreen.tsx's openExplore/openAuth).
@@ -117,7 +151,10 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
 
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
-      <View style={[styles.glass, styles.bar]}>
+      <View style={[styles.glass, styles.bar]} onLayout={handleBarLayout}>
+        {/* Positioned first so it paints behind the tab content, and only once barWidth is
+            known — otherwise it would flash at width:0 in the top-left corner for one frame. */}
+        {slotWidth ? <Animated.View style={[styles.indicator, indicatorAnimatedStyle]} /> : null}
         {state.routes.map((route, index) => {
           const tab = TABS.find((t) => t.name === route.name) ?? {
             label: route.name,
@@ -132,7 +169,6 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
               onPress={() => navigation.navigate(route.name)}
               activeOpacity={0.7}
             >
-              {active ? <View style={styles.indicator} /> : null}
               <SvgXml
                 xml={withFill(tab.icon, active ? colors.brandPink : colors.stone600)}
                 width={styles.icon.width}
@@ -221,8 +257,8 @@ tab: {
 indicator: {
   position: 'absolute',
   top: 0.6,               // was: 6 — a bit higher, closer to the top edge
-  alignSelf: 'center',
-  width: '62%',         // was: '55%' — slightly wider/more visible
+  // `left` and `width` are set by indicatorAnimatedStyle — this is one shared element that
+  // slides between tabs (see the effect above), not one recreated per active tab.
   height: 4,
   backgroundColor: colors.brandPink,
   borderBottomLeftRadius: 1000,
