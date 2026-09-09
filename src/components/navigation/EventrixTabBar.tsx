@@ -1,12 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SvgXml } from 'react-native-svg';
+import { SvgXml, Svg, Circle } from 'react-native-svg';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { Text } from '../common/Text';
 import { useGetMyVerificationStatusQuery } from '../../store/services/organizerApi';
+import { useGetMyEnrollmentsQuery } from '../../store/services/eventsApi';
+import { CreateReelSheet } from '../events/CreateReelSheet';
+import CreateMenuSheet, { CreateMenuAction } from './CreateMenuSheet';
 
 // Inlined as raw markup (same pattern as the icons in HomeScreen.tsx) instead of importing
 // the .svg files directly: RN's Image can't decode raw SVG on Android/iOS (only a browser's
@@ -16,6 +19,28 @@ const SHAPES_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" 
 const PLAY_CIRCLE_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.25C10.0716 2.25 8.18657 2.82183 6.58319 3.89317C4.97982 4.96451 3.73013 6.48726 2.99218 8.26884C2.25422 10.0504 2.06114 12.0108 2.43735 13.9021C2.81355 15.7934 3.74215 17.5307 5.10571 18.8943C6.46928 20.2579 8.20656 21.1865 10.0979 21.5627C11.9892 21.9389 13.9496 21.7458 15.7312 21.0078C17.5127 20.2699 19.0355 19.0202 20.1068 17.4168C21.1782 15.8134 21.75 13.9284 21.75 12C21.7473 9.41498 20.7192 6.93661 18.8913 5.10872C17.0634 3.28084 14.585 2.25273 12 2.25ZM12 20.25C10.3683 20.25 8.77326 19.7661 7.41655 18.8596C6.05984 17.9531 5.00242 16.6646 4.378 15.1571C3.75358 13.6496 3.5902 11.9908 3.90853 10.3905C4.22685 8.79016 5.01259 7.32015 6.16637 6.16637C7.32016 5.01259 8.79017 4.22685 10.3905 3.90852C11.9909 3.59019 13.6497 3.75357 15.1571 4.37799C16.6646 5.00242 17.9531 6.05984 18.8596 7.41655C19.7661 8.77325 20.25 10.3683 20.25 12C20.2475 14.1873 19.3775 16.2843 17.8309 17.8309C16.2843 19.3775 14.1873 20.2475 12 20.25ZM16.5225 11.3644L10.5225 7.61438C10.409 7.54344 10.2786 7.50416 10.1448 7.50063C10.011 7.4971 9.87868 7.52945 9.76159 7.5943C9.64451 7.65916 9.54691 7.75416 9.47893 7.86946C9.41096 7.98476 9.37507 8.11615 9.375 8.25V15.75C9.37507 15.8838 9.41096 16.0152 9.47893 16.1305C9.54691 16.2458 9.64451 16.3408 9.76159 16.4057C9.87868 16.4706 10.011 16.5029 10.1448 16.4994C10.2786 16.4958 10.409 16.4566 10.5225 16.3856L16.5225 12.6356C16.6302 12.5682 16.719 12.4745 16.7806 12.3633C16.8421 12.2521 16.8744 12.1271 16.8744 12C16.8744 11.8729 16.8421 11.7479 16.7806 11.6367C16.719 11.5255 16.6302 11.4318 16.5225 11.3644ZM10.875 14.3972V9.60281L14.7103 12L10.875 14.3972Z" fill="#57534E"/></svg>';
 const TICKET_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.75 9.75C21.9489 9.75 22.1397 9.67098 22.2803 9.53033C22.421 9.38968 22.5 9.19891 22.5 9V6C22.5 5.60218 22.342 5.22064 22.0607 4.93934C21.7794 4.65804 21.3978 4.5 21 4.5H3C2.60218 4.5 2.22064 4.65804 1.93934 4.93934C1.65804 5.22064 1.5 5.60218 1.5 6V9C1.5 9.19891 1.57902 9.38968 1.71967 9.53033C1.86032 9.67098 2.05109 9.75 2.25 9.75C2.84674 9.75 3.41903 9.98705 3.84099 10.409C4.26295 10.831 4.5 11.4033 4.5 12C4.5 12.5967 4.26295 13.169 3.84099 13.591C3.41903 14.0129 2.84674 14.25 2.25 14.25C2.05109 14.25 1.86032 14.329 1.71967 14.4697C1.57902 14.6103 1.5 14.8011 1.5 15V18C1.5 18.3978 1.65804 18.7794 1.93934 19.0607C2.22064 19.342 2.60218 19.5 3 19.5H21C21.3978 19.5 21.7794 19.342 22.0607 19.0607C22.342 18.7794 22.5 18.3978 22.5 18V15C22.5 14.8011 22.421 14.6103 22.2803 14.4697C22.1397 14.329 21.9489 14.25 21.75 14.25C21.1533 14.25 20.581 14.0129 20.159 13.591C19.7371 13.169 19.5 12.5967 19.5 12C19.5 11.4033 19.7371 10.831 20.159 10.409C20.581 9.98705 21.1533 9.75 21.75 9.75ZM3 15.675C3.84772 15.5029 4.60986 15.043 5.15728 14.3732C5.70471 13.7034 6.00376 12.865 6.00376 12C6.00376 11.135 5.70471 10.2966 5.15728 9.62681C4.60986 8.95705 3.84772 8.49714 3 8.325V6H8.25V18H3V15.675ZM21 15.675V18H9.75V6H21V8.325C20.1523 8.49714 19.3901 8.95705 18.8427 9.62681C18.2953 10.2966 17.9962 11.135 17.9962 12C17.9962 12.865 18.2953 13.7034 18.8427 14.3732C19.3901 15.043 20.1523 15.5029 21 15.675Z" fill="#57534E"/></svg>';
 const PLUS_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4.5V19.5M4.5 12H19.5" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// The FAB's ring: a CSS border can only turn whole top/left/right/bottom quadrants on or
+// off (each ~90° on a true circle), which is why an earlier pass could only fully remove or
+// fully keep the left/right segments — there's no "shorter" in that model. This draws it as
+// an SVG stroke instead, dashed down to one arc centered on the bottom (where the FAB
+// overlaps the bar), so its length is exact and independently tunable via FAB_RING_ARC_DEGREES.
+const FAB_SIZE = 56;
+const FAB_RING_WIDTH = 4;
+// Centers the stroke on the button's edge, matching how a CSS border sits on the box edge
+// (half the stroke inside, half outside) rather than fully inside or outside it.
+const FAB_RING_RADIUS = FAB_SIZE / 2 - FAB_RING_WIDTH / 2;
+const FAB_RING_CIRCUMFERENCE = 2 * Math.PI * FAB_RING_RADIUS;
+// Shortened from ~270° (only the top quadrant removed) — the arcs running up the left and
+// right sides read as too long. Tune this single number to make the visible arc longer/shorter.
+const FAB_RING_ARC_DEGREES = 150;
+const FAB_RING_VISIBLE_LENGTH = FAB_RING_CIRCUMFERENCE * (FAB_RING_ARC_DEGREES / 360);
+const FAB_RING_GAP_LENGTH = FAB_RING_CIRCUMFERENCE - FAB_RING_VISIBLE_LENGTH;
+// The circle's path starts at 3 o'clock; `rotation={-90}` below moves that start to 12
+// o'clock, so the bottom (where we want the arc centered) sits exactly half the
+// circumference along the path. This offset shifts the dash pattern so its visible segment
+// starts there rather than at the (now top) path origin.
+const FAB_RING_DASH_OFFSET = FAB_RING_VISIBLE_LENGTH / 2 - FAB_RING_CIRCUMFERENCE / 2;
 
 // Swaps the SVG's baked-in fill color for the active/inactive tint — react-native-svg's
 // SvgXml `color` prop only overrides elements using fill="currentColor", not a literal hex
@@ -38,16 +63,56 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Same "verified organizer" check CreateEventScreen/ProfileScreen gate on
-  // (verificationStatus?.status === 'approved') — controls whether the create-event
-  // shortcut shows up in the tab bar at all.
-  const { data: verificationStatus } = useGetMyVerificationStatusQuery();
+  // (verificationStatus?.status === 'approved') — decides which tap behaviour the FAB gets.
+  const { data: verificationStatus, isLoading: isLoadingStatus } = useGetMyVerificationStatusQuery();
   const isVerifiedOrganizer = verificationStatus?.status === 'approved';
 
-  // CreateEvent is a root-stack screen, not a tab — this navigation prop is the nested
-  // tab navigator's, so the request has to go up to the parent (same pattern as
+  // Only decides FAB visibility for a non-organizer (an organizer gets the FAB regardless) —
+  // skipped for organizers and while status is still loading so this never fires a request
+  // that ends up unused. Same query CreateReelSheet itself uses, so RTK Query shares the
+  // cache instead of double-fetching once that sheet opens.
+  const { data: enrollments = [] } = useGetMyEnrollmentsQuery(undefined, {
+    skip: isLoadingStatus || isVerifiedOrganizer,
+  });
+  const hasEnrollments = enrollments.length > 0;
+
+  // Hidden entirely for a participant with no bookings — there is nothing for the FAB to do
+  // for them (every reel is scoped to an event they attended; see CreateReelSheet).
+  const showFab = !isLoadingStatus && (isVerifiedOrganizer || hasEnrollments);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reelPickerOpen, setReelPickerOpen] = useState(false);
+
+  // CreateEvent/RecordReel are root-stack screens, not tabs — this navigation prop is the
+  // nested tab navigator's, so the request has to go up to the parent (same pattern as
   // HomeScreen.tsx's openExplore/openAuth).
   const openCreateEvent = () => {
     navigation.getParent()?.navigate('CreateEvent' as never);
+  };
+  const openReelRecorder = (eventId: string) => {
+    (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
+      'RecordReel',
+      { eventId },
+    );
+  };
+
+  // Organizers pick from a menu; everyone else (participants with >=1 booking, since that's
+  // the only way showFab is true for them) goes straight to the event picker — a reel is
+  // always "for" some event they attended, so there is no second option to choose between.
+  const handleFabPress = () => {
+    if (isVerifiedOrganizer) setMenuOpen(true);
+    else setReelPickerOpen(true);
+  };
+
+  const handleMenuSelect = (action: CreateMenuAction) => {
+    setMenuOpen(false);
+    if (action === 'create-event') openCreateEvent();
+    else setReelPickerOpen(true);
+  };
+
+  const handleSelectEventForReel = (eventId: string) => {
+    setReelPickerOpen(false);
+    openReelRecorder(eventId);
   };
 
   return (
@@ -85,15 +150,38 @@ export const EventrixTabBar: React.FC<BottomTabBarProps> = ({
           );
         })}
       </View>
-      {isVerifiedOrganizer ? (
+      {showFab ? (
         // Sibling of `glass` (not a child) so it isn't clipped by the glass container's
         // overflow: hidden — that's what lets it overlap above the bar's top edge.
         // 4 evenly-spaced tabs (Home/Explore/Shorts/Bookings) put dead center exactly
         // between Explore and Shorts, so no horizontal offset is needed beyond 50%.
-        <TouchableOpacity style={styles.fab} onPress={openCreateEvent} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fab} onPress={handleFabPress} activeOpacity={0.85}>
+          <Svg width={FAB_SIZE} height={FAB_SIZE} style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Circle
+              cx={FAB_SIZE / 2}
+              cy={FAB_SIZE / 2}
+              r={FAB_RING_RADIUS}
+              fill="none"
+              stroke={colors.background}
+              strokeWidth={FAB_RING_WIDTH}
+              strokeDasharray={`${FAB_RING_VISIBLE_LENGTH}, ${FAB_RING_GAP_LENGTH}`}
+              strokeDashoffset={FAB_RING_DASH_OFFSET}
+              rotation={-90}
+              origin={`${FAB_SIZE / 2}, ${FAB_SIZE / 2}`}
+            />
+          </Svg>
           <SvgXml xml={PLUS_SVG} width={26} height={26} />
         </TouchableOpacity>
       ) : null}
+
+      <CreateMenuSheet visible={menuOpen} onClose={() => setMenuOpen(false)} onSelect={handleMenuSelect} />
+      <CreateReelSheet
+        visible={reelPickerOpen}
+        onClose={() => setReelPickerOpen(false)}
+        onSelectEvent={handleSelectEventForReel}
+        title="Upload a reel for"
+        subtitle=""
+      />
     </View>
   );
 };
@@ -149,14 +237,14 @@ indicator: {
     top: -24,
     left: '50%',
     marginLeft: -20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     backgroundColor: colors.brandPink,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: colors.background,
+    // The ring itself is drawn as an SVG stroke (see the <Circle> in the FAB's render) so
+    // its arc length is exact, rather than a CSS border here.
     shadowColor: colors.brandPink,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,

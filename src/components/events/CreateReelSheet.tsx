@@ -13,6 +13,11 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSelectEvent: (eventId: string) => void;
+  // Overridable so the tab bar's FAB (EventrixTabBar.tsx) can present this same
+  // enrolled-events picker under its own copy ("Upload a reel for") instead of the
+  // Shorts-tab wording below. Pass '' to omit the subtitle entirely.
+  title?: string;
+  subtitle?: string;
 };
 
 // Every reel is scoped to an event (RecordReel requires an eventId, and the backend's
@@ -23,7 +28,13 @@ type Props = {
 // The list is the user's own enrollments rather than all events: a reel is a recap of
 // something you actually attended, and scoping it this way also means the picker cannot
 // offer an event the uploader has no connection to.
-export const CreateReelSheet: React.FC<Props> = ({ visible, onClose, onSelectEvent }) => {
+export const CreateReelSheet: React.FC<Props> = ({
+  visible,
+  onClose,
+  onSelectEvent,
+  title = 'Create a reel',
+  subtitle = 'Pick the event this reel is about',
+}) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // skip while closed so opening the Shorts tab doesn't fire a request the user may never
@@ -47,8 +58,8 @@ export const CreateReelSheet: React.FC<Props> = ({ visible, onClose, onSelectEve
   return (
     <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.6}>
       <View style={styles.root}>
-        <Text style={styles.title}>Create a reel</Text>
-        <Text style={styles.subtitle}>Pick the event this reel is about</Text>
+        <Text style={styles.title}>{title}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
         {isLoading ? (
           <SimpleListSkeleton count={4} />

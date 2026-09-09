@@ -862,15 +862,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     payBtn: {
       borderRadius: borderRadius.lg,
       overflow: 'hidden',
-      ...Platform.select({
-        android: { elevation: 6 },
-        default: {
-          shadowColor: colors.brandPink,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.4,
-          shadowRadius: 12,
-        },
-      }),
     },
     payBtnDisabled: { opacity: 0.55 },
     payBtnGradient: {

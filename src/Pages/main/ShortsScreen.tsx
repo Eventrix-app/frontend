@@ -3,7 +3,6 @@ import {
   FlatList,
   LayoutChangeEvent,
   StyleSheet,
-  TouchableOpacity,
   View,
   ViewToken,
 } from 'react-native';
@@ -12,7 +11,14 @@ import {
 // slide unmounting as rows recycle.
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+// TouchableOpacity from here, not core react-native: react-native-gesture-handler installs
+// a root-level touch interceptor that arbitrates every gesture (including the pause/like
+// GestureDetector below) before RN's own core-Touchable responder system sees a touch — so a
+// core TouchableOpacity sitting over that gesture's area could still have its taps stolen
+// even when it's a sibling rendered on top. This drop-in replacement is built on the same
+// native primitives GestureDetector uses, so both arbitrate through one system instead of two
+// competing ones.
+import { Gesture, GestureDetector, TouchableOpacity } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import LottieView from 'lottie-react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -281,23 +287,32 @@ const ReelSlide = React.memo<SlideProps>(({
   }, [item.caption, item.overlay]);
 
   return (
-    <GestureDetector gesture={tapGestures}>
-      <View style={[styles.slide, { height }]}>
-      <ReelVideo uri={item.mediaUrl} active={active} paused={paused} />
+    <View style={[styles.slide, { height }]}>
+      {/* Scoped to just the video + its own overlays, not the whole slide — the interactive
+          controls below (like, comments, creator row, +) are siblings rendered on top of this,
+          not descendants, so a tap that lands on one of them never reaches this gesture layer
+          underneath. Without that separation, tapping "like" also registered as a tap-to-pause,
+          since RNGH's native gesture recognizer and RN's TouchableOpacity responder system
+          both see the same touch independently. */}
+      <GestureDetector gesture={tapGestures}>
+        <View style={StyleSheet.absoluteFill}>
+          <ReelVideo uri={item.mediaUrl} active={active} paused={paused} />
 
-      {/* Only while this slide is the visible one — an off-screen paused slide would
-          otherwise flash its badge as it scrolls past. pointerEvents none so the badge never
-          swallows the tap that resumes playback. */}
-      {paused && active ? (
-        <View style={styles.pauseOverlay} pointerEvents="none">
-          <View style={styles.pauseBadge}>
-            <Feather name="pause" size={34} color="#FFFFFF" />
-          </View>
+          {/* Only while this slide is the visible one — an off-screen paused slide would
+              otherwise flash its badge as it scrolls past. pointerEvents none so the badge never
+              swallows the tap that resumes playback. */}
+          {paused && active ? (
+            <View style={styles.pauseOverlay} pointerEvents="none">
+              <View style={styles.pauseBadge}>
+                <Feather name="pause" size={34} color="#FFFFFF" />
+              </View>
+            </View>
+          ) : null}
+
+          {item.overlay ? <ReelOverlayText overlay={item.overlay} width={width} height={height} /> : null}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.bottomFade} />
         </View>
-      ) : null}
-
-      {item.overlay ? <ReelOverlayText overlay={item.overlay} width={width} height={height} /> : null}
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.bottomFade} />
+      </GestureDetector>
 
       <View style={[styles.topBar, { paddingTop: insetTop + spacing.sm }]}>
         <Text style={styles.topTitle}>Shorts</Text>
@@ -360,9 +375,8 @@ const ReelSlide = React.memo<SlideProps>(({
         </View>
       </View>
 
-        <HeartBurst ref={heartRef} />
-      </View>
-    </GestureDetector>
+      <HeartBurst ref={heartRef} />
+    </View>
   );
 });
 ReelSlide.displayName = 'ReelSlide';
