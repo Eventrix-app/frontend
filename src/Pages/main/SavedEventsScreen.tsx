@@ -78,10 +78,10 @@ const SavedEventsScreen: React.FC<Props> = ({ navigation }) => {
           ) : null}
           <TouchableOpacity style={styles.menuRow} onPress={handleRemove} disabled={isRemoving}>
             {isRemoving ? (
-              <ActivityIndicator color="#DC2626" size="small" />
+              <ActivityIndicator color={colors.error} size="small" />
             ) : (
               <>
-                <TrashIcon color="#DC2626" size={16} />
+                <TrashIcon color={colors.error} size={16} />
                 <Text style={styles.menuRowDestructiveText}>Remove from Saved</Text>
               </>
             )}
@@ -149,7 +149,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   menuRowDestructiveText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#DC2626',
+    color: colors.error,
   },
   menuRowText: {
     fontSize: 15,

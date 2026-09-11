@@ -1487,7 +1487,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {isOwner && event.approvalStatus === 'rejected' && (
           <View style={styles.rejectionBanner}>
             <View style={styles.bannerTitleRow}>
-              <CloseCircleIcon color="#DC2626" size={16} />
+              <CloseCircleIcon color={colors.errorSoftText} size={16} />
               <Text style={styles.rejectionTitle}>Event Rejected</Text>
             </View>
             {event.rejectionReason ? (
@@ -1522,9 +1522,9 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.salesBannerHeader}>
               <View style={styles.bannerTitleRow}>
                 {event.approvalStatus === 'pending_approval' ? (
-                  <HourglassIcon color="#065F46" size={15} />
+                  <HourglassIcon color={colors.successSoftText} size={15} />
                 ) : (
-                  <CheckCircleIcon color="#065F46" size={15} />
+                  <CheckCircleIcon color={colors.successSoftText} size={15} />
                 )}
                 <Text style={styles.salesText}>
                   {event.approvalStatus === 'pending_approval' ? 'Pending Review' : 'Approved'}
@@ -1541,7 +1541,7 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
             {event.totalCapacity != null && event.availableTickets != null && (
               <View style={styles.bannerTitleRow}>
-                <TicketIcon color="#047857" size={14} />
+                <TicketIcon color={colors.successSoftText} size={14} />
                 <Text style={styles.salesCount}>
                   {event.totalCapacity - event.availableTickets} / {event.totalCapacity} tickets sold
                 </Text>
@@ -2060,18 +2060,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     padding: spacing.md,
   },
   rejectionBanner: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorSoft,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     gap: spacing.xs,
   },
   bannerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rejectionTitle: { color: '#DC2626', fontSize: 15, fontFamily: 'ZalandoSansExpanded_700Bold' },
-  rejectionReason: { color: '#7F1D1D', fontSize: 13 },
+  rejectionTitle: { color: colors.errorSoftText, fontSize: 15, fontFamily: 'ZalandoSansExpanded_700Bold' },
+  rejectionReason: { color: colors.errorSoftText, fontSize: 13 },
   resubmitBtn: {
     marginTop: spacing.sm,
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.error,
     borderRadius: borderRadius.md,
     paddingVertical: 8,
     alignItems: 'center',
@@ -2095,7 +2095,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   editBtnText: { color: colors.white, fontWeight: '600' },
   salesBanner: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successSoft,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -2106,8 +2106,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  salesText: { fontWeight: '600', color: '#065F46' },
-  salesCount: { fontSize: 13, color: '#047857' },
+  salesText: { fontWeight: '600', color: colors.successSoftText },
+  salesCount: { fontSize: 13, color: colors.successSoftText },
 
   title: { fontSize: 22, color: colors.text, fontFamily: 'ZalandoSansExpanded_700Bold', marginTop: spacing.md, marginBottom: spacing.xs },
 
@@ -2309,7 +2309,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   tierInfo: { flex: 1, gap: 2 },
   tierName: { fontSize: 15, fontWeight: '600', color: colors.text },
   tierMeta: { fontSize: 12, color: colors.textSecondary },
-  tierMetaSoldOut: { color: '#DC2626', fontWeight: '600' },
+  tierMetaSoldOut: { color: colors.error, fontWeight: '600' },
   tierMetaClosed: { color: colors.textSecondary, fontStyle: 'italic' },
   tierPrice: { fontSize: 15, fontWeight: '700', color: colors.brandPink, marginLeft: spacing.sm },
   stepperRow: {
@@ -2371,7 +2371,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   footerContent: { borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md },
   bookBtn: { backgroundColor: colors.brandPink, borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' },
-  disabledBtn: { backgroundColor: '#9CA3AF' },
+  disabledBtn: { backgroundColor: colors.textSecondary },
   bookBtnSvg: { width: '100%', height: 54, alignItems: 'center' },
   organizerMenuFab: {
     position: 'absolute',
@@ -2589,10 +2589,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scheduleMarkerDone: { backgroundColor: '#10B981' },
+  scheduleMarkerDone: { backgroundColor: colors.success },
   scheduleMarkerCheck: { color: colors.white, fontSize: 12, fontWeight: '700' },
   scheduleLine: { width: 2, flex: 1, minHeight: 40, backgroundColor: colors.border, marginTop: 2 },
-  scheduleLineDone: { backgroundColor: '#10B981' },
+  scheduleLineDone: { backgroundColor: colors.success },
   scheduleCard: {
     flex: 1,
     backgroundColor: colors.muted,

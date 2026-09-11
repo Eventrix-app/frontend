@@ -32,7 +32,7 @@ export const AnimatedToggle: React.FC<Props> = ({ value, onChange }) => {
 
   const bg = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#E5E5EA', colors.primary],
+    outputRange: [colors.border, colors.primary],
   });
 
   return (

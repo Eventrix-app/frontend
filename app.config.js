@@ -32,7 +32,7 @@ module.exports = {
     splash: {
       image: './assets/app/logo.jpg',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#FAF7F4',
     },
     // Every require()d image ships inside the build. Debug builds stream them from Metro
     // instead, which is why they vanish on a device that cannot reach it — not a code fault.

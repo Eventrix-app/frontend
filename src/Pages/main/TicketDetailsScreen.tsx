@@ -21,11 +21,18 @@ import { TicketIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TicketDetails'>;
 
-const STATUS_LABELS: Record<string, { label: string; bg: string; text: string }> = {
-  confirmed: { label: 'Confirmed', bg: '#D1FAE5', text: '#065F46' },
-  pending: { label: 'Pending', bg: '#FEF3C7', text: '#92400E' },
-  cancelled: { label: 'Cancelled', bg: '#FEE2E2', text: '#991B1B' },
-  refunded: { label: 'Refunded', bg: '#E0E7FF', text: '#3730A3' },
+// A plain module-level record can't read the themed `colors` object, so this is a function
+// instead — called with `colors` at the render site where the hook value is in scope.
+// "Refunded" keeps a fixed indigo pair (no dark-mode-safe "info" token exists yet) since it's
+// the rarest status; the other three reuse the shared soft-status tokens.
+const statusLabel = (status: string, colors: ReturnType<typeof useTheme>['colors']): { label: string; bg: string; text: string } => {
+  switch (status) {
+    case 'confirmed': return { label: 'Confirmed', bg: colors.successSoft, text: colors.successSoftText };
+    case 'pending': return { label: 'Pending', bg: colors.warningSoft, text: colors.warningSoftText };
+    case 'cancelled': return { label: 'Cancelled', bg: colors.errorSoft, text: colors.errorSoftText };
+    case 'refunded': return { label: 'Refunded', bg: '#E0E7FF', text: '#3730A3' };
+    default: return { label: status, bg: colors.muted, text: colors.textSecondary };
+  }
 };
 
 const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -117,7 +124,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
-  const statusStyle = STATUS_LABELS[enrollment.status] ?? STATUS_LABELS.confirmed;
+  const statusStyle = statusLabel(enrollment.status, colors);
   const isCancelled = enrollment.status === 'cancelled';
   // Both conditions matter: totalAmount > 0 alone isn't enough, since a paid ticket type
   // sits at paymentStatus 'pending' from enroll() until checkout actually completes (no
@@ -279,7 +286,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                       disabled={isCancellingEnrollment}
                     >
                       {isCancellingEnrollment ? (
-                        <ActivityIndicator color="#991B1B" size="small" />
+                        <ActivityIndicator color={colors.errorSoftText} size="small" />
                       ) : (
                         <Text style={styles.refundText}>Cancel Enrollment</Text>
                       )}
@@ -376,13 +383,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   qrCode: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: 1, maxWidth: 260 },
   qrHint: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
   cancelledBanner: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorSoft,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
     alignItems: 'center',
   },
-  cancelledText: { color: '#991B1B', fontWeight: '600', fontSize: 14 },
+  cancelledText: { color: colors.errorSoftText, fontWeight: '600', fontSize: 14 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 14, color: colors.textSecondary },
   totalValue: { fontSize: 20, fontWeight: '700', color: colors.brandPink },
@@ -427,9 +434,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.md,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorSoft,
   },
-  refundText: { color: '#991B1B', fontWeight: '600', fontSize: 15 },
+  refundText: { color: colors.errorSoftText, fontWeight: '600', fontSize: 15 },
   refundPendingBadge: {
     borderRadius: borderRadius.md,
     paddingVertical: 14,

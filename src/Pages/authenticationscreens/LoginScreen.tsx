@@ -150,7 +150,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
         {errorMessage ? (
           <View style={[styles.errorContainer, styles.errorRow]}>
-            <WarningIcon color="#D32F2F" size={16} />
+            <WarningIcon color={colors.errorSoftText} size={16} />
             <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
@@ -303,15 +303,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     justifyContent: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEB',
-    borderColor: '#FFD1D1',
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
     borderWidth: 1,
     borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.sm,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.errorSoftText,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',

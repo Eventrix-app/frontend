@@ -175,12 +175,12 @@ const LocationAccessScreen: React.FC = () => {
               source={require('../../../assets/shared/icons/search.png')}
               style={styles.searchIcon}
               resizeMode="contain"
-              tintColor="#9CA3AF"
+              tintColor={colorsLight.placeholder}
             />
             <TextInput
               style={styles.cityInput}
               placeholder="or enter your city manually"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colorsLight.placeholder}
               value={cityInput}
               onChangeText={setCityInput}
               editable={!isLocating && !isGeocoding}
@@ -250,7 +250,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#D8D8DE',
+    backgroundColor: colors.neutralLine,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -270,7 +270,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
     paddingHorizontal: spacing.md,
       fontFamily: 'ZalandoSansExpanded_500Medium'
 },
-  divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
+  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.lg },
 
   // ── Content ──────────────────────────────────────────────────────────────
   imageContainer: {
@@ -283,7 +283,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   locationImage: { width: '100%', height: '100%' },
   errorText: {
     fontSize: 13,
-    color: '#D32F2F',
+    color: colors.errorSoftText,
     textAlign: 'center',
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
@@ -291,9 +291,9 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,

@@ -194,7 +194,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   cardUnread: {
     borderColor: 'rgba(244,51,98,0.2)',
-    backgroundColor: '#FFFAFB',
+    // A low-opacity brand-pink wash rather than a near-white literal, so the "unread"
+    // emphasis stays visible instead of disappearing (or looking blown out) once the card
+    // background is warm-white or near-black instead of pure white.
+    backgroundColor: 'rgba(255, 51, 102, 0.06)',
   },
   iconWrap: {
     width: 44,

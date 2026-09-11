@@ -159,7 +159,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         variant="auth"
       />
       {dateOfBirth && !isOldEnough ? (
-        <Text style={styles.ageHint}>You must be at least {MIN_AGE} to create an account.</Text>
+        <Text style={[styles.ageHint, { color: colors.errorSoftText }]}>You must be at least {MIN_AGE} to create an account.</Text>
       ) : null}
 
       <TouchableOpacity
@@ -188,9 +188,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       </TouchableOpacity>
 
       {errorMessage ? (
-        <View style={[styles.errorContainer, styles.errorRow]}>
-          <WarningIcon color="#D32F2F" size={16} />
-          <Text style={styles.errorText}>{errorMessage}</Text>
+        <View style={[styles.errorContainer, styles.errorRow, { backgroundColor: colors.errorSoft, borderColor: colors.error }]}>
+          <WarningIcon color={colors.errorSoftText} size={16} />
+          <Text style={[styles.errorText, { color: colors.errorSoftText }]}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -222,7 +222,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ageHint: {
-    color: '#D32F2F',
+    // Color comes from an inline override at the call site (colors.errorSoftText), since
+    // this StyleSheet is module-level and can't read the themed `colors` object.
     fontSize: 12,
     marginTop: 4,
   },
@@ -263,15 +264,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEB',
-    borderColor: '#FFD1D1',
+    // Color comes from an inline override at the call site (colors.errorSoft/colors.error),
+    // since this StyleSheet is module-level and can't read the themed `colors` object.
     borderWidth: 1,
     borderRadius: 12,
     padding: spacing.sm,
     marginVertical: spacing.sm,
   },
   errorText: {
-    color: '#D32F2F',
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',

@@ -304,7 +304,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginBottom: spacing.xs,
   },
   tierIndex: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  removeText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+  removeText: { fontSize: 13, fontWeight: '600', color: colors.error },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
   fieldHint: { fontSize: 12, color: colors.textSecondary, marginBottom: 6, marginTop: -2 },
   input: {

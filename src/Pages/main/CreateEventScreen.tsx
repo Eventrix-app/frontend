@@ -872,12 +872,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
   reviewNotice: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningSoft,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  reviewNoticeText: { fontSize: 12, color: '#92400E', lineHeight: 17 },
+  reviewNoticeText: { fontSize: 12, color: colors.warningSoftText, lineHeight: 17 },
   fieldHint: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 16 },
   pickerValue: { fontSize: 15, color: colors.text },
   pickerPlaceholder: { fontSize: 15, color: colors.textSecondary },
@@ -902,7 +902,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
   categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   tierEditNote: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.muted,
     borderRadius: borderRadius.md,
     padding: spacing.md,
   },
@@ -951,7 +951,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: '100%',
     height: 180,
     borderRadius: borderRadius.lg,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   galleryGrid: {
     flexDirection: 'row',
@@ -967,7 +967,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     width: '100%',
     height: '100%',
     borderRadius: borderRadius.md,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   galleryVideoPlaceholder: {
     alignItems: 'center',

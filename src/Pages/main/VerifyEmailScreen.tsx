@@ -159,7 +159,7 @@ const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
 
             {errorMessage ? (
               <View style={[styles.errorContainer, styles.errorRow]}>
-                <WarningIcon color="#D32F2F" size={16} />
+                <WarningIcon color={colors.errorSoftText} size={16} />
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
@@ -192,7 +192,9 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   reasonBanner: {
-    backgroundColor: '#FFF6F8',
+    // Low-opacity brand-pink wash instead of a near-white literal, so this pink-bordered
+    // banner stays legible against both the warm-white and near-black theme backgrounds.
+    backgroundColor: 'rgba(255, 51, 102, 0.08)',
     borderColor: colors.primary,
     borderWidth: 1,
     borderRadius: 12,
@@ -290,15 +292,15 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     justifyContent: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEB',
-    borderColor: '#FFD1D1',
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
     borderWidth: 1,
     borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.errorSoftText,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',

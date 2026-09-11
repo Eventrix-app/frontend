@@ -101,7 +101,7 @@ const LockedTierCard: React.FC<{ tier: TicketTypeRecord }> = ({ tier }) => {
       <View style={styles.cardHeader}>
         <Text style={styles.tierName}>{tier.name}</Text>
         <View style={styles.lockedBadgeRow}>
-          <LockIcon color="#92400E" size={13} />
+          <LockIcon color={colors.warningSoftText} size={13} />
           <Text style={styles.lockedBadge}>Has sales</Text>
         </View>
       </View>
@@ -417,14 +417,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  lockedCard: { backgroundColor: '#F9FAFB' },
+  lockedCard: { backgroundColor: colors.backgroundSecondary },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   tierName: { fontSize: 15, fontWeight: '700', color: colors.text },
   lockedBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  lockedBadge: { fontSize: 12, fontWeight: '600', color: '#92400E' },
+  lockedBadge: { fontSize: 12, fontWeight: '600', color: colors.warningSoftText },
   meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   lockedNote: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 17 },
-  removeText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+  removeText: { fontSize: 13, fontWeight: '600', color: colors.error },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 4, marginTop: spacing.sm },
   input: {
     backgroundColor: colors.white,

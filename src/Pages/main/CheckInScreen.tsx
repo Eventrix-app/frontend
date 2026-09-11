@@ -285,9 +285,9 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       {(isOffline || pendingSync.length > 0) && (
         <View style={styles.offlineBanner}>
           {isOffline ? (
-            <WifiOffIcon color="#92400E" size={14} />
+            <WifiOffIcon color={colors.warningSoftText} size={14} />
           ) : (
-            <SyncIcon color="#92400E" size={14} />
+            <SyncIcon color={colors.warningSoftText} size={14} />
           )}
           <Text style={styles.offlineBannerText}>
             {isOffline ? 'Offline — check-ins are being saved locally' : 'Syncing queued check-ins…'}
@@ -299,7 +299,7 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       {unacknowledgedDuplicates.length > 0 && (
         <View style={styles.duplicateBanner}>
           <View style={styles.duplicateHeader}>
-            <WarningIcon color="#7F1D1D" size={16} />
+            <WarningIcon color={colors.errorSoftText} size={16} />
             <Text style={styles.duplicateTitle}>
               {unacknowledgedDuplicates.length === 1
                 ? 'Duplicate entry detected'
@@ -448,9 +448,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningSoft,
   },
-  offlineBannerText: { fontSize: 12, fontWeight: '600', color: '#92400E', textAlign: 'center' },
+  offlineBannerText: { fontSize: 12, fontWeight: '600', color: colors.warningSoftText, textAlign: 'center' },
   // Red, not the amber used for the offline/syncing banner above: that one is informational
   // ("this is working, just later"), this one is an incident the organizer has to act on.
   duplicateBanner: {
@@ -458,22 +458,22 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     marginBottom: spacing.md,
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorSoft,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: colors.error,
     gap: 4,
   },
   duplicateHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  duplicateTitle: { fontSize: 13, fontWeight: '700', color: '#7F1D1D' },
-  duplicateBody: { fontSize: 12, color: '#7F1D1D' },
-  duplicateItem: { fontSize: 12, color: '#7F1D1D', marginLeft: 2 },
+  duplicateTitle: { fontSize: 13, fontWeight: '700', color: colors.errorSoftText },
+  duplicateBody: { fontSize: 12, color: colors.errorSoftText },
+  duplicateItem: { fontSize: 12, color: colors.errorSoftText, marginLeft: 2 },
   duplicateDismiss: {
     alignSelf: 'flex-start',
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderRadius: borderRadius.sm,
-    backgroundColor: '#7F1D1D',
+    backgroundColor: colors.error,
   },
   duplicateDismissText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   modeTabs: {
@@ -535,7 +535,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: 14,
     alignItems: 'center',
   },
-  submitBtnDisabled: { backgroundColor: '#9CA3AF' },
+  submitBtnDisabled: { backgroundColor: colors.textSecondary },
   submitBtnText: { color: colors.white, fontWeight: '600', fontSize: 15 },
   searchSection: { flex: 1, paddingHorizontal: spacing.md },
   loader: { marginTop: spacing.xxl },
@@ -560,12 +560,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   checkBtnText: { color: colors.white, fontWeight: '600', fontSize: 13 },
   checkedBadge: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successSoft,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
   },
-  checkedBadgeText: { color: '#065F46', fontWeight: '700', fontSize: 13 },
+  checkedBadgeText: { color: colors.successSoftText, fontWeight: '700', fontSize: 13 },
   emptyText: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
 });
 

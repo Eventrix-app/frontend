@@ -132,7 +132,7 @@ const PayoutBankAccountScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.statusWrap}>
             <View style={styles.statusIcon}>
               {account!.isPayoutReady ? (
-                <CheckCircleIcon color="#10B981" size={56} />
+                <CheckCircleIcon color={colors.success} size={56} />
               ) : account!.status === 'rejected' ? (
                 <WarningIcon color={colors.error ?? '#DC2626'} size={56} />
               ) : (

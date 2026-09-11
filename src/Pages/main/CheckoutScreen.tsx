@@ -786,7 +786,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       width: 7,
       height: 7,
       borderRadius: 4,
-      backgroundColor: '#10B981',
+      backgroundColor: colors.success,
     },
     tierTotalLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
     tierTotalSub: { fontSize: 11, color: colors.textSecondary },

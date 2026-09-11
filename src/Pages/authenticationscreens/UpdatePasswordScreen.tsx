@@ -203,7 +203,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
 
       {errorMessage ? (
         <View style={[styles.errorContainer, styles.errorRow]}>
-          <WarningIcon color="#D32F2F" size={16} />
+          <WarningIcon color={colors.errorSoftText} size={16} />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
@@ -258,15 +258,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     justifyContent: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEB',
-    borderColor: '#FFD1D1',
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
     borderWidth: 1,
     borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.errorSoftText,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
@@ -366,7 +366,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   reqHeaderLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   reqRow: {
     flexDirection: 'row',
@@ -378,13 +378,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reqCheckMet: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: colors.success,
+    borderColor: colors.success,
   },
   reqCheckText: {
     color: colors.white,

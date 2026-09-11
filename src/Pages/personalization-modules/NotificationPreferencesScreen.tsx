@@ -171,7 +171,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#D8D8DE',
+    backgroundColor: colors.neutralLine,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -191,7 +191,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
     paddingHorizontal: spacing.md,
       fontFamily: 'ZalandoSansExpanded_500Medium'
 },
-  divider: { height: 1, backgroundColor: '#EDEDF1', marginVertical: spacing.lg },
+  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.lg },
   list: {},
   row: {
     flexDirection: 'row',
@@ -199,7 +199,7 @@ const createStyles = (colors: typeof colorsLight) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
   },
-  rowDivider: { borderBottomWidth: 1, borderBottomColor: '#F2F2F5' },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   left: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md },
   rowLabel: { fontSize: 15, fontWeight: '500', color: colors.text, flexShrink: 1 },
   actions: { flexDirection: 'row', marginTop: spacing.xl, justifyContent: 'center' },

@@ -17,11 +17,15 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MyEvents'>;
 const STATUS_FILTERS = ['All', 'Draft', 'Pending', 'Approved', 'Rejected'] as const;
 type StatusFilter = typeof STATUS_FILTERS[number];
 
-const STATUS_BADGE_COLORS: Record<string, string> = {
-  draft: '#9CA3AF',
-  pending_approval: '#F59E0B',
-  approved: '#10B981',
-  rejected: '#EF4444',
+// A plain module-level record can't read the themed `colors` object, so this is a function
+// instead — called with `colors` at the render site where the hook value is in scope.
+const statusBadgeColor = (status: string, colors: ReturnType<typeof useTheme>['colors']): string => {
+  switch (status) {
+    case 'pending_approval': return colors.warning;
+    case 'approved': return colors.success;
+    case 'rejected': return colors.error;
+    default: return colors.textSecondary;
+  }
 };
 
 const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
@@ -114,15 +118,15 @@ const MyEventsScreen: React.FC<Props> = ({ navigation }) => {
                       // Cancelling only flips `status`, not `approvalStatus` — an organizer's
                       // cancelled event would otherwise still show a green "approved" badge
                       // here with no indication it's been cancelled at all.
-                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                      <View style={[styles.badge, { backgroundColor: colors.textSecondary }]}>
                         <Text style={styles.badgeText}>Event cancelled</Text>
                       </View>
                     ) : event.isCompleted ? (
-                      <View style={[styles.badge, { backgroundColor: '#6B7280' }]}>
+                      <View style={[styles.badge, { backgroundColor: colors.textSecondary }]}>
                         <Text style={styles.badgeText}>Completed</Text>
                       </View>
                     ) : (
-                      <View style={[styles.badge, { backgroundColor: STATUS_BADGE_COLORS[event.approvalStatus] ?? '#9CA3AF' }]}>
+                      <View style={[styles.badge, { backgroundColor: statusBadgeColor(event.approvalStatus, colors) }]}>
                         <Text style={styles.badgeText}>{event.approvalStatus.replace('_', ' ')}</Text>
                       </View>
                     )}

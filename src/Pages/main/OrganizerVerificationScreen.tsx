@@ -219,7 +219,7 @@ const OrganizerVerificationScreen: React.FC<Props> = ({ navigation }) => {
           ) : status!.status === 'approved' ? (
             <>
               <View style={styles.statusIcon}>
-                <CheckCircleIcon color="#10B981" size={56} />
+                <CheckCircleIcon color={colors.success} size={56} />
               </View>
               <Text style={styles.statusTitle}>You're verified!</Text>
               <Text style={styles.statusSubtitle}>You can now create and publish events.</Text>
@@ -378,9 +378,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     minWidth: 90,
     alignItems: 'center',
   },
-  docBtnDone: { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: '#10B981' },
+  docBtnDone: { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: colors.success },
   docBtnText: { fontSize: 13, fontWeight: '600', color: colors.brandPink },
-  docBtnTextDone: { color: '#059669' },
+  docBtnTextDone: { color: colors.successSoftText },
   submitBtn: {
     marginTop: spacing.lg,
     backgroundColor: colors.brandPink,

@@ -275,7 +275,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     borderRadius: borderRadius.md,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#991B1B',
+    backgroundColor: colors.error,
   },
   rejectConfirmText: { color: colors.white, fontWeight: '600', fontSize: 14 },
   btnDisabled: { opacity: 0.6 },

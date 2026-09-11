@@ -15,6 +15,11 @@ import { AppDispatch, RootState } from '../../store';
 import { useSelector } from 'react-redux';
 import { Text } from '../../components/common/Text';
 import { LeftArrow } from '../../components/common/Icons';
+// This screen is intentionally light-only (like the rest of the onboarding flow), so it
+// reads the light palette directly rather than useTheme() — but reads it through the token
+// object instead of repeating raw hex, so a future palette change doesn't require re-editing
+// every literal here again.
+import { colorsLight } from '../../theme/colors.light';
 
 const { width: screenWidth } = Dimensions.get('window');
 const MIN_SELECTIONS = 3;
@@ -133,7 +138,7 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <LeftArrow color="#FF3366" size={18} />
+            <LeftArrow color={colorsLight.primary} size={18} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -162,11 +167,11 @@ const InterestSelectionScreen: React.FC<InterestSelectionScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: colorsLight.background },
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 60 },
   heading: {
     fontSize: 28,
-    color: '#111827',
+    color: colorsLight.text,
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 32,
@@ -174,7 +179,7 @@ const styles = StyleSheet.create({
 },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colorsLight.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
@@ -194,16 +199,16 @@ const styles = StyleSheet.create({
     height: 40,
     minWidth: 86,
     borderRadius: 24,
-    backgroundColor: '#EEF2F7',
+    backgroundColor: colorsLight.muted,
   },
-  errorText: { fontSize: 15, color: '#D32F2F', textAlign: 'center' },
+  errorText: { fontSize: 15, color: colorsLight.errorSoftText, textAlign: 'center' },
   retryBtn: {
     paddingVertical: 10,
     paddingHorizontal: 28,
     borderRadius: 12,
-    backgroundColor: '#FF3366',
+    backgroundColor: colorsLight.primary,
   },
-  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  retryBtnText: { color: colorsLight.white, fontWeight: '700', fontSize: 15 },
   scrollArea: { flex: 1 },
   grid: {
     flexDirection: 'row',
@@ -221,17 +226,17 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#FFC0CB',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colorsLight.background,
   },
   chipSelected: {
-    borderColor: '#FF3366',
+    borderColor: colorsLight.primary,
     backgroundColor: 'rgba(255,51,102,0.07)',
   },
-  chipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  chipTextSelected: { color: '#FF3366', fontWeight: '600' },
+  chipText: { fontSize: 14, fontWeight: '500', color: colorsLight.text },
+  chipTextSelected: { color: colorsLight.primary, fontWeight: '600' },
   hintText: {
     fontSize: 13,
-    color: '#FF3366',
+    color: colorsLight.primary,
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -245,9 +250,9 @@ const styles = StyleSheet.create({
   },
   backButton: {
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colorsLight.background,
     borderWidth: 2,
-    borderColor: '#FF3366',
+    borderColor: colorsLight.primary,
     width: 60,
     height: 56,
     justifyContent: 'center',
@@ -257,16 +262,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 22,
     borderRadius: 12,
-    backgroundColor: '#FF3366',
+    backgroundColor: colorsLight.primary,
     width: screenWidth * 0.62,
     alignItems: 'center',
   },
-  continueButtonDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
-  continueButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
-  continueButtonTextDisabled: { color: '#9CA3AF' },
+  continueButtonDisabled: { backgroundColor: colorsLight.muted, borderColor: colorsLight.border },
+  continueButtonText: { fontSize: 16, fontWeight: '600', color: colorsLight.white },
+  continueButtonTextDisabled: { color: colorsLight.placeholder },
   taglineText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: colorsLight.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },

@@ -65,8 +65,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   },
   off: {
     borderWidth: 1.5,
-    borderColor: '#D8D8DE',
-    backgroundColor: '#F2F2F5',
+    borderColor: colors.border,
+    backgroundColor: colors.muted,
   },
   on: {
     backgroundColor: colors.primary,
