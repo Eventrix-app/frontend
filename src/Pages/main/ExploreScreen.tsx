@@ -18,7 +18,7 @@ import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetFollowedEventsQuery } from '../../store/services/organizerApi';
-import { calculateDistanceKm, toCardEvent } from '../../utils/eventCardAdapter';
+import { calculateDistanceKm, compareEventsByFeedPriority, toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import NoEvents from '../../components/common/Noevents';
@@ -78,7 +78,11 @@ const ExploreScreen: React.FC = () => {
   // poll — running toCardEvent plus a haversine distance over the whole list each time.
   const cardEvents = useMemo(() => {
     const source = followingOnly ? followedEvents : events;
-    const mapped = source.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
+    // Default ordering: live (today) events first, then soonest-upcoming, then cancelled,
+    // then completed — see compareEventsByFeedPriority. Superseded below by the explicit
+    // "Nearest first" toggle when the viewer asks for that instead.
+    const sortedSource = [...source].sort(compareEventsByFeedPriority);
+    const mapped = sortedSource.map((event) => toCardEvent(event, me?.latitude, me?.longitude));
     // Distance has no backend param yet (event lat/lng is barely populated until the map
     // picker ships) — filtered/sorted client-side over whatever's already been fetched, so it
     // organically starts covering the full catalog as more events get real coordinates.

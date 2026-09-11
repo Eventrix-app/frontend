@@ -1,6 +1,6 @@
 import { BackendEvent } from '../store/services/eventsApi';
 import { MockEvent } from '../data/mockEvents';
-import { getEventStartDateTime, isEventOver } from './eventDateTime';
+import { getEventStartDateTime, isEventOver, isEventToday } from './eventDateTime';
 
 // A bare 'YYYY-MM-DD' string parses as UTC midnight (per the Date spec), so formatting it
 // with the device's local timezone can roll the displayed calendar date back or forward a
@@ -53,6 +53,42 @@ export function eventStatusLabel(event: BackendEvent): string | undefined {
   // running is cancelled, not live.
   if (getEventStartDateTime(event).getTime() <= Date.now()) return 'Live';
   return undefined;
+}
+
+// Feed ordering for Home/Explore: events happening today first, then future events
+// soonest-first, then cancelled events, then already-finished events last. Cancelled and
+// completed events stay in the list (an attendee may still be looking for one) but are
+// pushed to the bottom since they're no longer actionable. Checked in this order — not
+// `eventStatusLabel`'s order — because "cancelled" must outrank "completed" here regardless
+// of whether the cancelled event's date has also already passed.
+enum EventFeedPriority {
+  Live = 0,
+  Upcoming = 1,
+  Cancelled = 2,
+  Completed = 3,
+}
+
+function eventFeedPriority(event: BackendEvent): EventFeedPriority {
+  if (event.status === 'cancelled') return EventFeedPriority.Cancelled;
+  if (event.isCompleted ?? isEventOver(event)) return EventFeedPriority.Completed;
+  // "Live" here means "scheduled for today", not "already started" — a today-evening event
+  // deserves top billing all day, not just once its start time has passed.
+  if (isEventToday(event)) return EventFeedPriority.Live;
+  return EventFeedPriority.Upcoming;
+}
+
+export function compareEventsByFeedPriority(a: BackendEvent, b: BackendEvent): number {
+  const priorityA = eventFeedPriority(a);
+  const priorityB = eventFeedPriority(b);
+  if (priorityA !== priorityB) return priorityA - priorityB;
+
+  const startA = getEventStartDateTime(a).getTime();
+  const startB = getEventStartDateTime(b).getTime();
+  // Live/upcoming: soonest first. Cancelled/completed: most recent first — a just-finished
+  // or just-cancelled event is more likely to still matter to someone browsing than one from
+  // months ago.
+  const isPastTier = priorityA === EventFeedPriority.Cancelled || priorityA === EventFeedPriority.Completed;
+  return isPastTier ? startB - startA : startA - startB;
 }
 
 export function formatDistanceKm(distanceKm: number): string {

@@ -105,10 +105,11 @@ export type MainTabParamList = {
   Home: undefined;
   Explore: undefined;
   // Undefined for ordinary tab use, which keeps the public feed behaviour unchanged.
-  // shortId is only ever set by a notification tap: `short_liked`/`short_commented` are
-  // sent to the reel's uploader, so the target is always one of the viewer's own reels —
-  // which is why the screen can resolve it from the uploader feed rather than needing a
-  // single-short endpoint that does not exist.
-  Shorts: { shortId?: string; openComments?: boolean } | undefined;
+  // shortId jumps to one specific reel instead of landing on whatever the feed shows first —
+  // used by a notification tap (`short_liked`/`short_commented`, always the viewer's own
+  // reel, uploaderId omitted) and by the Home screen's highlights rail (any uploader, so
+  // uploaderId is required there). Resolved via the uploader's own feed rather than a
+  // single-short endpoint, which the API does not have.
+  Shorts: { shortId?: string; uploaderId?: string; openComments?: boolean } | undefined;
   Bookings: undefined;
 };

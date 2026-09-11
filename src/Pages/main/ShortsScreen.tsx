@@ -401,6 +401,10 @@ const ShortsScreen: React.FC = () => {
   // soon as the target is handled (so returning to the tab later does not re-scroll), and
   // reading them live would drop the target on that same clear.
   const [targetShortId, setTargetShortId] = useState<string | null>(null);
+  // Whose feed to search for the target — the viewer's own for a notification tap (the only
+  // case that omits it), or the tapped reel's actual uploader for a cross-uploader jump like
+  // the Home screen's highlights rail.
+  const [targetUploaderId, setTargetUploaderId] = useState<string | null>(null);
   const [pendingOpenComments, setPendingOpenComments] = useState(false);
   const handledTargetRef = useRef<string | null>(null);
   // Separate from handledTargetRef: that one debounces the *param*, this one debounces the
@@ -416,12 +420,14 @@ const ShortsScreen: React.FC = () => {
     { skip: targetShortId !== null },
   );
 
-  // short_liked / short_commented are only ever delivered to the reel's uploader, so the
-  // target is always one of this viewer's own reels. That is what makes this resolvable
-  // without a GET /shorts/:id endpoint, which the API does not have.
+  // Resolves the target from its uploader's own feed rather than a GET /shorts/:id endpoint,
+  // which the API does not have. For a notification tap, targetUploaderId is never set
+  // (short_liked/short_commented only ever go to the reel's own uploader), so this falls
+  // back to the viewer's own id, same as before.
+  const resolvedUploaderId = targetUploaderId ?? currentUserId;
   const { data: ownFeed, isLoading: ownLoading, isError: ownError } = useGetShortsByUploaderQuery(
-    { userId: currentUserId ?? '' },
-    { skip: targetShortId === null || !currentUserId },
+    { userId: resolvedUploaderId ?? '' },
+    { skip: targetShortId === null || !resolvedUploaderId },
   );
   // Pages are accumulated and deduped inside the cache entry itself (see getShortsFeed's
   // merge in shortsApi.ts), so this reads the merged feed directly. It deliberately does not
@@ -539,18 +545,20 @@ const ShortsScreen: React.FC = () => {
     if (!incoming || incoming === handledTargetRef.current) return;
     handledTargetRef.current = incoming;
     setTargetShortId(incoming);
+    setTargetUploaderId(route.params?.uploaderId ?? null);
     setPendingOpenComments(route.params?.openComments === true);
-  }, [route.params?.shortId, route.params?.openComments]);
+  }, [route.params?.shortId, route.params?.uploaderId, route.params?.openComments]);
 
   // Leaving the tab returns it to the ordinary public feed. Without this, coming back later
   // would still be pinned to one reel with no obvious way out.
   useEffect(() => {
     if (isFocused) return;
     setTargetShortId(null);
+    setTargetUploaderId(null);
     setPendingOpenComments(false);
     handledTargetRef.current = null;
     scrolledForRef.current = null;
-    if (route.params?.shortId) navigation.setParams({ shortId: undefined, openComments: undefined } as never);
+    if (route.params?.shortId) navigation.setParams({ shortId: undefined, uploaderId: undefined, openComments: undefined } as never);
   }, [isFocused, navigation, route.params?.shortId]);
 
   // Scroll to the target once the uploader feed carrying it has arrived, then open the
@@ -568,7 +576,7 @@ const ShortsScreen: React.FC = () => {
       setCommentsFor(loaded[index]);
       setPendingOpenComments(false);
     }
-    if (route.params?.shortId) navigation.setParams({ shortId: undefined, openComments: undefined } as never);
+    if (route.params?.shortId) navigation.setParams({ shortId: undefined, uploaderId: undefined, openComments: undefined } as never);
   }, [targetShortId, loaded, slideHeight, pendingOpenComments, navigation, route.params?.shortId]);
 
   const renderItem = useCallback(

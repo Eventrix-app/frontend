@@ -43,3 +43,14 @@ export function daysUntilEventDate(eventDate: string): number | null {
   const todayIstMs = Date.parse(`${istDateKey(new Date())}T00:00:00${IST_OFFSET}`);
   return Math.round((targetMs - todayIstMs) / (1000 * 60 * 60 * 24));
 }
+
+// True when "today" (IST) falls anywhere within the event's civil date range — inclusive of
+// both endpoints, so a multi-day event already underway (started yesterday, ending tomorrow)
+// still counts as happening today. Plain string comparison is safe here since eventDate/
+// eventEndDate are always 'YYYY-MM-DD', which sorts lexicographically the same as
+// chronologically.
+export function isEventToday(event: { eventDate: string; eventEndDate?: string | null }): boolean {
+  const todayKey = istDateKey(new Date());
+  const endDate = event.eventEndDate ?? event.eventDate;
+  return event.eventDate <= todayKey && endDate >= todayKey;
+}

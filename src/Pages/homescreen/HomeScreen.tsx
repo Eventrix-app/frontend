@@ -22,7 +22,7 @@ import { useDisplayAddress } from '../../hooks/useDisplayAddress';
 import { useGetCategoriesQuery, useGetMeQuery } from '../../store/services/userApi';
 import { useGetNotificationsQuery } from '../../store/services/notificationsApi';
 import { useGetShortsFeedQuery } from '../../store/services/shortsApi';
-import { toCardEvent } from '../../utils/eventCardAdapter';
+import { compareEventsByFeedPriority, toCardEvent } from '../../utils/eventCardAdapter';
 import { Text } from '../../components/common/Text';
 import { NotificationBell, LocationPin, MicIcon } from '../../components/common/Icons';
 import { useVoiceSearch } from '../../hooks/useVoiceSearch';
@@ -83,6 +83,7 @@ const HomeScreen: React.FC = () => {
     () =>
       (shortsFeed?.shorts ?? []).map((short) => ({
         id: short.id,
+        uploaderUserId: short.uploaderUserId,
         // A reel has no generated thumbnail (no client-side video thumbnailing in this app),
         // so it falls back to the event's cover image and then to FallbackImage's own
         // skeleton if neither exists.
@@ -98,12 +99,19 @@ const HomeScreen: React.FC = () => {
   );
   const { data: me, refetch: refetchMe, isLoading: isLoadingMe } = useGetMeQuery();
   const { data: categories = [] } = useGetCategoriesQuery();
+  // Live (today) events first, then soonest-upcoming, then cancelled, then completed — see
+  // compareEventsByFeedPriority. Sorted ahead of toCardEvent so both the featured carousel
+  // and the recommended feed below inherit the same order.
+  const sortedEvents = useMemo(
+    () => [...events].sort(compareEventsByFeedPriority),
+    [events],
+  );
   // toCardEvent runs over every loaded event and does distance maths per item, so it is
   // memoized: without this it re-ran on every unrelated re-render (a pull-to-refresh quote
   // change, a notifications poll landing, a theme toggle).
   const cardEvents = useMemo(
-    () => events.map((event) => toCardEvent(event, me?.latitude, me?.longitude)),
-    [events, me?.latitude, me?.longitude],
+    () => sortedEvents.map((event) => toCardEvent(event, me?.latitude, me?.longitude)),
+    [sortedEvents, me?.latitude, me?.longitude],
   );
   // Backend caps featured events at 5 (see EventsService.MAX_FEATURED_EVENTS); sliced again
   // here defensively so a stale cached response or a future relaxation of that cap can never
@@ -226,12 +234,14 @@ const HomeScreen: React.FC = () => {
     [featured],
   );
 
-  // The highlights rail always routes to the same place regardless of which tile is tapped,
-  // so it is one stable callback rather than a fresh closure per tile per render.
-  const openShortsTab = useCallback(() => {
+  // Opens the Shorts tab scrolled to the specific reel that was tapped, rather than just
+  // landing on whatever the feed happens to show first. uploaderUserId is required here
+  // (unlike the shortId-only deep link used for notification taps in RootNavigator.tsx)
+  // because a highlight can belong to any organizer, not just the viewer.
+  const openShort = useCallback((shortId: string, uploaderUserId: string) => {
     (navigation.getParent() as { navigate: (a: string, b?: object) => void } | undefined)?.navigate(
       'Main',
-      { screen: 'Shorts' },
+      { screen: 'Shorts', params: { shortId, uploaderId: uploaderUserId } },
     );
   }, [navigation]);
 
@@ -421,7 +431,7 @@ const HomeScreen: React.FC = () => {
         {highlights.length > 0 && <SectionHeader title="Event Highlights" />}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {highlights.map((item) => (
-            <EventHighlightCard key={item.id} item={item} onPress={openShortsTab} />
+            <EventHighlightCard key={item.id} item={item} onPress={openShort} />
           ))}
         </ScrollView>
 
@@ -565,7 +575,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderRadius: 50,
     paddingHorizontal: spacing.md,
     height: 48,

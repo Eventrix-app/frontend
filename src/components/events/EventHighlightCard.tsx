@@ -7,6 +7,9 @@ import { PlayIcon } from '../common/Icons';
 
 export interface HighlightItem {
   id: string;
+  // The reel's actual owner — needed to jump to it directly, since it may belong to any
+  // organizer, not just the viewer (see openShort in HomeScreen.tsx).
+  uploaderUserId: string;
   thumbnail: any;
   /**
    * Never rendered — the tile shows only the reel. Kept because it is the sole
@@ -18,7 +21,7 @@ export interface HighlightItem {
 
 interface Props {
   item: HighlightItem;
-  onPress: () => void;
+  onPress: (id: string, uploaderUserId: string) => void;
 }
 
 // Memoized: these render inside lists that re-render whenever the parent screen does.
@@ -37,7 +40,7 @@ export const EventHighlightCard: React.FC<Props> = React.memo(({ item, onPress }
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.9}
-      onPress={onPress}
+      onPress={() => onPress(item.id, item.uploaderUserId)}
       accessibilityRole="button"
       accessibilityLabel={item.title}
     >
