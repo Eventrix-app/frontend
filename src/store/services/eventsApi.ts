@@ -185,7 +185,8 @@ export type UploadPurpose =
   | 'pan-or-aadhaar'
   // Any authenticated user may request this one, unlike the purposes above, because reel
   // uploaders are attendees rather than organizers.
-  | 'reel-video';
+  | 'reel-video'
+  | 'reel-thumbnail';
 export type UploadContentType = 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/heic' | 'image/webp' | 'video/mp4' | 'video/quicktime';
 export const ALLOWED_UPLOAD_CONTENT_TYPES: UploadContentType[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/webp', 'video/mp4', 'video/quicktime'];
 

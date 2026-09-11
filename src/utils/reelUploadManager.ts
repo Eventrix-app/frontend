@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
 import type { AppDispatch } from '../store';
 import { eventsApi, UploadContentType } from '../store/services/eventsApi';
@@ -189,6 +190,38 @@ function describeUploadError(err: unknown): string {
   return extractErrorMessage(err, 'Please try again.');
 }
 
+// Best-effort: extracts a frame from the reel's own video and uploads it, so the Home
+// highlights rail and other reel tiles can show a picture of the actual clip instead of
+// falling back to the event's cover image (see toCardEvent in eventCardAdapter.ts). Returns
+// undefined on any failure — a reel with no thumbnail still uploads and displays fine via
+// that fallback, so this must never fail the reel upload itself.
+async function generateAndUploadThumbnail(dispatch: AppDispatch, mediaUri: string): Promise<string | undefined> {
+  try {
+    // 100ms in, not the exact first frame — a video's frame 0 is disproportionately likely
+    // to be a black/blank transition frame.
+    const { uri: localThumbUri } = await VideoThumbnails.getThumbnailAsync(mediaUri, { time: 100 });
+    const uploadUrlRequest = dispatch(
+      eventsApi.endpoints.getUploadUrl.initiate({ purpose: 'reel-thumbnail', contentType: 'image/jpeg' }),
+    );
+    try {
+      const [{ uploadUrl, publicUrl }, blob] = await Promise.all([
+        uploadUrlRequest.unwrap(),
+        fetch(localThumbUri).then((r) => r.blob()),
+      ]);
+      const putResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': 'image/jpeg' },
+      });
+      return putResponse.ok ? publicUrl : undefined;
+    } finally {
+      uploadUrlRequest.reset();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 // How long a finished job lingers in the store before clearing itself.
 const TERMINAL_LINGER_MS = 4000;
 
@@ -251,6 +284,11 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
   const pendingMutations: { reset: () => void }[] = [];
 
   try {
+    // Started now rather than after the video lands: it runs concurrently with the (much
+    // slower) video upload below, so by the time that finishes this has almost always
+    // already resolved — adding no perceptible delay to the job.
+    const thumbnailPromise = generateAndUploadThumbnail(dispatch, job.mediaUri);
+
     const uploadUrlRequest = dispatch(
       eventsApi.endpoints.getUploadUrl.initiate({ purpose: 'reel-video', contentType: job.contentType }),
     );
@@ -298,9 +336,12 @@ async function runUpload(dispatch: AppDispatch, job: ReelUploadJob): Promise<voi
     // which is cheaper and cleaner than creating one and deleting it below.
     if (cancelRequested.has(job.id)) throw new UploadCancelledError();
 
+    const thumbnailUrl = await thumbnailPromise;
+
     const createRequest = dispatch(
       shortsApi.endpoints.createShort.initiate({
         mediaUrl: publicUrl,
+        thumbnailUrl,
         caption: job.caption?.trim() || undefined,
         overlay: job.overlay,
         eventId: job.eventId,
