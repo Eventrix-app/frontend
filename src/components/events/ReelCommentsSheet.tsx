@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useKeyboardShift } from '../../hooks/useKeyboardShift';
 import { useSelector } from 'react-redux';
 import HalfScreenModal from '../common/halfscreenmodal';
@@ -50,10 +50,10 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [draft, setDraft] = useState('');
-  // Only the composer tracks the keyboard here — the sheet itself stays anchored (see
-  // liftOnKeyboard={false} below). Lifting the whole sheet dragged the thread the user was
-  // reading up and off the screen just because they tapped the input.
-  const { shift: keyboardShift } = useKeyboardShift();
+  // Only need the boolean here — HalfScreenModal already handles the actual keyboard-clearing
+  // shift. This just adds a bit of extra breathing room above the keyboard once it's up, so
+  // the composer isn't sitting flush against it.
+  const { keyboardVisible } = useKeyboardShift();
 
   const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -131,7 +131,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
   );
 
   return (
-    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.75} liftOnKeyboard={false}>
+    <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.75}>
       <View style={styles.root}>
         <Text style={styles.title}>
           {data ? `${data.total} comment${data.total === 1 ? '' : 's'}` : 'Comments'}
@@ -155,6 +155,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
             data={comments}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
+            style={styles.listContainer}
             contentContainerStyle={styles.list}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -162,10 +163,13 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
         )}
 
         {isAuthenticated ? (
-          // Translated rather than laid out above the keyboard: a layout change would resize
-          // the list and scroll the thread, which is exactly what should not happen. The
-          // composer floats over the last comment instead, and the list keeps its position.
-          <Animated.View style={[styles.composer, { transform: [{ translateY: keyboardShift }] }]}>
+          // No transform here — HalfScreenModal lifts the whole sheet clear of the keyboard
+          // (its default liftOnKeyboard behavior) now, so the composer just sits in its
+          // normal flex position. The composer-only-shift approach this used to have relied
+          // on a second, independent keyboard listener that didn't reliably fire for an input
+          // living inside this Modal, leaving the composer stuck under the keyboard with no
+          // shift ever applied — invisible, not just clipped.
+          <View style={[styles.composer, keyboardVisible && styles.composerRaised]}>
             <TextInput
               style={styles.input}
               value={draft}
@@ -186,7 +190,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
                 <Text style={styles.postLabel}>Post</Text>
               )}
             </TouchableOpacity>
-          </Animated.View>
+          </View>
         ) : (
           <Text style={styles.signedOut}>Sign in to join the conversation.</Text>
         )}
@@ -198,6 +202,10 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: { flex: 1, paddingHorizontal: spacing.md },
   title: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  // Without an explicit flex, the FlatList doesn't reliably claim the space between the
+  // title and the composer — it can end up far shorter than the sheet, leaving the composer
+  // sitting much higher than intended instead of pinned to the bottom.
+  listContainer: { flex: 1 },
   list: { paddingBottom: spacing.md },
   row: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.sm, alignItems: 'flex-start' },
   avatar: { width: 34, height: 34, borderRadius: 17 },
@@ -224,10 +232,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
     paddingVertical: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderLight,
-    // Opaque because it slides up over the thread when the keyboard opens — without a
-    // background the comments underneath read straight through the input.
     backgroundColor: colors.white,
   },
+  // Extra clearance above the keyboard so the composer doesn't sit flush against it.
+  composerRaised: { marginBottom: spacing.xxl },
   input: {
     flex: 1,
     maxHeight: 100,
