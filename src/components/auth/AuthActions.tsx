@@ -1,9 +1,9 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import React, { useMemo } from 'react';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import GlassSurface from '../common/GlassSurface';
-import { LeftArrow, RightArrow } from '../common/Icons';
+import { LeftArrow } from '../common/Icons';
+import { SpringPressable } from '../common/SpringPressable';
 import { Text } from '../common/Text';
 
 type AuthActionsProps = {
@@ -18,26 +18,43 @@ export const AuthActions: React.FC<AuthActionsProps> = ({
   onPrimary,
   onBack,
   primaryDisabled,
-}) => (
-  <View style={styles.row}>
-    <TouchableOpacity style={styles.backWrap} onPress={onBack} activeOpacity={0.8}>
-      <GlassSurface style={styles.backBtn} contentStyle={styles.backContent}>
-        <LeftArrow color={colors.brandPink} />
-      </GlassSurface>
-    </TouchableOpacity>
-    <TouchableOpacity
-      style={[styles.primaryWrap, primaryDisabled && styles.primaryDisabled]}
-      onPress={onPrimary}
-      disabled={primaryDisabled}
-      activeOpacity={0.9}
-    >
-      <GlassSurface variant="solid" style={styles.primaryBtn} contentStyle={styles.primaryContent}>
-        <Text style={styles.primaryText}>{primaryLabel}</Text>
-        <RightArrow color={colors.white} />
-      </GlassSurface>
-    </TouchableOpacity>
-  </View>
-);
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.row}>
+      {/* Scale feedback rather than TouchableOpacity's fade: backBtn and primaryBtn below
+          both carry an Android elevation, and fading a subtree that contains one paints its
+          shadow as an opaque rectangle over the button while pressed. primaryBtnDisabled
+          already zeroes elevation alongside its opacity for exactly this reason. */}
+      <SpringPressable style={styles.backWrap} onPress={onBack} scaleTo={0.94} accessibilityLabel="Go back">
+        <View style={styles.backBtn}>
+          <View style={styles.backContent}>
+            <LeftArrow color={colors.brandPink} />
+          </View>
+        </View>
+      </SpringPressable>
+      <SpringPressable
+        style={styles.primaryWrap}
+        onPress={onPrimary}
+        disabled={primaryDisabled}
+        scaleTo={0.97}
+        accessibilityLabel={primaryLabel}
+      >
+        <View style={[styles.primaryBtn, primaryDisabled && styles.primaryBtnDisabled]}>
+          <View style={styles.primaryContent}>
+            <Text style={[styles.primaryText, primaryDisabled && styles.primaryTextDisabled]}>
+              {primaryLabel}
+            </Text>
+            <Text style={[styles.primaryText, primaryDisabled && styles.primaryTextDisabled]}>
+              →
+            </Text>
+          </View>
+        </View>
+      </SpringPressable>
+    </View>
+  );
+};
 
 type OutlineButtonRowProps = {
   leftLabel: string;
@@ -51,22 +68,30 @@ export const OutlineButtonRow: React.FC<OutlineButtonRowProps> = ({
   rightLabel,
   onLeft,
   onRight,
-}) => (
-  <View style={styles.outlineRow}>
-    <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
-      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
-        <Text style={styles.outlineText}>{leftLabel}</Text>
-      </GlassSurface>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
-      <GlassSurface style={styles.outlineBtn} contentStyle={styles.outlineContent} shadow={false}>
-        <Text style={styles.outlineText}>{rightLabel}</Text>
-      </GlassSurface>
-    </TouchableOpacity>
-  </View>
-);
+}) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.outlineRow}>
+      <TouchableOpacity onPress={onLeft} activeOpacity={0.8} style={styles.outlineWrap}>
+        <View style={styles.outlineBtn}>
+          <View style={styles.outlineContent}>
+            <Text style={styles.outlineText}>{leftLabel}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onRight} activeOpacity={0.8} style={styles.outlineWrap}>
+        <View style={styles.outlineBtn}>
+          <View style={styles.outlineContent}>
+            <Text style={styles.outlineText}>{rightLabel}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -79,8 +104,19 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1.5,
     borderColor: 'rgba(244,51,98,0.35)',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   backContent: {
     alignItems: 'center',
@@ -89,37 +125,48 @@ const styles = StyleSheet.create({
   },
   primaryWrap: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   primaryContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    minHeight: 56,
-  },
-  backArrow: {
-    fontSize: 22,
-    color: colors.brandPink,
-    fontWeight: '600',
+    minHeight: 52,
   },
   primaryBtn: {
     flex: 1,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.brandPink,
+    height: 52,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
-  primaryDisabled: {
+  primaryBtnDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
     opacity: 0.5,
   },
   primaryText: {
     color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  primaryTextDisabled: {
+    color: '#B5B5BD',
   },
   outlineRow: {
     flexDirection: 'row',
@@ -132,6 +179,8 @@ const styles = StyleSheet.create({
   outlineBtn: {
     height: 48,
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
     borderWidth: 1.5,
     borderColor: 'rgba(244,51,98,0.35)',
   },

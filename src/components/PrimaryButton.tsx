@@ -1,12 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   Animated,
   Pressable,
+  StyleProp,
   StyleSheet,
+  View,
   ViewStyle,
 } from 'react-native';
-import { colors, radius, typography } from '../theme';
-import GlassSurface from './common/GlassSurface';
+import { radius, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Text } from './common/Text';
 
 type Variant = 'solid' | 'ghost' | 'onGradient' | 'ghostOnGradient';
@@ -15,7 +17,7 @@ type Props = {
   label: string;
   onPress: () => void;
   variant?: Variant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 export const PrimaryButton: React.FC<Props> = ({
@@ -24,6 +26,8 @@ export const PrimaryButton: React.FC<Props> = ({
   variant = 'solid',
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(1)).current;
 
   const animateTo = (v: number) =>
@@ -42,7 +46,7 @@ export const PrimaryButton: React.FC<Props> = ({
       style={style}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
-        <GlassSurface
+        <View
           style={[
             styles.base,
             variant === 'solid' && styles.solid,
@@ -50,28 +54,30 @@ export const PrimaryButton: React.FC<Props> = ({
             variant === 'onGradient' && styles.onGradient,
             variant === 'ghostOnGradient' && styles.ghostOnGradient,
           ]}
-          contentStyle={styles.content}
         >
-          <Text
-            style={[
-              styles.label,
-              (variant === 'solid' || variant === 'ghostOnGradient') && { color: colors.white },
-              variant === 'ghost' && { color: colors.primary },
-              variant === 'onGradient' && { color: colors.primary },
-            ]}
-          >
-            {label}
-          </Text>
-        </GlassSurface>
+          <View style={styles.content}>
+            <Text
+              style={[
+                styles.label,
+                (variant === 'solid' || variant === 'ghostOnGradient') && { color: colors.white },
+                variant === 'ghost' && { color: colors.primary },
+                variant === 'onGradient' && { color: colors.primary },
+              ]}
+            >
+              {label}
+            </Text>
+          </View>
+        </View>
       </Animated.View>
     </Pressable>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   base: {
     height: 56,
     borderRadius: radius.pill,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -98,6 +104,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   ghostOnGradient: {
+    backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.7)',
   },

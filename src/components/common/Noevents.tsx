@@ -1,60 +1,82 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 
+// require() takes a static literal, so both variants are resolved at module load and
+// picked at render — the bundler cannot follow a computed path.
+const LIGHT_ILLUSTRATION = require('../../../assets/shared/placeholders/no-events.png');
+const DARK_ILLUSTRATION = require('../../../assets/shared/placeholders/no-events-black.png');
+import { LeftArrow } from './Icons';
+
 interface Props {
-  onBack: () => void;
-  onGoHome: () => void;
+  onBack?: () => void;
+  onGoHome?: () => void;
   title?: string;
   subtitle?: string;
+  inline?: boolean; // true = fits inside existing scroll content, no flex:1, no Back/Home buttons
 }
 
-const NoEvents: React.FC<Props> = ({
+const Noevents: React.FC<Props> = ({
   onBack,
   onGoHome,
   title = 'No events found',
   subtitle = 'Try adjusting your filters or interests.',
+  inline = false,
 }) => {
+  const { colors, theme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.root}>
+    <View style={inline ? styles.rootInline : styles.root}>
       <Image
-
-        source={require('../../../assets/NoEvents.png')}
-        style={styles.illustration}
+        source={theme === 'dark' ? DARK_ILLUSTRATION : LIGHT_ILLUSTRATION}
+        style={inline ? styles.illustrationInline : styles.illustration}
         resizeMode="contain"
       />
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
-          <Text style={styles.backIcon}>←</Text>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+      {!inline && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
+            <LeftArrow color={colors.brandPink} size={15} />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.homeBtn} onPress={onGoHome} activeOpacity={0.85}>
-          <Text style={styles.homeText}>Go to Home</Text>
-          <Text style={styles.homeIcon}>→</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.homeBtn} onPress={onGoHome} activeOpacity={0.85}>
+            <Text style={styles.homeText}>Go to Home</Text>
+            <Text style={styles.homeIcon}>→</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F3EF',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  rootInline: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
   },
   illustration: {
     width: 260,
     height: 260,
     marginBottom: spacing.xl,
+  },
+  illustrationInline: {
+    width: 180,
+    height: 180,
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: 20,
@@ -83,11 +105,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  backIcon: {
-    color: colors.brandPink,
-    fontSize: 15,
-    fontWeight: '700',
-  },
   backText: {
     color: colors.brandPink,
     fontSize: 15,
@@ -114,4 +131,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default NoEvents;
+export default Noevents;

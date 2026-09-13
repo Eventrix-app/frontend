@@ -33,6 +33,7 @@ yarn-error.*
 # IDE
 .vscode/
 .cursor/
+.idea/
 
 # local env files
 .env*.local
@@ -44,3 +45,27 @@ yarn-error.*
 /ios
 /android
 /lovable-screens
+*firebase-adminsdk*.json
+google-services.json
+# OAuth client downloads from the Cloud console - these carry a client_secret.
+client_secret_*.json
+# Service-account key downloads, whatever the console names them.
+*service-account*.json
+*serviceAccount*.json
+GoogleService-Info.plist
+
+# generated/derived artifacts (regenerate via convert.js)
+offline-base64.txt
+
+# editor backups — git already holds every previous version
+*.bak
+*.orig
+
+# graphify skill output
+graphify-out/
+
+# Working notes and the screenshots behind them — reference material for a task in
+# progress, not part of the app. The illustrations the app actually ships are tracked
+# under assets/shared/placeholders.
+bugs.txt
+error-reference/

@@ -1,23 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { AuthLayout } from '../../components/auth/AuthLayout';
-import GlassSurface from '../../components/common/GlassSurface';
 import { RootStackParamList } from '../../navigation/types';
 import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
+import { useClearPushTokenMutation } from '../../store/services/userApi';
+import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminRedirect'>;
 
 const AdminRedirectScreen: React.FC<Props> = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  
-  const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://enevtrix1.vercel.app/admin';
+  const [clearPushToken] = useClearPushTokenMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://eventrix1.vercel.app/admin';
   const dashboardUrl = `${dashboardBaseUrl}${dashboardBaseUrl.includes('?') ? '&' : '?'}loggedIn=true`;
 
   const handleRedirect = async () => {
@@ -36,7 +41,7 @@ const AdminRedirectScreen: React.FC<Props> = () => {
         }
       }
     } catch (error) {
-      console.error('Error redirecting to admin dashboard:', error);
+      if (__DEV__) console.error('Error redirecting to admin dashboard:', error);
     }
   };
 
@@ -49,7 +54,15 @@ const AdminRedirectScreen: React.FC<Props> = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Same best-effort push-token cleanup as SettingsScreen's logout — must never block
+    // the actual sign-out below. Only this device's token is cleared (multi-device push).
+    try {
+      const pushToken = await getExpoPushTokenSafe();
+      if (pushToken) await clearPushToken(pushToken).unwrap();
+    } catch {
+      // ignore
+    }
     dispatch(logout());
   };
 
@@ -72,11 +85,21 @@ const AdminRedirectScreen: React.FC<Props> = () => {
             If you are not redirected automatically within a few seconds, please click the button below.
           </Text>
 
-          <TouchableOpacity style={styles.primaryButtonWrap} onPress={handleRedirect} activeOpacity={0.9}>
-            <GlassSurface style={styles.primaryButton} contentStyle={styles.primaryButtonContent}>
-              <Text style={styles.primaryButtonText}>Open Dashboard Manually</Text>
-            </GlassSurface>
-          </TouchableOpacity>
+          {/* Scale, not fade: primaryButton is an elevated solid surface, and fading a
+              subtree containing an Android elevation paints its shadow as an opaque
+              rectangle over the button while pressed. */}
+          <SpringPressable
+            style={styles.primaryButtonWrap}
+            onPress={handleRedirect}
+            scaleTo={0.97}
+            accessibilityLabel="Open Dashboard Manually"
+          >
+            <View style={styles.primaryButton}>
+              <View style={styles.primaryButtonContent}>
+                <Text style={styles.primaryButtonText}>Open Dashboard Manually</Text>
+              </View>
+            </View>
+          </SpringPressable>
 
           <TouchableOpacity style={styles.logoutButtonWrap} onPress={handleLogout} activeOpacity={0.8}>
             <View style={styles.logoutButton}>
@@ -89,7 +112,7 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -118,7 +141,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    color: 'rgba(0,0,0,0.4)',
+    color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 18,
@@ -132,6 +155,17 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.brandPink,
     height: 52,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   primaryButtonContent: {
     alignItems: 'center',

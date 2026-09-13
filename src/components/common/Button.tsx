@@ -1,10 +1,10 @@
-import React from 'react';
-import { TouchableOpacity, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, View, ViewStyle, TextStyle } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from './GlassSurface';
 import { Text } from './Text';
+import { SpringPressable } from './SpringPressable';
 
 interface ButtonProps {
   title: string;
@@ -27,6 +27,9 @@ const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderRadius: borderRadius.lg,
@@ -76,30 +79,36 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    // SpringPressable, not TouchableOpacity: the primary/secondary variants render an
+    // elevated `glass` surface below, and fading a subtree containing an Android elevation
+    // paints an opaque rectangle over it for the length of the press.
+    <SpringPressable
       style={[getButtonStyle(), disabled && styles.disabled, style]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.7}
+      scaleTo={0.97}
+      accessibilityLabel={title}
     >
       {variant === 'primary' || variant === 'secondary' ? (
-        <GlassSurface style={styles.glass} contentStyle={styles.glassContent}>
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text style={[getTextStyle(), textStyle]}>{title}</Text>
-          )}
-        </GlassSurface>
+        <View style={styles.glass}>
+          <View style={styles.glassContent}>
+            {loading ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+            )}
+          </View>
+        </View>
       ) : loading ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.textInverse} />
       ) : (
         <Text style={[getTextStyle(), textStyle]}>{title}</Text>
       )}
-    </TouchableOpacity>
+    </SpringPressable>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
@@ -107,6 +116,16 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    backgroundColor: colors.white,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   glassContent: {
     alignItems: 'center',

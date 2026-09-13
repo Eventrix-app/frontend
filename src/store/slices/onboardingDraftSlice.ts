@@ -8,7 +8,7 @@ interface NotificationPrefs {
   specialOffers: boolean;
 }
 
-interface OnboardingDraftState {
+export interface OnboardingDraftState {
   categoryIds: string[];
   latitude: number | null;
   longitude: number | null;

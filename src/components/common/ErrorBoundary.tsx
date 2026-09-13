@@ -19,8 +19,10 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // TODO: send to your crash-reporting service (Sentry, etc.) once you have one
-    console.log('ErrorBoundary caught:', error, info);
+    // The only place a render crash is recorded now that Sentry has been removed. Left
+    // ungated by __DEV__ on purpose: this fires at most once per crash, not in a hot path,
+    // and it is the sole signal available when diagnosing one from a device log.
+    console.error('ErrorBoundary caught:', error, info.componentStack);
   }
 
   handleReset = () => {

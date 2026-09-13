@@ -1,6 +1,6 @@
-import { AppDispatch, RootState } from '../store';
+import { AppDispatch } from '../store';
 import { userApi } from '../store/services/userApi';
-import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
+import { markSynced, resetDraft, OnboardingDraftState } from '../store/slices/onboardingDraftSlice';
 
 /**
  * Syncs the locally-cached onboarding draft (interests/location/notification prefs) to
@@ -12,7 +12,7 @@ import { markSynced, resetDraft } from '../store/slices/onboardingDraftSlice';
  */
 export async function syncOnboardingDraft(
   dispatch: AppDispatch,
-  getState: () => RootState,
+  getState: () => { onboardingDraft: OnboardingDraftState },
 ): Promise<void> {
   const draft = getState().onboardingDraft;
 
@@ -52,6 +52,15 @@ export async function syncOnboardingDraft(
     dispatch(resetDraft());
     return;
   }
+
+  // Only reachable when there was real draft content to push — i.e. the onboarding
+  // chain actually just ran (not the harmless early call from Login/Register with an
+  // empty draft). Folded into the same allOk/retry bundle as the calls above (rather
+  // than fired separately from NotificationPreferencesScreen and forgotten) so a
+  // dropped connection at this exact moment doesn't permanently strand the account's
+  // hasCompletedOnboarding flag at false — the foreground-retry hook picks it back up
+  // next time, same as the interests/location/prefs calls it now travels with.
+  promises.push(dispatch(userApi.endpoints.completeOnboarding.initiate()).unwrap());
 
   const results = await Promise.allSettled(promises);
   const allOk = results.every((r) => r.status === 'fulfilled');
