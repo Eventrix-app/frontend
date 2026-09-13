@@ -41,6 +41,8 @@ import ShortsFeedSkeleton from '../../components/common/ShortsFeedSkeleton';
 import SlowNetworkNotice from '../../components/common/SlowNetworkNotice';
 import { useSlowNetwork } from '../../hooks/useSlowNetwork';
 import ReelCommentsSheet from '../../components/events/ReelCommentsSheet';
+import { useCreateReportMutation } from '../../store/services/moderationApi';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
 import {
   FeedShort,
   ShortOverlay,
@@ -190,6 +192,8 @@ interface SlideProps {
   onOpenComments: (short: FeedShort) => void;
   onOpenUploader: (uploaderId: string) => void;
   onCreate: () => void;
+  // Undefined when the viewer can't report this reel (signed out, or it's their own).
+  onReport?: (short: FeedShort) => void;
 }
 
 // Memoized, and this matters more here than in a typical list: every slide owns a video
@@ -214,6 +218,7 @@ const ReelSlide = React.memo<SlideProps>(({
   onOpenComments,
   onOpenUploader,
   onCreate,
+  onReport,
 }) => {
   const heartRef = useRef<LottieView>(null);
 
@@ -369,6 +374,16 @@ const ReelSlide = React.memo<SlideProps>(({
             <ChatIcon color="#FFFFFF" size={24} />
             <Text style={styles.actionLabel}>{formatCount(item.commentCount)}</Text>
           </TouchableOpacity>
+          {onReport ? (
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => onReport(item)}
+              accessibilityRole="button"
+              accessibilityLabel="Report this reel"
+            >
+              <Feather name="flag" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : null}
           {/* Share was a placeholder that did nothing — nothing performs or records a share,
               so it is removed rather than left as a dead control. */}
           <Text style={styles.viewCount}>{formatCount(item.viewCount)} views</Text>
@@ -524,6 +539,30 @@ const ShortsScreen: React.FC = () => {
   const handleOpenComments = useCallback((short: FeedShort) => setCommentsFor(short), []);
   const handleCloseComments = useCallback(() => setCommentsFor(null), []);
 
+  const [createReport] = useCreateReportMutation();
+  const handleReport = useCallback(
+    (short: FeedShort) => {
+      showConfirm(
+        'Report this reel?',
+        'This will be sent to our moderation team for review.',
+        async () => {
+          try {
+            await createReport({
+              targetType: 'short',
+              targetId: short.id,
+              reason: `Reported reel by ${short.uploader?.fullName ?? 'a user'}`,
+            }).unwrap();
+            showAlert('Reported', "Thanks — we'll take a look.");
+          } catch {
+            showAlert('Something went wrong', 'Could not submit the report. Please try again.');
+          }
+        },
+        'Report',
+      );
+    },
+    [createReport],
+  );
+
   const handleOpenUploader = useCallback(
     (uploaderId: string) => navigation.navigate('UserProfile', { userId: uploaderId }),
     [navigation],
@@ -596,10 +635,11 @@ const ShortsScreen: React.FC = () => {
           onOpenComments={handleOpenComments}
           onOpenUploader={handleOpenUploader}
           onCreate={openCreate}
+          onReport={currentUserId && item.uploader?.id !== currentUserId ? handleReport : undefined}
         />
       );
     },
-    [activeId, isFocused, handleLikeByDoubleTap, handleOpenComments, handleOpenEvent, handleOpenUploader, handleToggleLike, insets.top, likedSet, openCreate, slideHeight, slideWidth],
+    [activeId, currentUserId, handleReport, isFocused, handleLikeByDoubleTap, handleOpenComments, handleOpenEvent, handleOpenUploader, handleToggleLike, insets.top, likedSet, openCreate, slideHeight, slideWidth],
   );
 
   // Every slide is exactly the viewport height, so measurement can be skipped entirely —

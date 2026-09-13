@@ -16,10 +16,9 @@ import {
   useGetMeQuery,
   useUpdateNotificationChannelsMutation,
   useClearPushTokenMutation,
-  useDeleteAccountMutation,
   useExportMyDataMutation,
 } from '../../store/services/userApi';
-import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { showAlert } from '../../utils/crossPlatformAlert';
 import { getExpoPushTokenSafe } from '../../utils/getExpoPushToken';
 import { SpringPressable } from '../../components/common/SpringPressable';
 import { DeleteMyDataModal } from '../../components/common/DeleteMyDataModal';
@@ -78,9 +77,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   }, [dispatch]);
   const [updateNotificationChannels] = useUpdateNotificationChannelsMutation();
   const [clearPushToken] = useClearPushTokenMutation();
-  const [deleteAccount, { isLoading: isDeletingAccount }] = useDeleteAccountMutation();
   const [exportMyData, { isLoading: isExportingData }] = useExportMyDataMutation();
   const [deleteMyDataModalVisible, setDeleteMyDataModalVisible] = useState(false);
+  const [deleteAccountModalVisible, setDeleteAccountModalVisible] = useState(false);
   const { theme, colors, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // push/email default true (matching the backend's default for a newly created account)
@@ -145,28 +144,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleDeleteAccount = () => {
-    showConfirm(
-      'Delete your account?',
-      'This permanently deactivates your account and signs you out. This action cannot be undone.',
-      async () => {
-        try {
-          await deleteAccount().unwrap();
-        } catch {
-          showAlert('Something went wrong', "Couldn't delete your account. Please check your connection and try again.");
-          return;
-        }
-        // Only sign out on confirmed success — an unsuccessful request must never leave
-        // the user believing their account is gone while it still exists server-side.
-        dispatch(logout());
-      },
-      'Delete Account',
-    );
+  // Called by the modal only after the backend confirmed deletion — an unsuccessful request
+  // must never leave the user believing their account is gone while it still exists.
+  const handleAccountDeleted = () => {
+    setDeleteAccountModalVisible(false);
+    dispatch(logout());
   };
 
   // Called by DeleteMyDataModal once the backend has confirmed erasure — the modal owns
   // the identity-verification + mutation call itself, this just finishes the flow the same
-  // way handleDeleteAccount does (sign out only after confirmed success).
+  // way handleAccountDeleted does (sign out only after confirmed success).
   const handleDataErased = () => {
     setDeleteMyDataModalVisible(false);
     showAlert('Your data has been deleted', 'Your personal data has been erased. You have been signed out.');
@@ -311,11 +298,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.group}>
             <TouchableOpacity
               style={styles.singleRow}
-              onPress={handleDeleteAccount}
-              disabled={isDeletingAccount}
+              onPress={() => setDeleteAccountModalVisible(true)}
             >
               <View style={styles.rowText}>
-                <Text style={styles.dangerLabel}>{isDeletingAccount ? 'Deleting…' : 'Delete Account'}</Text>
+                <Text style={styles.dangerLabel}>Delete Account</Text>
                 <Text style={styles.subtitle}>Permanently deactivate your account</Text>
               </View>
             </TouchableOpacity>
@@ -357,6 +343,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         visible={deleteMyDataModalVisible}
         onClose={() => setDeleteMyDataModalVisible(false)}
         onErased={handleDataErased}
+        hasPassword={me?.hasPassword ?? true}
+        authProviders={me?.authProviders ?? []}
+      />
+      <DeleteMyDataModal
+        mode="account"
+        visible={deleteAccountModalVisible}
+        onClose={() => setDeleteAccountModalVisible(false)}
+        onErased={handleAccountDeleted}
         hasPassword={me?.hasPassword ?? true}
         authProviders={me?.authProviders ?? []}
       />

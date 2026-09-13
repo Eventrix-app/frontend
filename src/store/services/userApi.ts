@@ -150,8 +150,9 @@ export const userApi = createApi({
     // Self-service account deletion (Settings → Delete Account). Soft-deletes the account
     // server-side — see Backend's UsersService.deleteMe. The caller is responsible for
     // dispatching logout() afterwards; this mutation only performs the deletion itself.
-    deleteAccount: builder.mutation<void, void>({
-      query: () => ({ url: 'users/me', method: 'DELETE' }),
+    // Takes the same identity proof as eraseMyData below.
+    deleteAccount: builder.mutation<void, { currentPassword?: string; reauth?: { provider: 'google'; token: string } }>({
+      query: (body) => ({ url: 'users/me', method: 'DELETE', body }),
     }),
     // Self-service data export (Settings → Download My Data) — the backend emails a JSON
     // copy to the account's own registered address rather than returning it here. See

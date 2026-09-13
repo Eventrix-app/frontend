@@ -120,11 +120,11 @@ export const authApi = createApi({
         body: { email },
       }),
     }),
-    resetPassword: builder.mutation<void, { token: string; password: string }>({
-      query: ({ token, password }) => ({
+    resetPassword: builder.mutation<void, { email: string; token: string; password: string }>({
+      query: ({ email, token, password }) => ({
         url: 'auth/reset-password',
         method: 'POST',
-        body: { token, password },
+        body: { email, token, password },
       }),
     }),
     socialLogin: builder.mutation<LoginResult, SocialLoginCredentials>({

@@ -22,8 +22,8 @@ const AdminRedirectScreen: React.FC<Props> = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const dashboardBaseUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://eventrix1.vercel.app/admin';
-  const dashboardUrl = `${dashboardBaseUrl}${dashboardBaseUrl.includes('?') ? '&' : '?'}loggedIn=true`;
+  // The dashboard lives at the root of the admin subdomain; /admin on the main site now 404s.
+  const dashboardUrl = process.env.EXPO_PUBLIC_ADMIN_DASHBOARD_URL || 'https://admin.eventrix.theladders.tech/';
 
   const handleRedirect = async () => {
     try {

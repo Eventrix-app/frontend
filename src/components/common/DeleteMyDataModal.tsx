@@ -7,7 +7,7 @@ import Button from './Button';
 import { Text } from './Text';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import { useEraseMyDataMutation } from '../../store/services/userApi';
+import { useDeleteAccountMutation, useEraseMyDataMutation } from '../../store/services/userApi';
 import { showAlert } from '../../utils/crossPlatformAlert';
 
 type Provider = 'google';
@@ -24,26 +24,51 @@ interface Props {
   // Linked social sign-in providers for this account (CurrentUser.authProviders) — only
   // relevant when hasPassword is false, to know which provider to re-authenticate with.
   authProviders: string[];
+  // 'account' reuses the same identity check for Settings → Delete Account (deactivation).
+  mode?: 'erase' | 'account';
 }
+
+type Proof = { currentPassword?: string; reauth?: { provider: Provider; token: string } };
+
+const COPY = {
+  erase: {
+    title: 'Delete My Data',
+    body: "This permanently erases your profile, interests, saved events, follows, waitlist entries, and linked sign-in methods. Records we're legally required to keep — bookings, payments, refunds, payouts — are kept, but with your personal details removed from them. This cannot be undone.",
+    confirm: 'Permanently delete my data',
+    failed: 'Could not delete your data',
+    unverifiable: 'erase your data',
+  },
+  account: {
+    title: 'Delete Account',
+    body: 'This permanently deactivates your account and signs you out. This action cannot be undone.',
+    confirm: 'Delete my account',
+    failed: 'Could not delete your account',
+    unverifiable: 'delete your account',
+  },
+};
 
 // DPDP-Act "delete my data" confirmation — collects the identity proof
 // UsersService.eraseMyData requires (current password, or a fresh provider re-auth for a
 // social-only account) before calling the mutation, then hands control back via onErased.
-export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased, hasPassword, authProviders }) => {
+export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased, hasPassword, authProviders, mode = 'erase' }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [password, setPassword] = useState('');
-  const [eraseMyData, { isLoading }] = useEraseMyDataMutation();
+  const [eraseMyData, { isLoading: isErasing }] = useEraseMyDataMutation();
+  const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
+  const isLoading = isErasing || isDeleting;
+  const copy = COPY[mode];
+  const submitProof = (proof: Proof) => (mode === 'account' ? deleteAccount(proof) : eraseMyData(proof)).unwrap();
   const [reauthing, setReauthing] = useState(false);
 
   const linkedProvider = (authProviders.find((p) => p === 'google') as Provider | undefined);
 
   const submitReauth = async (provider: Provider, token: string) => {
     try {
-      await eraseMyData({ reauth: { provider, token } }).unwrap();
+      await submitProof({ reauth: { provider, token } });
       onErased();
     } catch (err: any) {
-      showAlert('Could not delete your data', err?.data?.message ?? 'Re-authentication failed. Please try again.');
+      showAlert(copy.failed, err?.data?.message ?? 'Re-authentication failed. Please try again.');
     } finally {
       setReauthing(false);
     }
@@ -62,7 +87,7 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
     } catch (err) {
       setReauthing(false);
       if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) return;
-      showAlert('Could not delete your data', 'Re-authentication with Google failed. Please try again.');
+      showAlert(copy.failed, 'Re-authentication with Google failed. Please try again.');
     }
   };
 
@@ -75,24 +100,19 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
   const handlePasswordSubmit = async () => {
     if (!password) return;
     try {
-      await eraseMyData({ currentPassword: password }).unwrap();
+      await submitProof({ currentPassword: password });
       setPassword('');
       onErased();
     } catch (err: any) {
-      showAlert('Could not delete your data', err?.data?.message ?? 'Please check your password and try again.');
+      showAlert(copy.failed, err?.data?.message ?? 'Please check your password and try again.');
     }
   };
 
   return (
     <HalfScreenModal visible={visible} onClose={onClose} heightPercent={0.62}>
       <View style={styles.content}>
-        <Text style={styles.title}>Delete My Data</Text>
-        <Text style={styles.body}>
-          This permanently erases your profile, interests, saved events, follows, waitlist
-          entries, and linked sign-in methods. Records we're legally required to keep —
-          bookings, payments, refunds, payouts — are kept, but with your personal details
-          removed from them. This cannot be undone.
-        </Text>
+        <Text style={styles.title}>{copy.title}</Text>
+        <Text style={styles.body}>{copy.body}</Text>
 
         {hasPassword ? (
           <>
@@ -105,7 +125,7 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
               autoFocus
             />
             <Button
-              title={isLoading ? 'Deleting…' : 'Permanently delete my data'}
+              title={isLoading ? 'Deleting…' : copy.confirm}
               onPress={handlePasswordSubmit}
               disabled={!password || isLoading}
               loading={isLoading}
@@ -128,8 +148,8 @@ export const DeleteMyDataModal: React.FC<Props> = ({ visible, onClose, onErased,
         ) : (
           <View style={styles.confirmBtn}>
             <Text style={styles.body}>
-              We couldn't determine how to verify your identity. Please contact support to
-              erase your data.
+              We couldn't determine how to verify your identity. Please contact support to{' '}
+              {copy.unverifiable}.
             </Text>
           </View>
         )}

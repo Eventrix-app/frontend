@@ -147,6 +147,12 @@ const CheckInScreen: React.FC<Props> = ({ navigation, route }) => {
       );
       return;
     }
+    // Mirrors the server's check-in rule: unpaid bookings still carry a valid ticketCode, and
+    // this path would otherwise admit them whenever signal drops.
+    if (target.paymentStatus !== 'paid') {
+      showAlert('Payment Not Confirmed', "This booking hasn't been paid for.");
+      return;
+    }
     if (target.checkedInAt) {
       showAlert('Already Checked In', 'This ticket was already used.');
       return;

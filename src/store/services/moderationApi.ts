@@ -2,7 +2,7 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import { createFallbackBaseQuery } from './baseQuery';
 import { CACHE_STABLE } from './cachePolicy';
 
-export type ReportTargetType = 'user' | 'chat_message' | 'review';
+export type ReportTargetType = 'user' | 'chat_message' | 'review' | 'short' | 'short_comment';
 
 export interface CreateReportBody {
   targetType: ReportTargetType;

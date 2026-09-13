@@ -16,7 +16,8 @@ import {
   useAddShortCommentMutation,
   useDeleteShortCommentMutation,
 } from '../../store/services/shortsApi';
-import { showConfirm } from '../../utils/crossPlatformAlert';
+import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { useCreateReportMutation } from '../../store/services/moderationApi';
 
 type Props = {
   visible: boolean;
@@ -66,6 +67,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
   );
   const [addComment, { isLoading: isPosting }] = useAddShortCommentMutation();
   const [deleteComment] = useDeleteShortCommentMutation();
+  const [createReport] = useCreateReportMutation();
 
   const comments = data?.comments ?? [];
 
@@ -93,11 +95,35 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
     [deleteComment, shortId],
   );
 
+  const handleReport = useCallback(
+    (comment: ShortComment) => {
+      showConfirm(
+        'Report this comment?',
+        'This will be sent to our moderation team for review.',
+        async () => {
+          try {
+            await createReport({
+              targetType: 'short_comment',
+              targetId: comment.id,
+              reason: `Reported reel comment by ${comment.user?.fullName ?? 'a user'}: "${comment.body.slice(0, 200)}"`,
+            }).unwrap();
+            showAlert('Reported', "Thanks — we'll take a look.");
+          } catch {
+            showAlert('Something went wrong', 'Could not submit the report. Please try again.');
+          }
+        },
+        'Report',
+      );
+    },
+    [createReport],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: ShortComment }) => {
       // Shown for your own comments, and to the reel's owner for anyone's — a creator needs
       // to be able to clear abuse off their own reel without waiting on moderation.
       const canDelete = item.userId === currentUserId || uploaderUserId === currentUserId;
+      const canReport = !!currentUserId && item.userId !== currentUserId;
 
       return (
         <View style={styles.row}>
@@ -119,6 +145,11 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
             <Text style={styles.body}>{item.body}</Text>
           </View>
 
+          {canReport ? (
+            <TouchableOpacity onPress={() => handleReport(item)} hitSlop={10}>
+              <Text style={styles.report}>Report</Text>
+            </TouchableOpacity>
+          ) : null}
           {canDelete ? (
             <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={10}>
               <Text style={styles.delete}>Delete</Text>
@@ -127,7 +158,7 @@ export const ReelCommentsSheet: React.FC<Props> = ({ visible, shortId, uploaderU
         </View>
       );
     },
-    [colors.textSecondary, currentUserId, handleDelete, styles, uploaderUserId],
+    [colors.textSecondary, currentUserId, handleDelete, handleReport, styles, uploaderUserId],
   );
 
   return (
@@ -216,6 +247,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   time: { fontSize: 11, color: colors.textSecondary },
   body: { fontSize: 14, color: colors.text },
   delete: { fontSize: 12, fontWeight: '600', color: colors.error },
+  report: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   retryBtn: {

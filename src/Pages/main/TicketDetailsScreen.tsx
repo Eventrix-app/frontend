@@ -180,7 +180,7 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {!isCancelled && enrollment.ticketCode ? (
+          {!isCancelled && enrollment.ticketCode && enrollment.paymentStatus === 'paid' ? (
             <View style={styles.qrSection}>
               <View style={styles.qrBox}>
                 {/* Value is the same signed ticketCode EventsService.checkIn() already
@@ -199,6 +199,8 @@ const TicketDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.cancelledBanner}>
               <Text style={styles.cancelledText}>This booking has been cancelled</Text>
             </View>
+          ) : enrollment.ticketCode ? (
+            <Text style={styles.qrHint}>Complete payment to get your entry code</Text>
           ) : null}
 
           <View style={styles.totalRow}>
