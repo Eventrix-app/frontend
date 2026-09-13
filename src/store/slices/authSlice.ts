@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { authApi } from '../services/authApi';
+import { authApi, isAdminOtpChallenge } from '../services/authApi';
 
 interface User {
   id: string;
@@ -41,6 +41,11 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
+        // An admin challenge carries no token; the session only starts at verifyAdminOtp.
+        if (isAdminOtpChallenge(payload)) {
+          state.isLoading = false;
+          return;
+        }
         state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
         state.token = payload.accessToken;
         state.isAuthenticated = true;
@@ -63,6 +68,14 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addMatcher(authApi.endpoints.socialLogin.matchFulfilled, (state, { payload }) => {
+        if (isAdminOtpChallenge(payload)) return;
+        state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
+        state.token = payload.accessToken;
+        state.isAuthenticated = true;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addMatcher(authApi.endpoints.verifyAdminOtp.matchFulfilled, (state, { payload }) => {
         state.user = { id: payload.id, email: payload.email, full_name: payload.full_name, roles: payload.roles };
         state.token = payload.accessToken;
         state.isAuthenticated = true;

@@ -10,7 +10,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { SpringPressable } from '../common/SpringPressable';
 import { Text } from '../common/Text';
-import { useSocialLoginMutation } from '../../store/services/authApi';
+import { isAdminOtpChallenge, useSocialLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
@@ -94,6 +94,10 @@ export const SocialLoginRow: React.FC<SocialLoginRowProps> = ({ compact = false 
         return;
       }
       const result = await socialLogin({ provider: 'google', token: idToken, deviceLabel: getDeviceLabel() }).unwrap();
+      if (isAdminOtpChallenge(result)) {
+        navigation.navigate('AdminOtp', { challengeId: result.challengeId, maskedEmail: result.maskedEmail });
+        return;
+      }
       handlePostLogin(result);
     } catch (err: any) {
       // A cancel is a normal outcome, not an error worth interrupting the user over.

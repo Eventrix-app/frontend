@@ -94,6 +94,7 @@ export type AuthStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   UpdatePassword: { email: string };
+  AdminOtp: { challengeId: string; maskedEmail: string };
 };
 
 // MyEvents is NOT a tab — MainNavigator only registers Home/Explore/Shorts/Bookings.

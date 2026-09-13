@@ -48,6 +48,20 @@ export interface AuthResponse {
   expiresIn?: number;
 }
 
+// Returned by login/social for admin accounts in place of AuthResponse — no token until the
+// emailed code is verified via verifyAdminOtp.
+export interface AdminOtpChallenge {
+  otpRequired: true;
+  challengeId: string;
+  maskedEmail: string;
+  expiresIn: number;
+}
+
+export type LoginResult = AuthResponse | AdminOtpChallenge;
+
+export const isAdminOtpChallenge = (result: LoginResult): result is AdminOtpChallenge =>
+  (result as AdminOtpChallenge).otpRequired === true;
+
 export interface SessionRecord {
   id: string;
   deviceLabel: string | null;
@@ -69,7 +83,7 @@ export const authApi = createApi({
   // is to be current: a retained Sessions list would keep showing a device the user just
   // revoked, which reads as the revocation having failed.
   endpoints: (builder) => ({
-    login: builder.mutation<AuthResponse, LoginCredentials>({
+    login: builder.mutation<LoginResult, LoginCredentials>({
       query: (credentials) => ({
         url: 'auth/login',
         method: 'POST',
@@ -113,9 +127,23 @@ export const authApi = createApi({
         body: { token, password },
       }),
     }),
-    socialLogin: builder.mutation<AuthResponse, SocialLoginCredentials>({
+    socialLogin: builder.mutation<LoginResult, SocialLoginCredentials>({
       query: (body) => ({
         url: 'auth/social',
+        method: 'POST',
+        body,
+      }),
+    }),
+    verifyAdminOtp: builder.mutation<AuthResponse, { challengeId: string; otp: string }>({
+      query: (body) => ({
+        url: 'auth/admin-otp/verify',
+        method: 'POST',
+        body,
+      }),
+    }),
+    resendAdminOtp: builder.mutation<{ expiresIn: number }, { challengeId: string }>({
+      query: (body) => ({
+        url: 'auth/admin-otp/resend',
         method: 'POST',
         body,
       }),
@@ -163,6 +191,8 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useSocialLoginMutation,
+  useVerifyAdminOtpMutation,
+  useResendAdminOtpMutation,
   useSendEmailVerificationOtpMutation,
   useConfirmEmailVerificationMutation,
   useGetCurrentUserQuery,

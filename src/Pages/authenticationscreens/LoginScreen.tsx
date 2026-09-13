@@ -8,7 +8,7 @@ import { SocialLoginRow } from '../../components/auth/SocialLoginRow';
 import AnimatedLink from '../../components/common/AnimatedLink';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import { useLoginMutation } from '../../store/services/authApi';
+import { isAdminOtpChallenge, useLoginMutation } from '../../store/services/authApi';
 import { useDispatch } from 'react-redux';
 import { AppDispatch, store } from '../../store';
 import { syncOnboardingDraft } from '../../utils/syncOnboardingDraft';
@@ -56,6 +56,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       // but then failed an exact-match backend lookup with a confusing "invalid email or
       // password" error.
       const result = await login({ email: email.trim(), password, deviceLabel: getDeviceLabel() }).unwrap();
+      if (isAdminOtpChallenge(result)) {
+        navigation.navigate('AdminOtp', { challengeId: result.challengeId, maskedEmail: result.maskedEmail });
+        return;
+      }
       // Fire-and-forget: sync onboarding draft in background, navigate immediately
       syncOnboardingDraft(dispatch, store.getState);
       // Warm the queries the landing screens subscribe to while the navigation transition

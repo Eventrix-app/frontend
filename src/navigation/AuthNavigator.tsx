@@ -11,6 +11,7 @@ import LoginScreen from '../Pages/authenticationscreens/LoginScreen';
 import RegisterScreen from '../Pages/authenticationscreens/RegisterScreen';
 import ForgotPasswordScreen from '../Pages/authenticationscreens/ForgotPasswordScreen';
 import UpdatePasswordScreen from '../Pages/authenticationscreens/UpdatePasswordScreen';
+import AdminOtpScreen from '../Pages/authenticationscreens/AdminOtpScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -32,6 +33,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="UpdatePassword" component={UpdatePasswordScreen} />
+      <Stack.Screen name="AdminOtp" component={AdminOtpScreen} />
     </Stack.Navigator>
   );
 };
