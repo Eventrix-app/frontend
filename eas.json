@@ -8,7 +8,7 @@
       "distribution": "internal",
       "developmentClient": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
+        "EXPO_PUBLIC_API_URL": "https://api.eventrix.theladders.tech/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
@@ -22,7 +22,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
+        "EXPO_PUBLIC_API_URL": "https://api.eventrix.theladders.tech/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
@@ -36,7 +36,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://backend-one-virid-16.vercel.app/api/",
+        "EXPO_PUBLIC_API_URL": "https://api.eventrix.theladders.tech/api/",
         "EXPO_PUBLIC_SUPABASE_URL": "https://zlgvwkdlifdpfncagcuc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_58yNf4TtL0Jjvqt_i7sWzg_f0t34JB4",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "384524317779-gbucdkkc2mogn0tf1g3eiq2h8b7o9k0t.apps.googleusercontent.com",
