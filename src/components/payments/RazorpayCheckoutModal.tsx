@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Text } from '../common/Text';
@@ -8,11 +8,17 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import type { CreateOrderResult } from '../../store/services/paymentsApi';
 
-interface RazorpaySuccessPayload {
+export interface RazorpaySuccessPayload {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
 }
+
+// Razorpay's UPI "intent" method hands off to a payment app through a non-http URL, which the
+// WebView cannot load itself — without this the UPI apps simply do nothing when tapped. Only
+// these schemes are passed to the OS: handing off anything a page inside the WebView asks for
+// would let it launch arbitrary deep links.
+const PAYMENT_APP_SCHEMES = ['upi:', 'tez:', 'phonepe:', 'paytmmp:', 'bhim:', 'credpay:', 'gpay:'];
 
 interface Props {
   visible: boolean;
@@ -34,22 +40,25 @@ const RazorpayCheckoutModal: React.FC<Props> = ({ visible, order, description, p
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  if (!order) return null;
+  // Memoised so an unrelated re-render of the checkout screen cannot hand the WebView a fresh
+  // source and restart a payment the user is halfway through.
+  const html = useMemo(() => {
+    if (!order) return null;
 
-  const options = {
-    key: order.keyId,
-    amount: order.amount,
-    currency: order.currency,
-    order_id: order.orderId,
-    name: 'Eventrix',
-    description,
-    prefill: { email: prefill?.email ?? '', contact: prefill?.contact ?? '' },
-    theme: { color: colors.brandPink },
-  };
+    const options = {
+      key: order.keyId,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.orderId,
+      name: 'Eventrix',
+      description,
+      prefill: { email: prefill?.email ?? '', contact: prefill?.contact ?? '' },
+      theme: { color: colors.brandPink },
+    };
 
-  // handler/modal.ondismiss are Razorpay checkout.js callbacks, not React — they run inside
-  // the WebView's own JS context, so the only way out is postMessage back to RN.
-  const html = `<!DOCTYPE html>
+    // handler/modal.ondismiss are Razorpay checkout.js callbacks, not React — they run inside
+    // the WebView's own JS context, so the only way out is postMessage back to RN.
+    return `<!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
@@ -75,11 +84,23 @@ const RazorpayCheckoutModal: React.FC<Props> = ({ visible, order, description, p
     </script>
   </body>
 </html>`;
+  }, [order, description, prefill?.email, prefill?.contact, colors.brandPink]);
+
+  if (!html) return null;
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'success') {
+      // Anything loaded in this WebView can postMessage, so an incomplete "success" is treated
+      // as a dismissal rather than sent on to verifyPayment. The backend's signature check is
+      // what actually decides whether a payment happened; this only keeps a malformed message
+      // from being reported to the user as a payment in progress.
+      const isSuccess =
+        data?.type === 'success' &&
+        typeof data.razorpay_order_id === 'string' &&
+        typeof data.razorpay_payment_id === 'string' &&
+        typeof data.razorpay_signature === 'string';
+      if (isSuccess) {
         onSuccess({
           razorpay_order_id: data.razorpay_order_id,
           razorpay_payment_id: data.razorpay_payment_id,
@@ -91,6 +112,20 @@ const RazorpayCheckoutModal: React.FC<Props> = ({ visible, order, description, p
     } catch {
       onDismiss();
     }
+  };
+
+  // originWhitelist stays open on purpose: a narrower list makes iOS hand non-matching URLs
+  // straight to the OS, which would bypass the allowlist below. This handler is the gate.
+  const handleShouldStartLoad = (request: { url: string }): boolean => {
+    const url = request.url;
+    if (/^(https?|about|data|blob):/i.test(url)) return true;
+
+    const scheme = url.slice(0, url.indexOf(':') + 1).toLowerCase();
+    if (PAYMENT_APP_SCHEMES.includes(scheme)) {
+      // A missing app rejects here; the user can just pick another method, so this is silent.
+      Linking.openURL(url).catch(() => undefined);
+    }
+    return false;
   };
 
   return (
@@ -106,6 +141,7 @@ const RazorpayCheckoutModal: React.FC<Props> = ({ visible, order, description, p
         onMessage={handleMessage}
         style={styles.webview}
         originWhitelist={['*']}
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
         javaScriptEnabled
         domStorageEnabled
       />

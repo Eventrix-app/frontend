@@ -22,7 +22,7 @@ export interface FeeBreakdown {
 
 // GET /payments/checkout-estimate — the authoritative pre-booking total. Computed by the
 // same FeeCalculationService call EventsService.enroll() makes, so `total` is exactly what
-// will be persisted as enrollment.totalAmount and charged by PayU.
+// will be persisted as enrollment.totalAmount and charged by the payment gateway.
 //
 // `lines` contains ONLY fees the buyer actually pays, and is empty under
 // feePayer=organizer, where the buyer is charged the bare ticket price and the organizer
@@ -132,32 +132,6 @@ export interface VerifyPaymentResult {
   status: string;
 }
 
-// Returned by POST /payments/payu/initiate — used by the WebView checkout flow.
-export interface PayUOrderResult {
-  txnid: string;
-  amount: number;
-  productinfo: string;
-  firstname: string;
-  email: string;
-  phone: string;
-  key: string;
-  hash: string;
-  actionUrl: string;
-}
-
-// Native SDK's camelCase field naming — distinct from PayUOrderResult (the WebView flow).
-// No pre-computed hash: the SDK requests hashes on demand via signPayUHash.
-export interface PayUNativeOrderResult {
-  key: string;
-  transactionId: string;
-  amount: number;
-  productInfo: string;
-  firstName: string;
-  email: string;
-  phone: string;
-  environment: '0' | '1';
-}
-
 export type FeeEstimateArg = number | { ticketPrice: number; feePayer?: 'organizer' | 'participant'; organizerId?: string };
 
 export const paymentsApi = createApi({
@@ -190,32 +164,6 @@ export const paymentsApi = createApi({
           dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
         } catch {
           // Verification failed client-side — webhook is the durable confirmation path.
-        }
-      },
-    }),
-    // WebView-based PayU checkout — mints txnid+hash for a pending-payment enrollment.
-    initiatePayUOrder: builder.mutation<PayUOrderResult, { enrollmentId: string }>({
-      query: (body) => ({ url: 'payments/payu/initiate', method: 'POST', body }),
-    }),
-    // Native SDK checkout (payu-non-seam-less-react) — no pre-computed hash.
-    initiatePayUNativeOrder: builder.mutation<PayUNativeOrderResult, { enrollmentId: string }>({
-      query: (body) => ({ url: 'payments/payu/initiate-native', method: 'POST', body }),
-    }),
-    // Hashes mid-checkout signed server-side (salt must never reach the client).
-    signPayUHash: builder.mutation<{ hash: string }, { hashString: string }>({
-      query: (body) => ({ url: 'payments/payu/sign-hash', method: 'POST', body }),
-    }),
-    verifyPayUNative: builder.mutation<
-      { success: boolean },
-      { txnid: string; mihpayid: string; status: 'success' | 'failure'; amount: string; productinfo: string; firstname: string; email: string; hash: string }
-    >({
-      query: (body) => ({ url: 'payments/payu/verify-native', method: 'POST', body }),
-      async onQueryStarted(_arg, { queryFulfilled, dispatch }) {
-        try {
-          await queryFulfilled;
-          dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
-        } catch {
-          // Verification failed client-side.
         }
       },
     }),
@@ -284,10 +232,6 @@ export const {
   useGetCheckoutEstimateQuery,
   useCreateOrderMutation,
   useVerifyPaymentMutation,
-  useInitiatePayUOrderMutation,
-  useInitiatePayUNativeOrderMutation,
-  useSignPayUHashMutation,
-  useVerifyPayUNativeMutation,
   useGetInvoiceDataQuery,
   useRequestRefundMutation,
   useGetMyRefundsQuery,

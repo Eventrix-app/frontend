@@ -30,13 +30,14 @@ import {
 } from '../../store/services/eventsApi';
 import {
   useGetCheckoutEstimateQuery,
-  useInitiatePayUOrderMutation,
-  type PayUOrderResult,
+  useCreateOrderMutation,
+  useVerifyPaymentMutation,
+  type CreateOrderResult,
 } from '../../store/services/paymentsApi';
 import { useGetOrganizerProfileQuery } from '../../store/services/organizerApi';
-import PayUCheckoutModal from '../../components/payments/PayUCheckoutModal';
+import RazorpayCheckoutModal, { type RazorpaySuccessPayload } from '../../components/payments/RazorpayCheckoutModal';
 import { useMyEventEnrollment } from '../../hooks/useMyEventEnrollment';
-import { showAlert, showConfirm } from '../../utils/crossPlatformAlert';
+import { showAlert } from '../../utils/crossPlatformAlert';
 import { useGetMeQuery } from '../../store/services/userApi';
 import { extractErrorMessage } from '../../utils/apiError';
 import { formatEventDate, formatEventTime } from '../../utils/eventCardAdapter';
@@ -54,13 +55,6 @@ interface CheckoutRouteParams {
 interface Props {
   navigation: NativeStackNavigationProp<RootStackParamList>;
   route: { params: CheckoutRouteParams };
-}
-
-// Mirrors PaymentsService.toPayuPhone; permissive because it only decides whether to
-// interrupt before enrolling, not what PayU receives.
-function hasTenDigitPhone(raw: string | null | undefined): boolean {
-  const digits = (raw ?? '').replace(/\D/g, '');
-  return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;
 }
 
 // Both watermark assets are required at module level so Metro can resolve them
@@ -82,14 +76,14 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: ticketTypes = [], isLoading: isLoadingTiers } = useGetTicketTypesQuery(eventId);
   const dispatch = useDispatch<AppDispatch>();
   const [enrollEvent, { isLoading: isEnrolling }] = useEnrollEventMutation();
-  const [initiatePayUOrder, { isLoading: isCreatingOrder }] = useInitiatePayUOrderMutation();
+  const [createOrder, { isLoading: isCreatingOrder }] = useCreateOrderMutation();
+  const [verifyPayment, { isLoading: isVerifying }] = useVerifyPaymentMutation();
 
-  // PayU's hosted page, not the native SDK. The SDK's generateHash protocol stalls before it
-  // ever presents a payment method; this flow needs one pre-computed hash and no callbacks.
-  const [payuOrder, setPayuOrder] = useState<PayUOrderResult | null>(null);
+  // Razorpay's hosted checkout, opened in a WebView. The enrollment id is kept next to the
+  // order because verifyPayment needs it once the sheet reports success.
+  const [pendingOrder, setPendingOrder] = useState<{ enrollmentId: string; order: CreateOrderResult } | null>(null);
 
-  const { data: me, refetch: refetchMe } = useGetMeQuery();
-  const hasPayablePhone = useMemo(() => hasTenDigitPhone(me?.phoneNumber), [me?.phoneNumber]);
+  const { data: me } = useGetMeQuery();
 
   // If a non-cancelled enrollment for this event already exists (a fresh booking just made,
   // or one left over from a previous abandoned/failed payment attempt), this screen switches
@@ -155,30 +149,10 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const isEstimatePending = !isResuming && !estimate;
   const isFreeEvent = estimate?.isFreeEvent ?? subtotal <= 0;
 
-  const isPaying = isEnrolling || isCreatingOrder || !!payuOrder || isLoadingEstimate;
+  const isPaying = isEnrolling || isCreatingOrder || isVerifying || !!pendingOrder || isLoadingEstimate;
 
   const handlePay = async () => {
     if (!event) return;
-
-    // Before enrollEvent: PayU rejects a bad phone at the end of the flow, leaving an
-    // unpayable enrollment behind. Server stays the authority; this just routes to the fix.
-    if (totalPayable > 0 && !hasPayablePhone) {
-      // The cached profile still holds the old number while its refetch is in flight, which
-      // re-prompted users who had just saved one. Confirm with the server before asking again.
-      const fresh = await refetchMe()
-        .unwrap()
-        .catch(() => null);
-
-      if (!hasTenDigitPhone(fresh?.phoneNumber)) {
-        showConfirm(
-          'Add a mobile number',
-          'Our payment provider needs a 10-digit mobile number before it can take a payment. Add one to your profile and come back — your selection is kept.',
-          () => navigation.navigate('EditProfile' as never),
-          'Add number',
-        );
-        return;
-      }
-    }
 
     try {
       let enrollment: EnrollmentRecord;
@@ -212,28 +186,50 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
 
-      // Opening the modal is the last step: it POSTs the form itself, and the outcome arrives
-      // through onSuccess/onDismiss rather than by awaiting anything here.
-      setPayuOrder(await initiatePayUOrder({ enrollmentId: enrollment.id }).unwrap());
+      // Opening the modal is the last step: Razorpay's checkout drives itself from there and
+      // the outcome arrives through onSuccess/onDismiss rather than by awaiting anything here.
+      const order = await createOrder({ enrollmentId: enrollment.id }).unwrap();
+      setPendingOrder({ enrollmentId: enrollment.id, order });
     } catch (e: any) {
       showAlert("Couldn't complete payment", extractErrorMessage(e, 'Something went wrong. Please try again.'));
     }
   };
 
-  // The backend already verified PayU's reverse hash before the page that reports this, so
-  // there is nothing left to confirm client-side — only the stale enrollment list to drop.
-  const handlePayUSuccess = () => {
-    setPayuOrder(null);
-    dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
-    showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
-      navigation.navigate('Bookings' as any),
-    );
+  // Razorpay reports success from inside its own checkout, so unlike PayU's server-verified
+  // redirect the signature still has to be confirmed by the backend before this screen can
+  // call the ticket paid.
+  const handleRazorpaySuccess = async (payload: RazorpaySuccessPayload) => {
+    const enrollmentId = pendingOrder?.enrollmentId;
+    setPendingOrder(null);
+    if (!enrollmentId) return;
+
+    try {
+      await verifyPayment({
+        enrollmentId,
+        razorpayOrderId: payload.razorpay_order_id,
+        razorpayPaymentId: payload.razorpay_payment_id,
+        razorpaySignature: payload.razorpay_signature,
+      }).unwrap();
+      showAlert('Booked!', 'Your payment was successful and your ticket is confirmed.', () =>
+        navigation.navigate('Bookings' as any),
+      );
+    } catch {
+      // The money has very likely been taken, and Razorpay's webhook is the durable
+      // confirmation path — so a failed client-side verify must not be reported as a failed
+      // payment, or the user pays twice.
+      dispatch(eventsApi.util.invalidateTags(['MyEnrollments']));
+      showAlert(
+        'Confirming your payment',
+        "We're still confirming this with your bank. Your ticket will appear in My Bookings shortly — please don't pay again.",
+        () => navigation.navigate('Bookings' as any),
+      );
+    }
   };
 
   // Covers both a failed payment and the user closing the sheet — the enrollment stays
   // pending either way, so this screen can resume it.
-  const handlePayUDismiss = () => {
-    setPayuOrder(null);
+  const handleRazorpayDismiss = () => {
+    setPendingOrder(null);
     showAlert('Payment not completed', 'You can try again anytime from My Bookings.');
   };
 
@@ -539,11 +535,13 @@ const CheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
         </SpringPressable>
       </View>
 
-      <PayUCheckoutModal
-        visible={!!payuOrder}
-        order={payuOrder}
-        onSuccess={handlePayUSuccess}
-        onDismiss={handlePayUDismiss}
+      <RazorpayCheckoutModal
+        visible={!!pendingOrder}
+        order={pendingOrder?.order ?? null}
+        description={event?.title ?? 'Event ticket'}
+        prefill={{ email: me?.email, contact: me?.phoneNumber ?? undefined }}
+        onSuccess={handleRazorpaySuccess}
+        onDismiss={handleRazorpayDismiss}
       />
 
       {/* Overflow (⋮) menu */}

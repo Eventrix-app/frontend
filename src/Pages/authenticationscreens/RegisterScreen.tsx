@@ -46,7 +46,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   // validation and rely entirely on the backend to reject it.
   const isEmailValid = email.trim() !== '' && email.includes('@');
   // Required here so checkout never has to interrupt a payment to collect it. Mirrors the
-  // server's toTenDigitMobile, which is what decides whether PayU will accept the number.
+  // server's toTenDigitMobile, which is what the backend validates the number against.
   const isPhoneValid = (() => {
     const digits = phoneNumber.replace(/\D/g, '');
     return (digits.length > 10 ? digits.slice(-10) : digits).length === 10;

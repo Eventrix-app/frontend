@@ -14,7 +14,7 @@ export interface RegisterCredentials {
   firstName: string;
   lastName: string;
   // Required: CreateUserDto rejects a signup without one, and the server normalises it to
-  // the 10 digits PayU needs so checkout never has to stop and ask.
+  // the 10 digits checkout prefills with, so it never has to stop and ask.
   phoneNumber: string;
   dateOfBirth: string; // 'YYYY-MM-DD' — backend enforces a minimum age of 18
   deviceLabel?: string;
