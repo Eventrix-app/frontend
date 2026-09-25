@@ -4,48 +4,126 @@ import { StatusBar } from 'expo-status-bar';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
-import {
-  ZalandoSansExpanded_200ExtraLight,
-  ZalandoSansExpanded_300Light,
-  ZalandoSansExpanded_400Regular,
-  ZalandoSansExpanded_500Medium,
-  ZalandoSansExpanded_600SemiBold,
-  ZalandoSansExpanded_700Bold,
-  ZalandoSansExpanded_800ExtraBold,
-  ZalandoSansExpanded_900Black,
-} from '@expo-google-fonts/zalando-sans-expanded';
-import {
-  Poppins_200ExtraLight,
-  Poppins_300Light,
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  Poppins_900Black,
-} from '@expo-google-fonts/poppins';
+// Imported per weight rather than from each family's package root. The root index
+// re-exports every weight *and* every italic, and each of those modules require()s its own
+// .ttf — so a barrel import made Metro bundle all 38 font files (~3.1 MB) when only these
+// 16 are ever passed to useFonts below. The per-weight paths pull in exactly one file each.
+import { ZalandoSansExpanded_200ExtraLight } from '@expo-google-fonts/zalando-sans-expanded/200ExtraLight';
+import { ZalandoSansExpanded_300Light } from '@expo-google-fonts/zalando-sans-expanded/300Light';
+import { ZalandoSansExpanded_400Regular } from '@expo-google-fonts/zalando-sans-expanded/400Regular';
+import { ZalandoSansExpanded_500Medium } from '@expo-google-fonts/zalando-sans-expanded/500Medium';
+import { ZalandoSansExpanded_600SemiBold } from '@expo-google-fonts/zalando-sans-expanded/600SemiBold';
+import { ZalandoSansExpanded_700Bold } from '@expo-google-fonts/zalando-sans-expanded/700Bold';
+import { ZalandoSansExpanded_800ExtraBold } from '@expo-google-fonts/zalando-sans-expanded/800ExtraBold';
+import { ZalandoSansExpanded_900Black } from '@expo-google-fonts/zalando-sans-expanded/900Black';
+import { Poppins_200ExtraLight } from '@expo-google-fonts/poppins/200ExtraLight';
+import { Poppins_300Light } from '@expo-google-fonts/poppins/300Light';
+import { Poppins_400Regular } from '@expo-google-fonts/poppins/400Regular';
+import { Poppins_500Medium } from '@expo-google-fonts/poppins/500Medium';
+import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
+import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
+import { Poppins_800ExtraBold } from '@expo-google-fonts/poppins/800ExtraBold';
+import { Poppins_900Black } from '@expo-google-fonts/poppins/900Black';
 import { store, persistor } from './src/store';
 import { AppDispatch, RootState } from './src/store';
 import RootNavigator from './src/navigation/RootNavigator';
 import NetworkGate from './src/components/common/NetworkGate';
 import { syncOnboardingDraft } from './src/utils/syncOnboardingDraft';
+import { registerForPushNotifications } from './src/utils/registerForPushNotifications';
+import { useRefreshMutation } from './src/store/services/authApi';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import ServerGate from './src/components/common/ServerGate';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
-// Keep the native splash screen up until both the Redux persist rehydration (handled by
-// PersistGate below) and these font files are ready, so no screen ever flashes with the
-// system fallback font before Zalando Sans Expanded / Poppins are available.
+// Keep the native splash screen up until Redux persist rehydration (handled by
+// PersistGate below), these font files, and — for the logged-out flow — the intro video
+// are all ready. See SplashGate and SplashScreen.tsx (the video screen) for the two
+// places that actually call hideAsync().
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Governs how a push is presented while the app is in the foreground — without this,
+// Expo's default is to suppress the OS alert/sound entirely while the app is open. The
+// actual "show a banner / update the list" behavior for a foreground push lives in
+// RootNavigator's notification listeners, which is where navigation + the notifications
+// cache are both reachable.
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    // Reel-upload progress re-posts itself every few percent (see reelUploadManager). On the
+    // default treatment that would mean a sound and a heads-up banner a dozen times over a
+    // single upload, so it is presented silently and only in the tray/list. Everything else
+    // — real server pushes — keeps the alerting treatment below.
+    const isUploadProgress = notification.request.content.data?.type === 'reel-upload';
+    if (isUploadProgress) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: true,
+      };
+    }
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
+});
+
+// Only the logged-out flow (AuthNavigator) mounts the video Splash screen, which hides
+// the native splash itself once the video reports readyToPlay (see SplashScreen.tsx) —
+// that hand-off is deliberately deferred so there's no blank flash between the native
+// splash and the video's first frame. Authenticated/admin users skip straight to
+// Main/AdminRedirect and never mount that screen, so hide the native splash here
+// instead, mirroring RootNavigator's own isAdmin/isAuthenticated routing decision.
+function SplashGate() {
+  const { isAuthenticated, user } = useSelector((s: RootState) => s.auth);
+  const isAdmin = isAuthenticated && (user?.roles ?? []).includes('admin');
+
+  useEffect(() => {
+    if (isAdmin || isAuthenticated) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
+// "auto" would follow the OS color scheme, not the app's own theme choice — once a user
+// manually toggles dark mode (ThemeContext persists that override independent of the OS
+// setting, see ThemeContext.tsx), the status bar needs to track that choice instead.
+function ThemedStatusBar() {
+  const { theme } = useTheme();
+  return <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />;
+}
 
 function AppStateSync() {
   const dispatch = useDispatch<AppDispatch>();
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
   const isSynced = useSelector((s: RootState) => s.onboardingDraft.isSynced);
   const appState = useRef(AppState.currentState);
+  const [refresh] = useRefreshMutation();
+
+  // Extends the session on launch (covers: app was killed while logged in and reopened
+  // later) — if the persisted token already expired (2+ days unused), this 401s and
+  // authErrorMiddleware turns that into an automatic logout; no manual error handling
+  // needed here. Also re-registers for push here — LoginScreen/RegisterScreen cover the
+  // fresh-login case, this covers "already logged in, app relaunched" (Expo push tokens
+  // can change across app reinstalls/updates, so this isn't a one-time-ever registration).
+  useEffect(() => {
+    if (isAuthenticated) {
+      refresh();
+      registerForPushNotifications(dispatch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
@@ -53,17 +131,23 @@ function AppStateSync() {
         appState.current.match(/inactive|background/) && next === 'active';
       appState.current = next;
 
-      if (comingToForeground && isAuthenticated && !isSynced) {
-        syncOnboardingDraft(dispatch, store.getState);
+      if (comingToForeground && isAuthenticated) {
+        // Same sliding-session refresh as on launch, triggered on every foreground so a
+        // daily-active user's session never expires; only 2+ days of not opening the app
+        // at all lets the token actually lapse.
+        refresh();
+        if (!isSynced) {
+          syncOnboardingDraft(dispatch, store.getState);
+        }
       }
     });
     return () => sub.remove();
-  }, [isAuthenticated, isSynced, dispatch]);
+  }, [isAuthenticated, isSynced, dispatch, refresh]);
 
   return null;
 }
 
-export default function App() {
+function App() {
   const [fontsLoaded, fontError] = useFonts({
     ZalandoSansExpanded_200ExtraLight,
     ZalandoSansExpanded_300Light,
@@ -83,14 +167,6 @@ export default function App() {
     Poppins_900Black,
   });
 
-  useEffect(() => {
-    // Don't block forever on a font-load failure (e.g. offline first install) — fall back
-    // to the system font rather than leaving the app stuck behind the splash screen.
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [fontsLoaded, fontError]);
-
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -99,21 +175,24 @@ export default function App() {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <BottomSheetModalProvider>
-            <SafeAreaProvider>
-              <AppStateSync />
-              <NetworkGate>
-                 <ServerGate>
-                  <ErrorBoundary>
-                    <RootNavigator />
-                  </ErrorBoundary>
-                 </ServerGate>
-              </NetworkGate>
-              <StatusBar style="auto" />
-            </SafeAreaProvider>
-          </BottomSheetModalProvider>
+          <ThemeProvider>
+              <SafeAreaProvider>
+                <SplashGate />
+                <AppStateSync />
+                <NetworkGate>
+                   <ServerGate>
+                    <ErrorBoundary>
+                      <RootNavigator />
+                    </ErrorBoundary>
+                   </ServerGate>
+                </NetworkGate>
+                <ThemedStatusBar />
+              </SafeAreaProvider>
+          </ThemeProvider>
         </GestureHandlerRootView>
       </PersistGate>
     </Provider>
   );
 }
+
+export default App;

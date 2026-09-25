@@ -1,4 +1,7 @@
 import 'react-native-gesture-handler';
+// Polyfills global.crypto.getRandomValues, which crypto-js needs for the AES salt/IV in
+// checkInEncryptedStorage. Without it every offline check-in cache write throws.
+import 'react-native-get-random-values';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

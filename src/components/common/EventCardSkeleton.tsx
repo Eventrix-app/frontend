@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Card from './Card';
 import Skeleton from './Skeleton';
-import theme from '../../theme';
+import { spacing } from '../../theme/spacing';
 
 const EventCardSkeleton: React.FC = () => {
   return (
@@ -20,19 +20,19 @@ const EventCardSkeleton: React.FC = () => {
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   image: {
-    marginBottom: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   title: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: spacing.sm,
   },
   date: {
-    marginBottom: theme.spacing.xs,
+    marginBottom: spacing.xs,
   },
   location: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: spacing.sm,
   },
   footer: {
     flexDirection: 'row',

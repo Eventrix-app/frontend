@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
+
+// require() takes a static literal, so both variants are resolved at module load and
+// picked at render — the bundler cannot follow a computed path.
+const LIGHT_ILLUSTRATION = require('../../../assets/shared/placeholders/error.png');
+const DARK_ILLUSTRATION = require('../../../assets/shared/placeholders/error-black.png');
+import { LeftArrow } from './Icons';
 
 interface Props {
   onBack: () => void;
@@ -16,11 +22,12 @@ const ErrorScreen: React.FC<Props> = ({
   title = 'Oops, something went wrong',
   subtitle = 'Try again in a moment.',
 }) => {
+  const { colors, theme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.root}>
       <Image
-        // TODO: swap for your actual asset path, e.g. require('../../../assets/Error.png')
-        source={require('../../../assets/Error.png')}
+        source={theme === 'dark' ? DARK_ILLUSTRATION : LIGHT_ILLUSTRATION}
         style={styles.illustration}
         resizeMode="contain"
       />
@@ -30,7 +37,7 @@ const ErrorScreen: React.FC<Props> = ({
 
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.85}>
-          <Text style={styles.backIcon}>←</Text>
+          <LeftArrow color={colors.brandPink} size={15} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
@@ -43,10 +50,10 @@ const ErrorScreen: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F3EF',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
@@ -82,11 +89,6 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-  },
-  backIcon: {
-    color: colors.brandPink,
-    fontSize: 15,
-    fontWeight: '700',
   },
   backText: {
     color: colors.brandPink,

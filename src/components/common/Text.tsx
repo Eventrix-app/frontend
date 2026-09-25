@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { ZalandoSansExpanded, Poppins } from '../../theme/fonts';
 
 export type TextVariant =
@@ -33,7 +33,7 @@ const VARIANT_STYLES: Record<TextVariant, TextStyle> = {
 
 export interface TextProps extends RNTextProps {
   variant?: TextVariant;
-  color?: keyof typeof colors;
+  color?: keyof ReturnType<typeof useTheme>['colors'];
 }
 
 // Drop-in replacement for RN's <Text>: every screen imports this instead, so body copy
@@ -41,13 +41,16 @@ export interface TextProps extends RNTextProps {
 // styles. A `style` prop that sets its own fontFamily (e.g. a title style overridden to
 // Zalando Sans Expanded) always wins, since it's applied after the variant default below.
 const Text = React.forwardRef<RNText, TextProps>(
-  ({ variant = 'body', color, style, ...rest }, ref) => (
-    <RNText
-      ref={ref}
-      style={[VARIANT_STYLES[variant], color ? { color: colors[color] } : null, style]}
-      {...rest}
-    />
-  )
+  ({ variant = 'body', color, style, ...rest }, ref) => {
+    const { colors } = useTheme();
+    return (
+      <RNText
+        ref={ref}
+        style={[VARIANT_STYLES[variant], color ? { color: colors[color] } : null, style]}
+        {...rest}
+      />
+    );
+  }
 );
 Text.displayName = 'Text';
 

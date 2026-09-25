@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { AuthInput } from '../../components/auth/AuthInput';
 import { AuthActions, OutlineButtonRow } from '../../components/auth/AuthActions';
 import { LegalFooter } from '../../components/auth/LegalFooter';
 import { AuthStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
-import { borderRadius } from '../../theme/borderRadius';
-import GlassSurface from '../../components/common/GlassSurface';
 import { useResetPasswordMutation } from '../../store/services/authApi';
+import { SpringPressable } from '../../components/common/SpringPressable';
 import { Text } from '../../components/common/Text';
+import { WarningIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'UpdatePassword'>;
 
@@ -25,6 +25,8 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isSuccess, setIsSuccess] = useState(false);
 
   const [resetPassword, { isLoading }] = useResetPasswordMutation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Requirements check matching mockup
   const hasMinLength = password.length >= 8;
@@ -49,10 +51,10 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
 
     try {
       setErrorMessage(null);
-      await resetPassword({ token: otp.trim(), password }).unwrap();
+      await resetPassword({ email, token: otp.trim(), password }).unwrap();
       setIsSuccess(true);
     } catch (err: any) {
-      console.error('Reset password error:', err);
+      if (__DEV__) console.error('Reset password error:', err);
       if (err.data && err.data.message) {
         if (Array.isArray(err.data.message)) {
           setErrorMessage(err.data.message.join(', '));
@@ -83,24 +85,32 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
         centerTitle
       >
         <View style={styles.successContainer}>
-          <GlassSurface variant="solid" style={styles.successIconGlass} contentStyle={styles.successIconContent}>
-            <Text style={styles.successIcon}>✓</Text>
-          </GlassSurface>
-          
+          <View style={styles.successIconGlass}>
+            <View style={styles.successIconContent}>
+              <Text style={styles.successIcon}>✓</Text>
+            </View>
+          </View>
+
           <Text style={styles.successTitle}>All Set!</Text>
           <Text style={styles.successText}>
             You can now log in to your account with your new password.
           </Text>
 
-          <TouchableOpacity
+          {/* Scale, not fade: loginBtn is an elevated solid surface, and fading a subtree
+              containing an Android elevation paints its shadow as an opaque rectangle over
+              the button while pressed. */}
+          <SpringPressable
             style={styles.loginBtnWrap}
             onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.9}
+            scaleTo={0.97}
+            accessibilityLabel="Back to Log In"
           >
-            <GlassSurface variant="solid" style={styles.loginBtn} contentStyle={styles.loginBtnContent}>
-              <Text style={styles.loginBtnText}>Back to Log In</Text>
-            </GlassSurface>
-          </TouchableOpacity>
+            <View style={styles.loginBtn}>
+              <View style={styles.loginBtnContent}>
+                <Text style={styles.loginBtnText}>Back to Log In</Text>
+              </View>
+            </View>
+          </SpringPressable>
         </View>
         <LegalFooter />
       </AuthLayout>
@@ -125,7 +135,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Create Password"
         value={password}
         onChangeText={(text) => {
@@ -136,7 +146,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <AuthInput
-        icon={require('../../../assets/login screen/input-placeholders/lock.png')}
+        icon={require('../../../assets/auth/lock.png')}
         placeholder="Confirm Password"
         value={confirm}
         onChangeText={(text) => {
@@ -192,8 +202,9 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
       )}
 
       {errorMessage ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        <View style={[styles.errorContainer, styles.errorRow]}>
+          <WarningIcon color={colors.errorSoftText} size={16} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -221,7 +232,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   spacer: {
     height: spacing.md,
   },
@@ -238,18 +249,24 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEB',
-    borderColor: '#FFD1D1',
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
     borderWidth: 1,
     borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.errorSoftText,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
@@ -265,6 +282,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   successIconContent: {
     width: 80,
@@ -299,6 +325,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandPink,
     height: 56,
     borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: { elevation: 6 },
+      default: {
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+      },
+    }),
   },
   loginBtnContent: {
     flexDirection: 'row',
@@ -324,13 +360,13 @@ const styles = StyleSheet.create({
   },
   reqHeaderTitle: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.5)',
+    color: colors.textMuted,
       fontFamily: 'ZalandoSansExpanded_500Medium'
 },
   reqHeaderLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   reqRow: {
     flexDirection: 'row',
@@ -342,13 +378,13 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reqCheckMet: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: colors.success,
+    borderColor: colors.success,
   },
   reqCheckText: {
     color: colors.white,
@@ -357,10 +393,10 @@ const styles = StyleSheet.create({
   },
   reqLabel: {
     fontSize: 14,
-    color: 'rgba(0,0,0,0.4)',
+    color: colors.textMuted,
   },
   reqLabelMet: {
-    color: '#1A1A2E',
+    color: colors.text,
     fontWeight: '500',
   },
 });

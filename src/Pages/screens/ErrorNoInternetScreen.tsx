@@ -1,28 +1,35 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/spacing';
 import { borderRadius } from '../../theme/borderRadius';
 import { Text } from '../../components/common/Text';
+import { RadioTowerIcon } from '../../components/common/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ErrorNoInternet'>;
 
-const ErrorNoInternetScreen: React.FC<Props> = ({ navigation }) => (
-  <View style={styles.root}>
-    <Text style={styles.icon}>📡</Text>
-    <Text style={styles.title}>No Internet Connection</Text>
-    <Text style={styles.subtitle}>
-      Please check your connection and try again. We'll reload your events when you're back online.
-    </Text>
-    <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()}>
-      <Text style={styles.btnText}>Try Again</Text>
-    </TouchableOpacity>
-  </View>
-);
+const ErrorNoInternetScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.root}>
+      <View style={styles.icon}>
+        <RadioTowerIcon color={colors.textSecondary} size={64} />
+      </View>
+      <Text style={styles.title}>No Internet Connection</Text>
+      <Text style={styles.subtitle}>
+        Please check your connection and try again. We'll reload your events when you're back online.
+      </Text>
+      <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()}>
+        <Text style={styles.btnText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
@@ -31,7 +38,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   icon: {
-    fontSize: 64,
     marginBottom: spacing.lg,
   },
   title: {

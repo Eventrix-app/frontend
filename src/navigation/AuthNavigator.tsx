@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthStackParamList } from './types';
 import SplashScreen from '../Pages/splashscreen/SplashScreen';
+import CompleteProfileScreen from '../Pages/onboardscreen/CompleteProfileScreen';
 import OnboardingScreen from '../Pages/onboardscreen/OnboardingScreen';
 import InterestSelectionScreen from '../Pages/interestselection/InterestSelectionScreen';
 import LocationAccessScreen from '../Pages/personalization-modules/LocationAccessScreen';
@@ -10,6 +11,7 @@ import LoginScreen from '../Pages/authenticationscreens/LoginScreen';
 import RegisterScreen from '../Pages/authenticationscreens/RegisterScreen';
 import ForgotPasswordScreen from '../Pages/authenticationscreens/ForgotPasswordScreen';
 import UpdatePasswordScreen from '../Pages/authenticationscreens/UpdatePasswordScreen';
+import AdminOtpScreen from '../Pages/authenticationscreens/AdminOtpScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -22,6 +24,7 @@ const AuthNavigator = () => {
       initialRouteName="Splash"
     >
       <Stack.Screen name="Splash" component={SplashScreen} options={{ animation: 'none' }} />
+      <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: 'none' }} />
       <Stack.Screen name="InterestSelection" component={InterestSelectionScreen} />
       <Stack.Screen name="LocationAccess" component={LocationAccessScreen} />
@@ -30,6 +33,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="UpdatePassword" component={UpdatePasswordScreen} />
+      <Stack.Screen name="AdminOtp" component={AdminOtpScreen} />
     </Stack.Navigator>
   );
 };
